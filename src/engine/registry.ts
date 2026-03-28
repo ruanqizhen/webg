@@ -136,10 +136,45 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     // Usually handled dynamically when building context in graph editor
     inputs: [{ name: 'input', type: 'any' }],
     outputs: [{ name: 'output', type: 'any' }],
-    executor: (ctx) => {
+     executor: (ctx) => {
        // Terminal logic: For controls, value is already injected into outputs by initialization.
        // For indicators, value received on input is the outcome.
        return { outputs: { output: ctx.inputs.input !== undefined ? ctx.inputs.input : ctx.params.value } };
     }
+  },
+
+  // Structures & Tunnels
+  'io.tunnel': {
+    type: 'io.tunnel',
+    label: 'Tunnel',
+    inputs: [{ id: 'input', name: 'input', type: 'any', direction: 'input' }],
+    outputs: [{ id: 'output', name: 'output', type: 'any', direction: 'output' }],
+    executor: async (ctx) => {
+      return { outputs: { output: ctx.inputs.input } };
+    }
+  },
+  'structure.forLoop': {
+    type: 'structure.forLoop',
+    label: 'For Loop',
+    inputs: [{ id: 'N', name: 'N', type: 'number', direction: 'input' }],
+    outputs: [{ id: 'i', name: 'i', type: 'number', direction: 'output' }],
+    params: [],
+    executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
+  },
+  'structure.whileLoop': {
+    type: 'structure.whileLoop',
+    label: 'While Loop',
+    inputs: [{ id: 'stop', name: 'stop', type: 'boolean', direction: 'input' }],
+    outputs: [],
+    params: [],
+    executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
+  },
+  'structure.case': {
+    type: 'structure.case',
+    label: 'Case Structure',
+    inputs: [{ id: 'selector', name: 'selector', type: 'any', direction: 'input' }],
+    outputs: [],
+    params: [{ name: 'activeCase', type: 'string', defaultValue: 'true' }],
+    executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   }
 };

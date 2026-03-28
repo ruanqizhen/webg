@@ -19,8 +19,18 @@ import { useUIStore } from '../../store/useUIStore';
 import { BaseNode } from './nodes/BaseNode';
 import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
+import { StructureNode } from './nodes/StructureNode';
+import { TunnelNode } from './nodes/TunnelNode';
 
+const NODE_TYPES = { 
+  custom: BaseNode, 
+  'structure.forLoop': StructureNode,
+  'structure.whileLoop': StructureNode,
+  'structure.case': StructureNode,
+  'io.tunnel': TunnelNode 
+};
 
+const EDGE_TYPES = { custom: CustomEdge };
 
 export function GraphEditor() {
   const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
@@ -86,17 +96,53 @@ export function GraphEditor() {
 
       addGraphEdge({
         id: `e_${connection.source}_${connection.sourceHandle}-${connection.target}_${connection.targetHandle}`,
-        sourceNode: connection.source,
-        sourcePort: connection.sourceHandle,
-        targetNode: connection.target,
-        targetPort: connection.targetHandle
+        sourceNode: connection.source!,
+        sourcePort: connection.sourceHandle!,
+        targetNode: connection.target!,
+        targetPort: connection.targetHandle!
       });
     },
     [nodes, addGraphEdge]
   );
 
-  const memoizedNodeTypes = useMemo(() => ({ custom: BaseNode }), []);
-  const memoizedEdgeTypes = useMemo(() => ({ custom: CustomEdge }), []);
+  const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
+    // Basic bounds checking for parent assignment
+    // React Flow position is relative to parent!
+    // So if it ALREADY has a parent, we don't dynamically reparent easily unless we do absolute coordinate math.
+    // For simplicity in this demo, we only assign parent if it has NO parent and is dropped into a structure.
+    if (!node.parentNode) {
+       const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
+       for (const s of structures) {
+          const sX = s.position.x;
+          const sY = s.position.y;
+          const sW = s.width || 300;
+          const sH = s.height || 200;
+          if (node.position.x > sX && node.position.x < sX + sW &&
+              node.position.y > sY && node.position.y < sY + sH) {
+             // Change to child
+             updateNode(node.id, { 
+                 parent: s.id, 
+                 position: { x: node.position.x - sX, y: node.position.y - sY }
+             });
+             break;
+          }
+       }
+    } else {
+       // If it is dragged OUTSIDE its parent bounds, un-parent it.
+       const parentNode = flowNodes.find(n => n.id === node.parentNode);
+       if (parentNode) {
+          const pW = parentNode.width || 300;
+          const pH = parentNode.height || 200;
+          if (node.position.x < 0 || node.position.x > pW || node.position.y < 0 || node.position.y > pH) {
+             // Detach
+             updateNode(node.id, { 
+                 parent: undefined, 
+                 position: { x: parentNode.position.x + node.position.x, y: parentNode.position.y + node.position.y }
+             });
+          }
+       }
+    }
+  }, [flowNodes, updateNode]);
 
   return (
     <div className="w-full h-full flex-grow relative" onClick={() => setSelectedNodeId(null)}>
@@ -106,8 +152,9 @@ export function GraphEditor() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        nodeTypes={memoizedNodeTypes}
-        edgeTypes={memoizedEdgeTypes}
+        onNodeDragStop={onNodeDragStop}
+        nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
       >

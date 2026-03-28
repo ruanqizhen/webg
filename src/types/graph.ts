@@ -1,4 +1,4 @@
-export type DataType = 'number' | 'boolean' | 'string' | 'array';
+export type DataType = 'number' | 'boolean' | 'string' | 'array' | 'any';
 
 export interface Port {
   id: string;

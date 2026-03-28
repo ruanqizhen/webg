@@ -24,8 +24,10 @@ export interface NodeContext {
 export type NodeExecutor = (ctx: NodeContext) => NodeResult | Promise<NodeResult>;
 
 export interface PortDefinition {
+  id?: string;
   name: string;
   type: string;
+  direction?: 'input' | 'output';
 }
 
 export interface ParamDefinition {

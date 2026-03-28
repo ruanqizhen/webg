@@ -38,10 +38,38 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   }),
 
   addEdge: (newEdge) => set((state) => {
-    // Single input limitation: remove any existing edge going to the same target port
+    const sourceNode = state.nodes.find(n => n.id === newEdge.sourceNode);
+    const targetNode = state.nodes.find(n => n.id === newEdge.targetNode);
+
     const filteredEdges = state.edges.filter(e => 
       !(e.targetNode === newEdge.targetNode && e.targetPort === newEdge.targetPort)
     );
+
+    if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
+       const tunnelId = crypto.randomUUID();
+       // Attach tunnel to the inner nested level visually
+       const tunnelParent = targetNode.parent ? targetNode.parent : sourceNode.parent;
+       
+       const tunnelNode: NodeInstance = {
+         id: tunnelId,
+         type: 'io.tunnel',
+         position: { x: 10, y: 10 }, 
+         parent: tunnelParent,
+         inputs: [], outputs: [], params: {}
+       };
+       const edge1: Edge = {
+         id: `e_${newEdge.sourceNode}_${newEdge.sourcePort}-${tunnelId}_input`,
+         sourceNode: newEdge.sourceNode, sourcePort: newEdge.sourcePort,
+         targetNode: tunnelId, targetPort: 'input'
+       };
+       const edge2: Edge = {
+         id: `e_${tunnelId}_output-${newEdge.targetNode}_${newEdge.targetPort}`,
+         sourceNode: tunnelId, sourcePort: 'output',
+         targetNode: newEdge.targetNode, targetPort: newEdge.targetPort
+       };
+       return { nodes: [...state.nodes, tunnelNode], edges: [...filteredEdges, edge1, edge2] };
+    }
+
     return { edges: [...filteredEdges, newEdge] };
   }),
 
