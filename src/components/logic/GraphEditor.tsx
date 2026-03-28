@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import ReactFlow, { 
   Background, 
   Controls, 
@@ -22,17 +22,18 @@ import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
 
-const NODE_TYPES = { 
-  custom: BaseNode, 
-  'structure.forLoop': StructureNode,
-  'structure.whileLoop': StructureNode,
-  'structure.case': StructureNode,
-  'io.tunnel': TunnelNode 
-};
-
-const EDGE_TYPES = { custom: CustomEdge };
-
 export function GraphEditor() {
+  // Use useRef to keep the exact same object reference even across Vite HMR hot-reloads
+  const nodeTypes = useRef({ 
+    custom: BaseNode, 
+    'structure.forLoop': StructureNode,
+    'structure.whileLoop': StructureNode,
+    'structure.case': StructureNode,
+    'io.tunnel': TunnelNode 
+  }).current;
+
+  const edgeTypes = useRef({ custom: CustomEdge }).current;
+
   const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
   const { setSelectedNodeId } = useUIStore();
 
@@ -153,8 +154,8 @@ export function GraphEditor() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
-        nodeTypes={NODE_TYPES}
-        edgeTypes={EDGE_TYPES}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
       >
