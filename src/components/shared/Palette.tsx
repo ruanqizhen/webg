@@ -4,6 +4,42 @@ import { NodeRegistry } from '../../engine/registry';
 import { getNodeColor } from '../../lib/colors';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId } from '../../lib/utils';
+import { 
+  Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
+  PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
+  EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box
+} from 'lucide-react';
+
+const UI_ICONS: Record<string, any> = {
+  numberInput: Hash,
+  button: Pointer,
+  numberIndicator: SquareAsterisk,
+  textLabel: Type,
+  gauge: Gauge,
+  indicatorLight: Lightbulb,
+};
+
+const LOGIC_ICONS: Record<string, any> = {
+  'source.number': Hash,
+  'source.boolean': ToggleLeft,
+  'source.string': Type,
+  'math.add': PlusSquare,
+  'math.subtract': MinusSquare,
+  'math.multiply': XSquare,
+  'math.divide': DivideSquare,
+  'logic.greater': ChevronRightSquare,
+  'logic.less': ChevronLeftSquare,
+  'logic.equal': EqualSquare,
+  'logic.and': GitMerge,
+  'logic.or': GitBranch,
+  'logic.not': Ban,
+  'sink.display': TerminalSquare,
+  'sink.log': ClipboardList,
+  'structure.forLoop': Repeat,
+  'structure.whileLoop': RefreshCw,
+  'structure.case': Layers,
+  'io.tunnel': ArrowRightSquare
+};
 
 const UI_CONTROLS = [
   { type: 'numberInput', label: 'Number Input' },
@@ -127,32 +163,40 @@ export function Palette() {
           Object.entries(filteredCategories).map(([cat, nodes]: any) => (
              <div key={cat} className="flex flex-col gap-2">
                 <div className="text-xs font-semibold text-gray-500 capitalize px-1">{cat}</div>
-                {nodes.map((node: any) => (
-                   <div 
-                     key={node.type}
-                     className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing flex items-center border-l-4"
-                     style={{ borderLeftColor: getNodeColor(cat) }}
-                     onDragStart={(e) => handleDragStartLogic(e, node.type)}
-                     onClick={() => handleClickLogic(node.type)}
-                     draggable
-                   >
-                     {node.label}
-                   </div>
-                ))}
+                {nodes.map((node: any) => {
+                   const Icon = LOGIC_ICONS[node.type] || Box;
+                   return (
+                     <div 
+                       key={node.type}
+                       className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing flex items-center border-l-4 gap-2"
+                       style={{ borderLeftColor: getNodeColor(cat) }}
+                       onDragStart={(e) => handleDragStartLogic(e, node.type)}
+                       onClick={() => handleClickLogic(node.type)}
+                       draggable
+                     >
+                       <Icon className="w-4 h-4 text-gray-400" />
+                       <span className="truncate">{node.label}</span>
+                     </div>
+                   );
+                })}
              </div>
           ))
         ) : (
           <div className="flex flex-col gap-2">
              <div className="text-xs font-semibold text-gray-500 px-1">CONTROLS & INDICATORS</div>
-             {filteredUIControls.map((ctrl) => (
-               <div
-                 key={ctrl.type}
-                 className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all active:scale-95"
-                 onClick={() => handleClickUI(ctrl)}
-               >
-                 {ctrl.label}
-               </div>
-             ))}
+             {filteredUIControls.map((ctrl) => {
+               const Icon = UI_ICONS[ctrl.type] || Box;
+               return (
+                 <div
+                   key={ctrl.type}
+                   className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all active:scale-95 flex items-center"
+                   onClick={() => handleClickUI(ctrl)}
+                 >
+                   <Icon className="w-4 h-4 mr-2 text-purple-500" />
+                   {ctrl.label}
+                 </div>
+               );
+             })}
           </div>
         )}
         
