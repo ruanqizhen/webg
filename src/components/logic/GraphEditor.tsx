@@ -22,7 +22,23 @@ import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
-import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+
+const initialNodeTypes: any = {
+  custom: BaseNode,
+  'structure.forLoop': StructureNode,
+  'structure.whileLoop': StructureNode,
+  'structure.case': StructureNode,
+  'io.tunnel': TunnelNode
+};
+
+// Register all primitive and basic logic/math nodes to BaseNode custom renderer
+Object.keys(NodeRegistry).forEach(key => {
+  if (!initialNodeTypes[key]) {
+    initialNodeTypes[key] = BaseNode;
+  }
+});
+
+const initialEdgeTypes: any = { custom: CustomEdge };
 
 // Inner component that uses useReactFlow - rendered INSIDE ReactFlow
 function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
@@ -30,25 +46,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
   const { setSelectedNodeId, setSelectedEdgeId } = useUIStore();
   const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
 
-  // Memoize nodeTypes and edgeTypes to prevent React Flow warnings
-  const nodeTypes = useMemo(() => ({
-    custom: BaseNode,
-    'structure.forLoop': StructureNode,
-    'structure.whileLoop': StructureNode,
-    'structure.case': StructureNode,
-    'io.tunnel': TunnelNode
-  }), []);
-
-  const edgeTypes = useMemo(() => ({
-    custom: CustomEdge
-  }), []);
-
-  // Setup keyboard shortcuts
-  useKeyboardShortcuts({
-    onZoomFit: () => {
-      reactFlow.fitView({ padding: 0.2 });
-    }
-  });
 
   // Register zoom fit function with parent ref
   useEffect(() => {
@@ -201,8 +198,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
+        nodeTypes={initialNodeTypes}
+        edgeTypes={initialEdgeTypes}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
         onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}

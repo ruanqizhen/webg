@@ -8,6 +8,7 @@ import { GraphEditor } from '../logic/GraphEditor';
 import { useCallback, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId } from '../../lib/utils';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export function IdeLayout() {
   const { viewMode, setViewMode } = useUIStore();
@@ -17,6 +18,10 @@ export function IdeLayout() {
   const handleZoomFit = useCallback(() => {
     zoomFitRef.current?.();
   }, []);
+
+  useKeyboardShortcuts({
+    onZoomFit: handleZoomFit
+  });
 
   // Load from storage on mount and start auto-save
   useEffect(() => {

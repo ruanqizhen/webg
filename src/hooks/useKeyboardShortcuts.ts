@@ -33,9 +33,11 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       
-      // Don't trigger shortcuts when typing in inputs (except for Delete/Escape)
-      if (isInput && e.key !== 'Delete' && e.key !== 'Backspace' && e.key !== 'Escape') {
-        return;
+      // Don't trigger shortcuts when typing in inputs
+      if (isInput) {
+        if (e.key !== 'Escape') {
+           return; 
+        }
       }
 
       // Copy (Ctrl+C)

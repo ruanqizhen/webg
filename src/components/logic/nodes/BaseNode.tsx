@@ -16,6 +16,55 @@ const CASE_COLORS: Record<string, string> = {
   'default': '#6b7280', // gray
 };
 
+const SHAPE_CONFIGS: Record<string, any> = {
+  'math.add': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '+', size: 48 },
+  'math.subtract': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '-', size: 48 },
+  'math.multiply': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '×', size: 48 },
+  'math.divide': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '÷', size: 48 },
+  'logic.greater': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '>', size: 40 },
+  'logic.less': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '<', size: 40 },
+  'logic.equal': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '=', size: 40 },
+  'logic.and': { shape: 'and-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '&', size: 48 },
+  'logic.or': { shape: 'or-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '≥1', size: 48 },
+  'logic.not': { shape: 'not-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '!', size: 48 },
+};
+
+function renderShape(config: any) {
+  const { shape, color, borderColor } = config;
+  if (shape === 'triangle') {
+    return (
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
+        <polygon points="5,5 95,50 5,95" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (shape === 'square') {
+    return (
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
+        <rect x="5" y="5" width="90" height="90" rx="15" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (shape === 'and-gate') {
+    return (
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
+        <path d="M 5,5 L 50,5 A 45,45 0 0 1 50,95 L 5,95 Z" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (shape === 'or-gate') {
+    return (
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
+        <path d="M 5,5 C 35,5 65,30 95,50 C 65,70 35,95 5,95 C 25,70 25,30 5,5 Z" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
+      </svg>
+    );
+  } else if (shape === 'not-gate') {
+    return (
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
+        <polygon points="5,20 65,50 5,80" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
+        <circle cx="80" cy="50" r="12" fill={color} stroke={borderColor} strokeWidth="6" />
+      </svg>
+    );
+  }
+}
+
 export function BaseNode({ id, data, type, selected }: any) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
@@ -84,6 +133,80 @@ export function BaseNode({ id, data, type, selected }: any) {
     updateNode(id, { breakpoint: !hasBreakpoint });
   };
 
+  const shapeConfig = SHAPE_CONFIGS[type];
+  const isCustomShape = !!shapeConfig;
+
+  // Render logic for custom SVG icon shapes
+  if (isCustomShape) {
+    const size = shapeConfig.size || 50;
+    const { inputs, outputs } = def;
+
+    return (
+      <div 
+        className={`relative flex items-center justify-center transition-all ${selected ? 'ring-2 ring-blue-500 rounded-full bg-blue-500/10' : ''} ${isCurrentStep ? 'ring-4 ring-yellow-400 rounded-lg shadow-yellow-400/50 animate-pulse' : ''} ${caseBorder}`}
+        style={{ width: size, height: size, opacity: nodeOpacity }}
+        onClick={() => setSelectedNodeId(id)}
+      >
+        {renderShape(shapeConfig)}
+        <span 
+          className="relative z-10 font-bold pointer-events-none" 
+          style={{ 
+            color: shapeConfig.borderColor, 
+            fontSize: size * 0.4, 
+            transform: shapeConfig.shape === 'triangle' ? 'translateX(-5px)' : 'none',
+          }}
+        >
+          {shapeConfig.symbol}
+        </span>
+        
+        {/* Handles */}
+        {inputs.map((port: any, idx: number) => {
+           let top = 50;
+           if (inputs.length > 1) {
+             top = 25 + (idx * (50 / (inputs.length - 1)));
+           }
+           if (shapeConfig.shape === 'triangle') top = 30 + (idx * 40); // slightly spread out for triangle flat side
+
+           return (
+             <Handle 
+               key={port.name}
+               type="target" 
+               position={Position.Left} 
+               id={port.name} 
+               style={{ background: getTypeColor(port.type), width: 10, height: 10, left: -6, top: `${top}%` }} 
+               title={`${port.name} (${port.type})`}
+             />
+           );
+        })}
+
+        {outputs.map((port: any, idx: number) => {
+           let top = 50;
+           if (outputs.length > 1) {
+             top = 25 + (idx * (50 / (outputs.length - 1)));
+           }
+           const val = portValues[`${id}_${port.name}`];
+           return (
+             <div key={port.name} className="absolute group" style={{ top: `${top}%`, left: '100%', transform: 'translateY(-50%)' }}>
+               <Handle 
+                 type="source" 
+                 position={Position.Right} 
+                 id={port.name} 
+                 style={{ background: getTypeColor(port.type), width: 10, height: 10, right: 'auto', left: -4, top: '50%' }}
+                 title={`${port.name} (${port.type})`}
+               />
+               {val !== undefined && (
+                 <span className="hidden group-hover:block absolute left-4 -top-3 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-50 whitespace-nowrap pointer-events-none">
+                   {String(val)}
+                 </span>
+               )}
+             </div>
+           );
+        })}
+      </div>
+    );
+  }
+
+  // Generic rectangular node fallback
   return (
     <div
       className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder} ${caseBorder}`}
