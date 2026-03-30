@@ -5,6 +5,17 @@ import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
 
+// Colors for different cases inside Case Structure
+const CASE_COLORS: Record<string, string> = {
+  'true': '#10b981',    // green
+  'false': '#ef4444',   // red
+  '0': '#3b82f6',       // blue
+  '1': '#f59e0b',       // amber
+  '2': '#8b5cf6',       // purple
+  '3': '#ec4899',       // pink
+  'default': '#6b7280', // gray
+};
+
 export function BaseNode({ id, data, type, selected }: any) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
@@ -12,10 +23,18 @@ export function BaseNode({ id, data, type, selected }: any) {
   const currentStepNode = useRuntimeStore(s => s.currentStepNode);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
   const { updateNode, nodes } = useGraphStore();
-  
+
   const node = nodes.find(n => n.id === id);
   const hasBreakpoint = node?.breakpoint || false;
   const isCurrentStep = currentStepNode === id;
+  const caseId = node?.caseId;
+  const parentId = node?.parent;
+  
+  // Find parent case structure to get active case
+  const parentCase = parentId ? nodes.find(n => n.id === parentId) : undefined;
+  const isCaseStructure = parentCase?.type === 'structure.case';
+  const activeCase = parentCase?.params?.activeCase;
+  const isNodeInActiveCase = caseId === activeCase;
 
   if (!def) return <div className="p-2 bg-red-500 text-white rounded">Unknown Node: {type}</div>;
 
@@ -27,10 +46,37 @@ export function BaseNode({ id, data, type, selected }: any) {
   if (nodeState === 'error') stateBorder = 'ring-2 ring-red-500 shadow-red-500/50';
   else if (nodeState === 'running') stateBorder = 'ring-2 ring-blue-500 animate-pulse';
   else if (nodeState === 'done') stateBorder = 'ring-2 ring-green-500';
-  
+
   // Highlight for current step in debug mode
   if (isCurrentStep) {
     stateBorder = 'ring-4 ring-yellow-400 shadow-yellow-400/50 animate-pulse';
+  }
+
+  // Case Structure visual feedback
+  let caseIndicator = null;
+  let nodeOpacity = 1;
+  let caseBorder = '';
+  
+  if (isCaseStructure && caseId) {
+    const caseColor = CASE_COLORS[caseId] || CASE_COLORS['default'];
+    
+    // Add colored top border based on case
+    caseBorder = `border-t-4`;
+    
+    // Show case indicator badge
+    caseIndicator = (
+      <span
+        className="ml-1 px-1.5 py-0.5 text-[8px] font-bold rounded text-white"
+        style={{ backgroundColor: caseColor }}
+      >
+        {caseId}
+      </span>
+    );
+    
+    // Dim nodes not in active case
+    if (!isNodeInActiveCase) {
+      nodeOpacity = 0.5;
+    }
   }
 
   const toggleBreakpoint = (e: React.MouseEvent) => {
@@ -39,8 +85,9 @@ export function BaseNode({ id, data, type, selected }: any) {
   };
 
   return (
-    <div 
-      className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder}`}
+    <div
+      className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder} ${caseBorder}`}
+      style={{ opacity: nodeOpacity }}
       onClick={() => setSelectedNodeId(id)}
     >
       {/* Header */}
@@ -48,7 +95,10 @@ export function BaseNode({ id, data, type, selected }: any) {
          className="px-2 py-1 text-white text-xs font-semibold flex justify-between items-center"
          style={{ backgroundColor: headerColor }}
       >
-        <span>{def.label}</span>
+        <div className="flex items-center gap-1">
+          <span>{def.label}</span>
+          {caseIndicator}
+        </div>
         {/* Breakpoint toggle button */}
         <button
           className={`w-4 h-4 rounded-full border border-white/50 flex items-center justify-center transition-colors ${

@@ -5,6 +5,17 @@ import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
 
+// Colors for different cases
+const CASE_COLORS: Record<string, string> = {
+  'true': '#10b981',    // green
+  'false': '#ef4444',   // red
+  '0': '#3b82f6',       // blue
+  '1': '#f59e0b',       // amber
+  '2': '#8b5cf6',       // purple
+  '3': '#ec4899',       // pink
+  'default': '#6b7280', // gray
+};
+
 export function StructureNode({ id, data, type, selected }: any) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
@@ -46,27 +57,34 @@ export function StructureNode({ id, data, type, selected }: any) {
         <span>{def?.label || type}</span>
         {isCaseStructure && (
           <div className="flex gap-1">
-            {cases.map((caseName: string) => (
-              <button
-                key={caseName}
-                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
-                  activeCase === caseName
-                    ? 'bg-white text-gray-800 font-bold'
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCaseChange(caseName);
-                }}
-              >
-                {caseName}
-              </button>
-            ))}
+            {cases.map((caseName: string) => {
+              const caseColor = CASE_COLORS[caseName] || CASE_COLORS['default'];
+              return (
+                <button
+                  key={caseName}
+                  className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 ${
+                    activeCase === caseName
+                      ? 'bg-white text-gray-800 font-bold shadow-sm'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCaseChange(caseName);
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: caseColor }}
+                  />
+                  {caseName}
+                </button>
+              );
+            })}
             {mode === 'number' && (
               <button
-                className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 ${
                   activeCase === 'default'
-                    ? 'bg-white text-gray-800 font-bold'
+                    ? 'bg-white text-gray-800 font-bold shadow-sm'
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                 }`}
                 onClick={(e) => {
@@ -74,6 +92,10 @@ export function StructureNode({ id, data, type, selected }: any) {
                   handleCaseChange('default');
                 }}
               >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: CASE_COLORS['default'] }}
+                />
                 Default
               </button>
             )}
@@ -83,8 +105,14 @@ export function StructureNode({ id, data, type, selected }: any) {
 
       {/* Case label for Case Structure */}
       {isCaseStructure && (
-        <div className="absolute top-8 left-2 text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-          Case: {activeCase}
+        <div className="absolute top-8 left-2 text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
+          <span>Active Case:</span>
+          <span
+            className="px-1.5 py-0.5 text-[9px] rounded text-white"
+            style={{ backgroundColor: CASE_COLORS[activeCase] || CASE_COLORS['default'] }}
+          >
+            {activeCase}
+          </span>
         </div>
       )}
 
