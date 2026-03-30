@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -37,7 +37,8 @@ const edgeTypes = {
 
 export function GraphEditor() {
   const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
-  const { setSelectedNodeId } = useUIStore();
+  const { setSelectedNodeId, setSelectedEdgeId } = useUIStore();
+  const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
 
   const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => ({
     id: n.id,
@@ -84,7 +85,7 @@ export function GraphEditor() {
     (connection: Connection) => {
       const sourceNode = nodes.find(n => n.id === connection.source);
       const targetNode = nodes.find(n => n.id === connection.target);
-      
+
       if (!sourceNode || !targetNode || !connection.sourceHandle || !connection.targetHandle) return;
 
       const sourceDef = NodeRegistry[sourceNode.type];
@@ -94,7 +95,8 @@ export function GraphEditor() {
       const targetPort = targetDef?.inputs.find(p => p.name === connection.targetHandle);
 
       if (sourcePort && targetPort && sourcePort.type !== 'any' && targetPort.type !== 'any' && sourcePort.type !== targetPort.type) {
-        alert(`Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`);
+        setTypeMismatch(`Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`);
+        setTimeout(() => setTypeMismatch(null), 3000);
         return;
       }
 
@@ -168,7 +170,19 @@ export function GraphEditor() {
   }, [flowNodes, updateNode, nodes]);
 
   return (
-    <div className="w-full h-full flex-grow relative" onClick={() => setSelectedNodeId(null)}>
+    <div className="w-full h-full flex-grow relative" onClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}>
+      {/* Type mismatch toast */}
+      {typeMismatch && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <circle cx="12" cy="16" r="1" fill="currentColor" />
+          </svg>
+          {typeMismatch}
+        </div>
+      )}
+
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -180,6 +194,8 @@ export function GraphEditor() {
         edgeTypes={edgeTypes}
         fitView
         deleteKeyCode={["Backspace", "Delete"]}
+        onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
+        onPaneClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
       >
         <Background color="#eee" gap={16} />
         <Controls />

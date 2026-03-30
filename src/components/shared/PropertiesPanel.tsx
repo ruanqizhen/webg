@@ -3,16 +3,17 @@ import { useGraphStore } from '../../store/useGraphStore';
 import { NodeRegistry } from '../../engine/registry';
 
 export function PropertiesPanel() {
-  const { selectedNodeId, selectedControlId } = useUIStore();
-  const { nodes, uiControls, updateNode, updateUIControl } = useGraphStore();
+  const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
+  const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge } = useGraphStore();
 
   const activeNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
   const activeControl = selectedControlId ? uiControls.find(c => c.id === selectedControlId) : null;
+  const activeEdge = selectedEdgeId ? edges.find(e => e.id === selectedEdgeId) : null;
 
-  if (!activeNode && !activeControl) {
+  if (!activeNode && !activeControl && !activeEdge) {
     return (
       <div className="w-64 border-l bg-gray-50 p-4 h-full shrink-0 text-sm text-gray-400 italic">
-        Select a node or control to view properties.
+        Select a node, control, or connection to view properties.
       </div>
     );
   }
@@ -268,6 +269,51 @@ export function PropertiesPanel() {
                  </div>
               )}
            </>
+        )}
+
+        {activeEdge && (
+          <>
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-500 font-semibold">Connection</label>
+              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
+                {activeEdge.sourceNode} → {activeEdge.targetNode}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-500 font-semibold">Source Port</label>
+              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
+                {activeEdge.sourcePort}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-500 font-semibold">Target Port</label>
+              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
+                {activeEdge.targetPort}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-500 font-semibold">Edge ID</label>
+              <div className="font-mono text-[10px] text-gray-400 break-all">{activeEdge.id}</div>
+            </div>
+
+            <div className="pt-2 border-t">
+              <button
+                onClick={() => {
+                  removeEdge(activeEdge.id);
+                }}
+                className="w-full bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Delete Connection
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
