@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { NodeRegistry } from '../../engine/registry';
 import { getNodeColor } from '../../lib/colors';
@@ -16,6 +17,7 @@ const UI_CONTROLS = [
 export function Palette() {
   const { viewMode } = useUIStore();
   const { addNode, addUIControl } = useGraphStore();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleDragStartLogic = (e: React.DragEvent, nodeType: string) => {
     e.dataTransfer.setData('application/reactflow', nodeType);
@@ -91,15 +93,38 @@ export function Palette() {
     return acc;
   }, {});
 
+  // Filter nodes and controls based on search query
+  const filteredCategories: Record<string, any[]> = searchQuery
+    ? Object.entries(categories)
+        .map(([cat, nodes]) => [cat, (nodes as any[]).filter((n) => n.label.toLowerCase().includes(searchQuery.toLowerCase()))])
+        .filter(([_, nodes]) => (nodes as any[]).length > 0)
+        .reduce((acc, [cat, nodes]) => ({ ...acc, [cat as string]: nodes }), {})
+    : categories;
+
+  const filteredUIControls = searchQuery
+    ? UI_CONTROLS.filter(c => c.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : UI_CONTROLS;
+
   return (
     <div className="w-64 border-r bg-gray-50 flex flex-col h-full overflow-y-auto shrink-0 shadow-inner">
       <div className="p-3 text-sm font-bold text-gray-700 uppercase tracking-wide border-b bg-white top-0 sticky">
         Palette
       </div>
       
+      {/* Search input */}
+      <div className="p-3 border-b bg-white">
+        <input
+          type="text"
+          placeholder="Search nodes..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
+        />
+      </div>
+
       <div className="p-3 flex flex-col gap-4">
         {viewMode === 'logic' ? (
-          Object.entries(categories).map(([cat, nodes]: any) => (
+          Object.entries(filteredCategories).map(([cat, nodes]: any) => (
              <div key={cat} className="flex flex-col gap-2">
                 <div className="text-xs font-semibold text-gray-500 capitalize px-1">{cat}</div>
                 {nodes.map((node: any) => (
@@ -119,7 +144,7 @@ export function Palette() {
         ) : (
           <div className="flex flex-col gap-2">
              <div className="text-xs font-semibold text-gray-500 px-1">CONTROLS & INDICATORS</div>
-             {UI_CONTROLS.map((ctrl) => (
+             {filteredUIControls.map((ctrl) => (
                <div
                  key={ctrl.type}
                  className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all active:scale-95"
@@ -129,6 +154,13 @@ export function Palette() {
                </div>
              ))}
           </div>
+        )}
+        
+        {searchQuery && viewMode === 'logic' && Object.keys(filteredCategories).length === 0 && (
+          <div className="text-center text-gray-400 text-sm py-4">No nodes found</div>
+        )}
+        {searchQuery && viewMode === 'ui' && filteredUIControls.length === 0 && (
+          <div className="text-center text-gray-400 text-sm py-4">No controls found</div>
         )}
       </div>
     </div>

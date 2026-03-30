@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type { Edge, Graph, NodeInstance, UIControl } from '../types/graph';
 import { generateId, deepClone } from '../lib/utils';
 
+const STORAGE_KEY = 'webg-project';
+const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
+
 interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
   updateNode: (id: string, updates: Partial<NodeInstance>) => void;
@@ -19,6 +22,9 @@ interface GraphState extends Graph {
   // File operations
   loadGraph: (graph: Graph) => void;
   exportGraph: () => Graph;
+  saveToStorage: () => void;
+  loadFromStorage: () => boolean;
+  startAutoSave: () => () => void;
 
   // Copy/Paste
   copyNode: (nodeId: string) => void;
@@ -289,6 +295,55 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     canUndo: () => historyStack.length > 0,
 
-    canRedo: () => redoStack.length > 0
+    canRedo: () => redoStack.length > 0,
+    
+    // Save to localStorage
+    saveToStorage: () => {
+      try {
+        const state = get();
+        const data = {
+          version: '1.1',
+          timestamp: Date.now(),
+          graph: {
+            nodes: state.nodes,
+            edges: state.edges,
+            uiControls: state.uiControls
+          }
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {
+        console.error('Failed to save to storage:', err);
+      }
+    },
+    
+    // Load from localStorage
+    loadFromStorage: () => {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data) return false;
+        
+        const parsed = JSON.parse(data);
+        if (parsed.graph) {
+          get().loadGraph(parsed.graph);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('Failed to load from storage:', err);
+        return false;
+      }
+    },
+    
+    // Start auto-save interval, returns cleanup function
+    startAutoSave: () => {
+      const intervalId = setInterval(() => {
+        get().saveToStorage();
+      }, AUTO_SAVE_INTERVAL);
+      
+      // Initial save after 2 seconds
+      setTimeout(() => get().saveToStorage(), 2000);
+      
+      return () => clearInterval(intervalId);
+    }
   };
 });

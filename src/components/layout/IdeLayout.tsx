@@ -4,18 +4,31 @@ import { Palette } from '../shared/Palette';
 import { PropertiesPanel } from '../shared/PropertiesPanel';
 import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor } from '../logic/GraphEditor';
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId } from '../../lib/utils';
 
 export function IdeLayout() {
   const { viewMode } = useUIStore();
-  const { addNode } = useGraphStore();
+  const { addNode, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
 
   const handleZoomFit = useCallback(() => {
     zoomFitRef.current?.();
   }, []);
+
+  // Load from storage on mount and start auto-save
+  useEffect(() => {
+    // Try to load from storage
+    const loaded = loadFromStorage();
+    if (!loaded) {
+      // No saved project, continue with empty canvas
+    }
+    
+    // Start auto-save
+    const cleanup = startAutoSave();
+    return cleanup;
+  }, [loadFromStorage, startAutoSave]);
 
   const handleDropLogic = useCallback((e: React.DragEvent) => {
     e.preventDefault();

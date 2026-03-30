@@ -74,6 +74,37 @@ export class ExecutionEngine {
     return false;
   }
 
+  // Detect deadlock - when no nodes are ready to execute but execution is not complete
+  public detectDeadlock(executingNodes: string[]): boolean {
+    if (executingNodes.length === 0) return false;
+    
+    // Check if all executing nodes are waiting for inputs that will never arrive
+    for (const nodeId of executingNodes) {
+      const node = this.graph.nodes.find(n => n.id === nodeId);
+      if (!node) continue;
+      
+      const nodeEdges = this.graph.edges.filter(e => e.targetNode === nodeId);
+      let hasUnresolvedInput = false;
+      
+      for (const edge of nodeEdges) {
+        const sourceNode = this.graph.nodes.find(n => n.id === edge.sourceNode);
+        if (sourceNode) {
+          const sourceValue = this.runtime.portValues[`${edge.sourceNode}_${edge.sourcePort}`];
+          if (sourceValue === undefined) {
+            hasUnresolvedInput = true;
+            break;
+          }
+        }
+      }
+      
+      // If this node has no unresolved inputs, it's not deadlocked
+      if (!hasUnresolvedInput) return false;
+    }
+    
+    // All nodes are waiting for inputs - this is a deadlock
+    return true;
+  }
+
   private async executeSubgraph(parentId: string | undefined, caseStructureId?: string, activeCase?: string) {
     let nodesInLevel = this.graph.nodes.filter(n => n.parent === parentId);
 
@@ -119,10 +150,17 @@ export class ExecutionEngine {
       if (deg === 0) queue.push(id);
     }
 
+    // Track nodes that have been processed
+    const processedNodes = new Set<string>();
+    let deadlockCheckCount = 0;
+
     while (queue.length > 0) {
       const nodeId = queue.shift()!;
       const node = nodesInLevel.find(n => n.id === nodeId);
       if (!node) continue;
+
+      processedNodes.add(nodeId);
+      deadlockCheckCount = 0;  // Reset deadlock counter when a node is processed
 
       // Check if we should pause (breakpoint or step mode)
       if (this.debugCallbacks?.shouldPause) {
@@ -252,6 +290,24 @@ export class ExecutionEngine {
          inDegree.set(childId, count);
          if (count === 0) queue.push(childId);
       }
+      
+      // Deadlock detection: check if queue is empty but there are still nodes to process
+      if (queue.length === 0) {
+        const remainingNodes = nodesInLevel.filter(n => !processedNodes.has(n.id));
+        if (remainingNodes.length > 0) {
+          // Check if this is a deadlock situation
+          deadlockCheckCount++;
+          if (deadlockCheckCount >= 3) {  // Check a few times to avoid false positives
+            throw new Error(`Deadlock Detected: ${remainingNodes.length} nodes cannot be executed due to unresolved dependencies`);
+          }
+        }
+      }
+    }
+    
+    // Final check: ensure all nodes were processed
+    const remainingNodes = nodesInLevel.filter(n => !processedNodes.has(n.id));
+    if (remainingNodes.length > 0) {
+      throw new Error(`Deadlock Detected: ${remainingNodes.length} nodes could not be executed. Check for missing connections or circular dependencies.`);
     }
   }
 
