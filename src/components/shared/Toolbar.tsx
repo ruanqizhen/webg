@@ -1,14 +1,16 @@
-import { Play, Square, Trash2, MousePointer2, Network } from 'lucide-react';
+import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
 import { Button } from '../ui/button';
+import { useRef } from 'react';
 
 export function Toolbar() {
   const { viewMode, setViewMode } = useUIStore();
-  const { clearGraph, nodes, edges, uiControls } = useGraphStore();
+  const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRun = async () => {
     if (nodes.length === 0) return;
@@ -28,22 +30,79 @@ export function Toolbar() {
     }
   };
 
+  const handleSave = () => {
+    const graph = exportGraph();
+    const fileData = {
+      version: "1.1",
+      graph: graph,
+      ui: {
+        panelLayout: {},
+        viewport: {}
+      }
+    };
+    const blob = new Blob([JSON.stringify(fileData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'project.webg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoad = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.graph) {
+          loadGraph(data.graph);
+        } else if (data.nodes) {
+          // Direct graph format
+          loadGraph(data);
+        }
+      } catch (err: any) {
+        alert("Failed to load file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be loaded again
+    e.target.value = '';
+  };
+
   const currentStatus = runtimeStore.isRunning ? 'Running' : 'Idle';
 
   return (
     <div className="h-14 border-b flex items-center px-4 justify-between bg-white shrink-0">
+      {/* Hidden file input for loading */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".webg,.json"
+        className="hidden"
+      />
+
       <div className="flex items-center gap-2">
         <h1 className="font-extrabold text-xl mr-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-600">WebG</h1>
-        
+
         {/* View Toggle */}
         <div className="flex bg-gray-100 p-1 rounded-md border text-sm font-medium">
-          <button 
+          <button
             className={`px-3 py-1 rounded flex gap-1 items-center transition-colors ${viewMode === 'ui' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => setViewMode('ui')}
           >
             <MousePointer2 size={16} /> UI
           </button>
-          <button 
+          <button
             className={`px-3 py-1 rounded flex gap-1 items-center transition-colors ${viewMode === 'logic' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => setViewMode('logic')}
           >
@@ -53,6 +112,12 @@ export function Toolbar() {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={handleSave} className="gap-1">
+          <Save size={16} /> Save
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleLoad} className="gap-1">
+          <FolderOpen size={16} /> Load
+        </Button>
         <Button size="sm" variant="default" onClick={handleRun} disabled={runtimeStore.isRunning} className="bg-green-600 hover:bg-green-700 gap-1">
           <Play size={16} /> Run
         </Button>

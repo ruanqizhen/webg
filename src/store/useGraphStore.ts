@@ -5,18 +5,22 @@ interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
   updateNode: (id: string, updates: Partial<NodeInstance>) => void;
   removeNode: (id: string) => void;
-  
+
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
-  
+
   addUIControl: (control: UIControl, terminalNode: NodeInstance) => void;
   updateUIControl: (id: string, updates: Partial<UIControl>) => void;
   removeUIControl: (id: string) => void;
-  
+
   clearGraph: () => void;
+  
+  // File operations
+  loadGraph: (graph: Graph) => void;
+  exportGraph: () => Graph;
 }
 
-export const useGraphStore = create<GraphState>((set) => ({
+export const useGraphStore = create<GraphState>((set, get) => ({
   nodes: [],
   edges: [],
   uiControls: [],
@@ -99,5 +103,24 @@ export const useGraphStore = create<GraphState>((set) => ({
     return { uiControls, nodes, edges };
   }),
 
-  clearGraph: () => set({ nodes: [], edges: [], uiControls: [] })
+  clearGraph: () => set({ nodes: [], edges: [], uiControls: [] }),
+  
+  // Export current graph state
+  exportGraph: () => {
+    const state = get();
+    return {
+      nodes: state.nodes,
+      edges: state.edges,
+      uiControls: state.uiControls
+    };
+  },
+  
+  // Load graph from external data
+  loadGraph: (graph: Graph) => {
+    set({
+      nodes: graph.nodes || [],
+      edges: graph.edges || [],
+      uiControls: graph.uiControls || []
+    });
+  }
 }));
