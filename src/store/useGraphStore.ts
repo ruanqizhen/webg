@@ -16,7 +16,7 @@ interface GraphState extends Graph {
   clearGraph: () => void;
 }
 
-export const useGraphStore = create<GraphState>((set, get) => ({
+export const useGraphStore = create<GraphState>((set) => ({
   nodes: [],
   edges: [],
   uiControls: [],

@@ -174,7 +174,12 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     label: 'Case Structure',
     inputs: [{ id: 'selector', name: 'selector', type: 'any', direction: 'input' }],
     outputs: [],
-    params: [{ name: 'activeCase', type: 'string', defaultValue: 'true' }],
+    params: [
+      { name: 'mode', type: 'string', defaultValue: 'boolean' }, // 'boolean' or 'number'
+      { name: 'cases', type: 'array', defaultValue: ['true', 'false'] }, // case names/labels
+      { name: 'defaultCase', type: 'string', defaultValue: 'false' }, // default case for number mode
+      { name: 'activeCase', type: 'string', defaultValue: 'true' } // currently selected case for editing
+    ],
     executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   }
 };

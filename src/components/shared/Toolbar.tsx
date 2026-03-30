@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw, Trash2, Maximize, MousePointer2, Network } from 'lucide-react';
+import { Play, Square, Trash2, MousePointer2, Network } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';

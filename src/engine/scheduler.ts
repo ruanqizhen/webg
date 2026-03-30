@@ -59,8 +59,13 @@ export class ExecutionEngine {
     return false;
   }
 
-  private async executeSubgraph(parentId: string | undefined) {
-    const nodesInLevel = this.graph.nodes.filter(n => n.parent === parentId);
+  private async executeSubgraph(parentId: string | undefined, caseStructureId?: string, activeCase?: string) {
+    let nodesInLevel = this.graph.nodes.filter(n => n.parent === parentId);
+
+    // For Case Structure, only execute nodes in the active case
+    if (caseStructureId && activeCase) {
+      nodesInLevel = nodesInLevel.filter(n => n.caseId === activeCase || n.caseId === undefined);
+    }
     
     const inDegree = new Map<string, number>();
     const deps = new Map<string, string[]>();
@@ -147,10 +152,25 @@ export class ExecutionEngine {
               if (count >= 100000) throw new Error("While Loop Timeout");
            }
         } else if (node.type === 'structure.case') {
-           // Case execution, filter by active case
-           // Currently React Flow maps everything flat inside the parent, we'll just execute it all
-           // unless nodes have a case ID. For simplicity, we execute the subgraph.
-           await this.executeSubgraph(node.id);
+           // Case Structure execution - execute only the selected case based on selector value
+           const selectorValue = inputs.selector;
+           const mode = node.params.mode || 'boolean';
+           const cases = node.params.cases || ['true', 'false'];
+           const defaultCase = node.params.defaultCase || 'false';
+           
+           // Determine which case to execute based on selector
+           let caseToExecute: string;
+           
+           if (mode === 'boolean') {
+             caseToExecute = selectorValue ? 'true' : 'false';
+           } else {
+             // Number mode - find matching case
+             const matchedCase = cases.find((c: string) => String(selectorValue) === c);
+             caseToExecute = matchedCase || defaultCase;
+           }
+           
+           // Execute only the selected case subgraph
+           await this.executeSubgraph(node.id, node.id, caseToExecute);
         } else {
            // Standard Node or Tunnel
            const nodeTask = await def.executor(ctx);

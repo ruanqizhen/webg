@@ -17,6 +17,8 @@ export interface NodeInstance {
   parent?: string;
   width?: number;
   height?: number;
+  // For nodes inside Case structure - which case they belong to
+  caseId?: string;
 }
 
 export interface Edge {
@@ -35,6 +37,15 @@ export interface UIControl {
   bindingNodeId: string;
   x?: number;
   y?: number;
+  width?: number;
+  height?: number;
+  // For numberInput and gauge
+  min?: number;
+  max?: number;
+  step?: number;
+  // For button and indicatorLight
+  colorOn?: string;
+  colorOff?: string;
 }
 
 export interface Graph {

@@ -8,6 +8,7 @@ const UI_CONTROLS = [
   { type: 'button', label: 'Button' },
   { type: 'numberIndicator', label: 'Number Indicator' },
   { type: 'textLabel', label: 'Text Label' },
+  { type: 'gauge', label: 'Gauge' },
   { type: 'indicatorLight', label: 'Indicator Light' },
 ];
 
@@ -35,10 +36,10 @@ export function Palette() {
   const handleClickUI = (controlDef: any) => {
     const termId = crypto.randomUUID();
     const ctrlId = crypto.randomUUID();
-    
-    const isIndicator = controlDef.type.includes('Indicator') || controlDef.type.includes('Label') || controlDef.type.includes('Light');
-    
-    const terminalDef = {
+
+    const isIndicator = controlDef.type.includes('Indicator') || controlDef.type.includes('Label') || controlDef.type.includes('Light') || controlDef.type === 'gauge';
+
+    const terminalDef: any = {
       id: termId,
       type: 'io.terminal',
       position: { x: Math.random() * 200 + 50, y: Math.random() * 200 + 50 },
@@ -46,21 +47,38 @@ export function Palette() {
       outputs: [],
       params: { value: controlDef.type === 'button' ? false : 0 }
     };
-    
+
     if (isIndicator) {
        terminalDef.inputs = [{ name: 'input', type: 'any', direction: 'input', id: 'input' }];
     } else {
        terminalDef.outputs = [{ name: 'output', type: 'any', direction: 'output', id: 'output' }];
     }
 
+    // Default properties for different control types
+    const controlDefaults: Record<string, any> = {
+      numberInput: { min: 0, max: 100, step: 1, defaultValue: 0 },
+      button: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
+      numberIndicator: { defaultValue: 0 },
+      textLabel: { defaultValue: '' },
+      gauge: { min: 0, max: 100, colorOn: '#4CAF50', defaultValue: 0 },
+      indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
+    };
+
     addUIControl({
       id: ctrlId,
       type: controlDef.type,
       label: controlDef.label,
-      defaultValue: controlDef.type === 'button' ? false : 0,
+      defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
       bindingNodeId: termId,
       x: 50,
-      y: 50
+      y: 50,
+      width: controlDefaults[controlDef.type]?.width,
+      height: controlDefaults[controlDef.type]?.height,
+      min: controlDefaults[controlDef.type]?.min,
+      max: controlDefaults[controlDef.type]?.max,
+      step: controlDefaults[controlDef.type]?.step,
+      colorOn: controlDefaults[controlDef.type]?.colorOn,
+      colorOff: controlDefaults[controlDef.type]?.colorOff,
     }, terminalDef);
   };
 

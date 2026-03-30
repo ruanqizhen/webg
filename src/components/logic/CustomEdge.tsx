@@ -6,7 +6,6 @@ import { NodeRegistry } from '../../engine/registry';
 import { useGraphStore } from '../../store/useGraphStore';
 
 export function CustomEdge({
-  id,
   source,
   sourceX,
   sourceY,

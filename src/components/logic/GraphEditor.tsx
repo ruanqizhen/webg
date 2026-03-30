@@ -41,7 +41,8 @@ export function GraphEditor() {
     id: n.id,
     type: 'custom',
     position: n.position,
-    data: { def: NodeRegistry[n.type] },
+    data: { def: NodeRegistry[n.type], caseId: n.caseId },
+    parentNode: n.parent,
   })), [nodes]);
 
   const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => ({
@@ -120,10 +121,15 @@ export function GraphEditor() {
           const sH = s.height || 200;
           if (node.position.x > sX && node.position.x < sX + sW &&
               node.position.y > sY && node.position.y < sY + sH) {
-             // Change to child
-             updateNode(node.id, { 
-                 parent: s.id, 
-                 position: { x: node.position.x - sX, y: node.position.y - sY }
+             // Check if it's a Case Structure - assign caseId based on active case
+             const isCaseStructure = s.type === 'structure.case';
+             const caseStructureNode = nodes.find(n => n.id === s.id);
+             const activeCase = caseStructureNode?.params?.activeCase;
+             
+             updateNode(node.id, {
+                 parent: s.id,
+                 position: { x: node.position.x - sX, y: node.position.y - sY },
+                 caseId: isCaseStructure ? activeCase : undefined
              });
              break;
           }
@@ -136,14 +142,28 @@ export function GraphEditor() {
           const pH = parentNode.height || 200;
           if (node.position.x < 0 || node.position.x > pW || node.position.y < 0 || node.position.y > pH) {
              // Detach
-             updateNode(node.id, { 
-                 parent: undefined, 
-                 position: { x: parentNode.position.x + node.position.x, y: parentNode.position.y + node.position.y }
+             updateNode(node.id, {
+                 parent: undefined,
+                 position: { x: parentNode.position.x + node.position.x, y: parentNode.position.y + node.position.y },
+                 caseId: undefined
              });
           }
        }
     }
-  }, [flowNodes, updateNode]);
+    
+    // Handle moving nodes between cases within a Case Structure
+    if (node.parentNode) {
+      const parentNode = nodes.find(n => n.id === node.parentNode);
+      if (parentNode?.type === 'structure.case') {
+        // Node is inside a Case Structure - update its caseId based on current active case
+        const activeCase = parentNode.params?.activeCase;
+        const nodeCaseId = node.data?.caseId;
+        if (activeCase && nodeCaseId !== activeCase) {
+          updateNode(node.id, { caseId: activeCase });
+        }
+      }
+    }
+  }, [flowNodes, updateNode, nodes]);
 
   return (
     <div className="w-full h-full flex-grow relative" onClick={() => setSelectedNodeId(null)}>
