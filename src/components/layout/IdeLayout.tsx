@@ -1,4 +1,5 @@
 import { useUIStore } from '../../store/useUIStore';
+import { MousePointer2, Network } from 'lucide-react';
 import { Toolbar } from '../shared/Toolbar';
 import { Palette } from '../shared/Palette';
 import { PropertiesPanel } from '../shared/PropertiesPanel';
@@ -9,7 +10,7 @@ import { useGraphStore } from '../../store/useGraphStore';
 import { generateId } from '../../lib/utils';
 
 export function IdeLayout() {
-  const { viewMode } = useUIStore();
+  const { viewMode, setViewMode } = useUIStore();
   const { addNode, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
 
@@ -57,13 +58,32 @@ export function IdeLayout() {
       <div className="flex flex-1 overflow-hidden relative">
          <Palette />
          
-         <div
-           className="flex-1 flex overflow-hidden relative"
-           onDrop={viewMode === 'logic' ? handleDropLogic : undefined}
-           onDragOver={viewMode === 'logic' ? handleDragOver : undefined}
-         >
-            {viewMode === 'ui' && <FrontPanel />}
-            {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
+         <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-gray-200">
+            {/* Tabs Header */}
+            <div className="flex bg-gray-50 border-b shrink-0 px-2 pt-2 gap-1 select-none">
+               <button 
+                  className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'ui' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+                  onClick={() => setViewMode('ui')}
+               >
+                  <MousePointer2 size={16} /> Front Panel
+               </button>
+               <button 
+                  className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'logic' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+                  onClick={() => setViewMode('logic')}
+               >
+                  <Network size={16} /> Block Diagram
+               </button>
+            </div>
+            
+            {/* Tab Contents */}
+            <div
+              className="flex-1 flex overflow-hidden relative bg-white"
+              onDrop={viewMode === 'logic' ? handleDropLogic : undefined}
+              onDragOver={viewMode === 'logic' ? handleDragOver : undefined}
+            >
+               {viewMode === 'ui' && <FrontPanel />}
+               {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
+            </div>
          </div>
 
          <PropertiesPanel />

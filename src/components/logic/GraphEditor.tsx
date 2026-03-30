@@ -3,7 +3,6 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  Panel,
   useReactFlow,
   ReactFlowProvider
 } from 'reactflow';
@@ -212,9 +211,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         <Background color="#eee" gap={16} />
         <Controls />
         <MiniMap zoomable pannable />
-        <Panel position="top-right" className="bg-white p-2 rounded shadow text-sm font-semibold text-gray-500">
-          Block Diagram
-        </Panel>
       </ReactFlow>
     </>
   );

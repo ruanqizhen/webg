@@ -203,10 +203,6 @@ export function FrontPanel() {
       }}
       onDragOver={(e) => e.preventDefault()}
     >
-      <div className="absolute top-2 right-2 bg-white px-3 py-1 shadow rounded text-sm font-semibold text-gray-500 select-none">
-        Front Panel
-      </div>
-      
       {uiControls.map(c => (
         <ControlItem key={c.id} control={c} />
       ))}

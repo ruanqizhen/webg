@@ -1,5 +1,4 @@
-import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen, ZoomIn, StepForward } from 'lucide-react';
-import { useUIStore } from '../../store/useUIStore';
+import { Play, Square, Trash2, Save, FolderOpen, ZoomIn, StepForward } from 'lucide-react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
@@ -7,7 +6,6 @@ import { Button } from '../ui/button';
 import { useRef } from 'react';
 
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
-  const { viewMode, setViewMode } = useUIStore();
   const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,21 +158,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       <div className="flex items-center gap-2">
         <h1 className="font-extrabold text-xl mr-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-600">WebG</h1>
 
-        {/* View Toggle */}
-        <div className="flex bg-gray-100 p-1 rounded-md border text-sm font-medium">
-          <button
-            className={`px-3 py-1 rounded flex gap-1 items-center transition-colors ${viewMode === 'ui' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setViewMode('ui')}
-          >
-            <MousePointer2 size={16} /> UI
-          </button>
-          <button
-            className={`px-3 py-1 rounded flex gap-1 items-center transition-colors ${viewMode === 'logic' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setViewMode('logic')}
-          >
-            <Network size={16} /> Logic
-          </button>
-        </div>
+
       </div>
 
       <div className="flex items-center gap-2">
