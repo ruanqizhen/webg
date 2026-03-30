@@ -6,6 +6,8 @@ interface DebugCallbacks {
   onNodeStart?: (nodeId: string) => void;
   onNodeFinish?: (nodeId: string) => void;
   shouldPause?: (nodeId: string) => Promise<boolean>;
+  isPaused?: () => boolean;
+  onContinue?: () => void;
 }
 
 export class ExecutionEngine {
@@ -34,7 +36,11 @@ export class ExecutionEngine {
     let curr = this.graph.nodes.find(n => n.id === nodeId);
     while (curr) {
       if (curr.parent === parentId) return curr.id;
-      curr = this.graph.nodes.find(n => n.id === curr!.parent);
+      const parentRef = curr.parent;
+      if (!parentRef) return null;
+      const nextCurr = this.graph.nodes.find(n => n.id === parentRef);
+      if (!nextCurr) return null;
+      curr = nextCurr;
     }
     return null;
   }
@@ -123,15 +129,18 @@ export class ExecutionEngine {
         const shouldPause = await this.debugCallbacks.shouldPause(node.id);
         if (shouldPause) {
           this.updateNodeState(node.id, 'running');
-          // Wait for user to continue
+          // Wait for user to continue using a proper promise-based approach
           await new Promise<void>((resolve) => {
-            const checkPause = setInterval(() => {
-              // This is a simplified approach - in production, use a proper signal
-              if (!(this.debugCallbacks as any)._isPaused) {
-                clearInterval(checkPause);
+            const checkPause = () => {
+              if (!this.debugCallbacks?.isPaused?.()) {
+                this.debugCallbacks?.onContinue?.();
                 resolve();
+              } else {
+                // Check again after 100ms
+                setTimeout(checkPause, 100);
               }
-            }, 100);
+            };
+            checkPause();
           });
         }
       }

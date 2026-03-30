@@ -6,6 +6,7 @@ import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor } from '../logic/GraphEditor';
 import { useCallback, useRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
+import { generateId } from '../../lib/utils';
 
 export function IdeLayout() {
   const { viewMode } = useUIStore();
@@ -21,9 +22,7 @@ export function IdeLayout() {
     const type = e.dataTransfer.getData('application/reactflow');
     if (!type) return;
 
-    // Optional: get bounding client rect to calculate drop position accurately
-    // Here we use a minimal approach to place the node
-    const id = crypto.randomUUID();
+    const id = generateId();
     addNode({
       id,
       type,
@@ -32,7 +31,7 @@ export function IdeLayout() {
       outputs: [],
       params: {}
     });
-  }, [addNode]);
+  }, [addNode, generateId]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

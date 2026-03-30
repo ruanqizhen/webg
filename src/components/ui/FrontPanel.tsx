@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -51,10 +51,13 @@ function ControlItem({ control }: { control: UIControl }) {
 
   const terminalId = control.bindingNodeId;
   const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
 
   const onPointerDown = (e: React.PointerEvent) => {
     setSelectedControlId(control.id);
     setIsDragging(true);
+    dragRef.current.pointerId = e.pointerId;
+    dragRef.current.element = e.currentTarget;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
@@ -69,8 +72,27 @@ function ControlItem({ control }: { control: UIControl }) {
 
   const onPointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    dragRef.current.pointerId = null;
+    dragRef.current.element = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // Pointer may already be released, ignore
+    }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (dragRef.current.element && dragRef.current.pointerId !== null) {
+        try {
+          (dragRef.current.element as HTMLElement).releasePointerCapture(dragRef.current.pointerId);
+        } catch (err) {
+          // Ignore
+        }
+      }
+    };
+  }, []);
 
   const handleChange = (e: any) => {
     let newVal = e.target.value;

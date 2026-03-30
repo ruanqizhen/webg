@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Edge, Graph, NodeInstance, UIControl } from '../types/graph';
+import { generateId, deepClone } from '../lib/utils';
 
 interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
@@ -45,11 +46,11 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
   const saveToHistory = () => {
     const state = get();
-    const snapshot: Graph = {
-      nodes: [...state.nodes],
-      edges: [...state.edges],
-      uiControls: [...state.uiControls]
-    };
+    const snapshot: Graph = deepClone({
+      nodes: state.nodes,
+      edges: state.edges,
+      uiControls: state.uiControls
+    });
     historyStack.push(snapshot);
     if (historyStack.length > MAX_HISTORY) {
       historyStack.shift();
@@ -64,7 +65,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     addNode: (node) => {
       saveToHistory();
-      set((state) => ({ nodes: [...state.nodes, node] }));
+      set((state) => ({ nodes: [...state.nodes, { ...node, id: node.id || generateId() }] }));
     },
 
     updateNode: (id, updates) => {
@@ -95,7 +96,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         );
 
         if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
-          const tunnelId = crypto.randomUUID();
+          const tunnelId = generateId();
           const tunnelParent = targetNode.parent ? targetNode.parent : sourceNode.parent;
 
           const tunnelNode: NodeInstance = {
@@ -206,8 +207,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
         return { nodeId: null, controlId: null };
       }
 
-      const newNodeId = crypto.randomUUID();
-      const newControlId = clipboard.control ? crypto.randomUUID() : null;
+      const newNodeId = generateId();
+      const newControlId = clipboard.control ? generateId() : null;
 
       const newNode: NodeInstance = {
         ...clipboard.node,
@@ -218,8 +219,9 @@ export const useGraphStore = create<GraphState>((set, get) => {
         params: { ...clipboard.node.params }
       };
 
-      get().addNode(newNode);
-
+      // Save history once and perform both operations together
+      saveToHistory();
+      
       if (clipboard.control && newControlId) {
         const newControl: UIControl = {
           ...clipboard.control,
@@ -228,7 +230,12 @@ export const useGraphStore = create<GraphState>((set, get) => {
           x: position.x - 100,
           y: position.y
         };
-        get().addUIControl(newControl, newNode);
+        set((state) => ({
+          nodes: [...state.nodes, newNode],
+          uiControls: [...state.uiControls, newControl]
+        }));
+      } else {
+        set((state) => ({ nodes: [...state.nodes, newNode] }));
       }
 
       return { nodeId: newNodeId, controlId: newControlId };

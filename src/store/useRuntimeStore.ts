@@ -7,22 +7,24 @@ interface RuntimeState extends RuntimeMemory {
   setNodeState: (nodeId: string, state: NodeState) => void;
   setPortValue: (portId: string, value: any) => void;
   resetRuntime: () => void;
-  
+
   // Debug controls
   isStepMode: boolean;
   isPaused: boolean;
   currentStepNode: string | null;
-  
+
   setStepMode: (enabled: boolean) => void;
   setIsPaused: (paused: boolean) => void;
   setCurrentStepNode: (nodeId: string | null) => void;
   waitForStep: () => Promise<void>;
   continueExecution: () => void;
   resetDebug: () => void;
+  checkIsPaused: () => boolean;
 }
 
 export const useRuntimeStore = create<RuntimeState>((set, get) => {
   let stepResolver: (() => void) | null = null;
+  let stepRejecter: ((reason?: any) => void) | null = null;
   
   return {
     isRunning: false,
@@ -58,8 +60,13 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
     
     // Wait for user to continue (for step mode or breakpoint)
     waitForStep: () => {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>((resolve, reject) => {
+        // Clean up any existing resolver first (race condition fix)
+        if (stepResolver) {
+          stepResolver();
+        }
         stepResolver = resolve;
+        stepRejecter = reject;
         set({ isPaused: true });
       });
     },
@@ -70,12 +77,29 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
         stepResolver();
         stepResolver = null;
       }
+      if (stepRejecter) {
+        stepRejecter = null;
+      }
       set({ isPaused: false, currentStepNode: null });
     },
     
     resetDebug: () => {
-      stepResolver = null;
+      if (stepResolver) {
+        stepResolver();
+        stepResolver = null;
+      }
+      if (stepRejecter) {
+        stepRejecter = null;
+      }
       set({ isStepMode: false, isPaused: false, currentStepNode: null });
+    },
+    
+    // Check if currently paused (for scheduler)
+    checkIsPaused: () => get().isPaused,
+    
+    // Callback for scheduler to call when continuing
+    onContinue: () => {
+      // Optional callback for debugging
     }
   };
 });

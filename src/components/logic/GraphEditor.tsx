@@ -25,24 +25,24 @@ import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
-// Define nodeTypes and edgeTypes outside component to avoid recreation on each render
-const nodeTypes = {
-  custom: BaseNode,
-  'structure.forLoop': StructureNode,
-  'structure.whileLoop': StructureNode,
-  'structure.case': StructureNode,
-  'io.tunnel': TunnelNode
-};
-
-const edgeTypes = {
-  custom: CustomEdge
-};
-
 // Inner component that uses useReactFlow - rendered INSIDE ReactFlow
 function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
   const reactFlow = useReactFlow();
   const { setSelectedNodeId, setSelectedEdgeId } = useUIStore();
   const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
+
+  // Memoize nodeTypes and edgeTypes to prevent React Flow warnings
+  const nodeTypes = useMemo(() => ({
+    custom: BaseNode,
+    'structure.forLoop': StructureNode,
+    'structure.whileLoop': StructureNode,
+    'structure.case': StructureNode,
+    'io.tunnel': TunnelNode
+  }), []);
+
+  const edgeTypes = useMemo(() => ({
+    custom: CustomEdge
+  }), []);
 
   // Setup keyboard shortcuts
   useKeyboardShortcuts({
@@ -137,8 +137,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     if (!node.parentNode) {
        const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
        for (const s of structures) {
-          const sX = s.position.x;
-          const sY = s.position.y;
+          const sX = s.position?.x ?? 0;
+          const sY = s.position?.y ?? 0;
           const sW = s.width || 300;
           const sH = s.height || 200;
           if (node.position.x > sX && node.position.x < sX + sW &&
@@ -146,7 +146,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
              const isCaseStructure = s.type === 'structure.case';
              const caseStructureNode = nodes.find(n => n.id === s.id);
              const activeCase = caseStructureNode?.params?.activeCase;
-             
+
              updateNode(node.id, {
                  parent: s.id,
                  position: { x: node.position.x - sX, y: node.position.y - sY },
@@ -163,13 +163,13 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           if (node.position.x < 0 || node.position.x > pW || node.position.y < 0 || node.position.y > pH) {
              updateNode(node.id, {
                  parent: undefined,
-                 position: { x: parentNode.position.x + node.position.x, y: parentNode.position.y + node.position.y },
+                 position: { x: (parentNode.position?.x ?? 0) + node.position.x, y: (parentNode.position?.y ?? 0) + node.position.y },
                  caseId: undefined
              });
           }
        }
     }
-    
+
     if (node.parentNode) {
       const parentNode = nodes.find(n => n.id === node.parentNode);
       if (parentNode?.type === 'structure.case') {

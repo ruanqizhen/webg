@@ -26,9 +26,9 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       );
       await engine.executeAll();
     } catch (err: any) {
-      alert("Execution Error: " + err.message);
-    } finally {
+      console.error("Execution Error:", err);
       runtimeStore.setRunning(false);
+      throw err;  // Re-throw for caller to handle
     }
   };
 
@@ -44,6 +44,8 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
          runtimeStore.setNodeState,
          runtimeStore.setPortValue,
          {
+           isPaused: () => runtimeStore.checkIsPaused(),
+           onContinue: () => {},
            onNodeStart: (nodeId) => {
              runtimeStore.setCurrentStepNode(nodeId);
            },
@@ -67,10 +69,15 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       );
       await engine.executeAll();
     } catch (err: any) {
-      alert("Execution Error: " + err.message);
-    } finally {
+      console.error("Execution Error:", err);
       runtimeStore.setRunning(false);
       runtimeStore.setStepMode(false);
+      throw err;
+    } finally {
+      if (!runtimeStore.isPaused) {
+        runtimeStore.setRunning(false);
+        runtimeStore.setStepMode(false);
+      }
     }
   };
 
@@ -110,16 +117,27 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const data = JSON.parse(event.target?.result as string);
+        const result = event.target?.result;
+        if (typeof result !== 'string') {
+          throw new Error('Invalid file content');
+        }
+        const data = JSON.parse(result);
         if (data.graph) {
           loadGraph(data.graph);
         } else if (data.nodes) {
           // Direct graph format
           loadGraph(data);
+        } else {
+          throw new Error('Invalid file format');
         }
       } catch (err: any) {
-        alert("Failed to load file: " + err.message);
+        console.error("Failed to load file:", err);
+        alert("Failed to load file: " + (err.message || 'Unknown error'));
       }
+    };
+    reader.onerror = () => {
+      console.error("Failed to read file");
+      alert("Failed to read file");
     };
     reader.readAsText(file);
     // Reset input so same file can be loaded again

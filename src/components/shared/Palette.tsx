@@ -2,6 +2,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { NodeRegistry } from '../../engine/registry';
 import { getNodeColor } from '../../lib/colors';
 import { useGraphStore } from '../../store/useGraphStore';
+import { generateId } from '../../lib/utils';
 
 const UI_CONTROLS = [
   { type: 'numberInput', label: 'Number Input' },
@@ -22,7 +23,7 @@ export function Palette() {
   };
 
   const handleClickLogic = (nodeType: string) => {
-    const id = crypto.randomUUID();
+    const id = generateId();
     addNode({
       id,
       type: nodeType,
@@ -34,8 +35,8 @@ export function Palette() {
   };
 
   const handleClickUI = (controlDef: any) => {
-    const termId = crypto.randomUUID();
-    const ctrlId = crypto.randomUUID();
+    const termId = generateId();
+    const ctrlId = generateId();
 
     const isIndicator = controlDef.type.includes('Indicator') || controlDef.type.includes('Label') || controlDef.type.includes('Light') || controlDef.type === 'gauge';
 

@@ -7,25 +7,24 @@ interface UseKeyboardShortcutsOptions {
 }
 
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
-  const { 
-    selectedNodeId, 
-    selectedEdgeId, 
-    selectedControlId,
-    setSelectedNodeId,
-    setSelectedEdgeId,
-    setSelectedControlId 
-  } = useUIStore();
-  
-  const { 
-    copyNode, 
-    pasteNode, 
-    undo, 
-    redo, 
-    canUndo, 
+  const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+  const selectedEdgeId = useUIStore((state) => state.selectedEdgeId);
+  const selectedControlId = useUIStore((state) => state.selectedControlId);
+  const setSelectedNodeId = useUIStore((state) => state.setSelectedNodeId);
+  const setSelectedEdgeId = useUIStore((state) => state.setSelectedEdgeId);
+  const setSelectedControlId = useUIStore((state) => state.setSelectedControlId);
+  const onZoomFit = options.onZoomFit;
+
+  const {
+    copyNode,
+    pasteNode,
+    undo,
+    redo,
+    canUndo,
     canRedo,
     removeNode,
     removeEdge,
-    removeUIControl 
+    removeUIControl
   } = useGraphStore();
 
   useEffect(() => {
@@ -75,7 +74,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       // Zoom Fit (Ctrl+0 or Ctrl+=)
       if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.key === '=')) {
         e.preventDefault();
-        options.onZoomFit?.();
+        onZoomFit?.();
       }
 
       // Delete (Delete or Backspace)
@@ -106,14 +105,14 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    selectedNodeId, 
-    selectedEdgeId, 
+    selectedNodeId,
+    selectedEdgeId,
     selectedControlId,
-    copyNode, 
-    pasteNode, 
-    undo, 
-    redo, 
-    canUndo, 
+    copyNode,
+    pasteNode,
+    undo,
+    redo,
+    canUndo,
     canRedo,
     removeNode,
     removeEdge,
@@ -121,6 +120,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     setSelectedNodeId,
     setSelectedEdgeId,
     setSelectedControlId,
-    options.onZoomFit
+    onZoomFit
   ]);
 }
