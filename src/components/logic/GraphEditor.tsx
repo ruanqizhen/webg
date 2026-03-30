@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef } from 'react';
-import ReactFlow, { 
-  Background, 
-  Controls, 
-  MiniMap, 
+import { useCallback, useMemo } from 'react';
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
   Panel
 } from 'reactflow';
 import type {
@@ -22,18 +22,20 @@ import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
 
+// Define nodeTypes and edgeTypes outside component to avoid recreation on each render
+const nodeTypes = {
+  custom: BaseNode,
+  'structure.forLoop': StructureNode,
+  'structure.whileLoop': StructureNode,
+  'structure.case': StructureNode,
+  'io.tunnel': TunnelNode
+};
+
+const edgeTypes = {
+  custom: CustomEdge
+};
+
 export function GraphEditor() {
-  // Use useRef to keep the exact same object reference even across Vite HMR hot-reloads
-  const nodeTypes = useRef({ 
-    custom: BaseNode, 
-    'structure.forLoop': StructureNode,
-    'structure.whileLoop': StructureNode,
-    'structure.case': StructureNode,
-    'io.tunnel': TunnelNode 
-  }).current;
-
-  const edgeTypes = useRef({ custom: CustomEdge }).current;
-
   const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
   const { setSelectedNodeId } = useUIStore();
 
