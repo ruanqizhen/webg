@@ -198,7 +198,9 @@ export function FrontPanel() {
   return (
     <div 
       className="w-full h-full relative overflow-hidden bg-[url('radial-gradient(#cbd5e1_1px,transparent_1px)')] [background-size:16px_16px] bg-slate-50 flex-grow"
-      onClick={() => setSelectedControlId(null)}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) setSelectedControlId(null);
+      }}
       onDragOver={(e) => e.preventDefault()}
     >
       <div className="absolute top-2 right-2 bg-white px-3 py-1 shadow rounded text-sm font-semibold text-gray-500 select-none">
