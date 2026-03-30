@@ -19,6 +19,8 @@ export interface NodeInstance {
   height?: number;
   // For nodes inside Case structure - which case they belong to
   caseId?: string;
+  // For debugging - breakpoint flag
+  breakpoint?: boolean;
 }
 
 export interface Edge {

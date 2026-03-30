@@ -1,4 +1,4 @@
-import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen, ZoomIn } from 'lucide-react';
+import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen, ZoomIn, StepForward } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -16,6 +16,8 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     if (nodes.length === 0) return;
     try {
       runtimeStore.setRunning(true);
+      runtimeStore.setStepMode(false);
+      
       const engine = new ExecutionEngine(
          { nodes, edges, uiControls },
          runtimeStore,
@@ -28,6 +30,52 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     } finally {
       runtimeStore.setRunning(false);
     }
+  };
+
+  const handleStepRun = async () => {
+    if (nodes.length === 0) return;
+    try {
+      runtimeStore.setRunning(true);
+      runtimeStore.setStepMode(true);
+      
+      const engine = new ExecutionEngine(
+         { nodes, edges, uiControls },
+         runtimeStore,
+         runtimeStore.setNodeState,
+         runtimeStore.setPortValue,
+         {
+           onNodeStart: (nodeId) => {
+             runtimeStore.setCurrentStepNode(nodeId);
+           },
+           onNodeFinish: () => {
+             runtimeStore.setCurrentStepNode(null);
+           },
+           shouldPause: async (nodeId) => {
+             // Check if step mode is enabled or node has breakpoint
+             const node = nodes.find(n => n.id === nodeId);
+             const isStepMode = runtimeStore.isStepMode;
+             const hasBreakpoint = node?.breakpoint;
+             
+             if (isStepMode || hasBreakpoint) {
+               runtimeStore.setCurrentStepNode(nodeId);
+               await runtimeStore.waitForStep();
+               return true;
+             }
+             return false;
+           }
+         }
+      );
+      await engine.executeAll();
+    } catch (err: any) {
+      alert("Execution Error: " + err.message);
+    } finally {
+      runtimeStore.setRunning(false);
+      runtimeStore.setStepMode(false);
+    }
+  };
+
+  const handleContinue = () => {
+    runtimeStore.continueExecution();
   };
 
   const handleSave = () => {
@@ -78,7 +126,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     e.target.value = '';
   };
 
-  const currentStatus = runtimeStore.isRunning ? 'Running' : 'Idle';
+  const currentStatus = runtimeStore.isRunning ? (runtimeStore.isPaused ? 'Paused' : 'Running') : 'Idle';
 
   return (
     <div className="h-14 border-b flex items-center px-4 justify-between bg-white shrink-0">
@@ -121,17 +169,53 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
         <Button size="sm" variant="outline" onClick={onZoomFit} className="gap-1" title="Zoom Fit (Ctrl+0)">
           <ZoomIn size={16} /> Fit
         </Button>
-        <Button size="sm" variant="default" onClick={handleRun} disabled={runtimeStore.isRunning} className="bg-green-600 hover:bg-green-700 gap-1">
-          <Play size={16} /> Run
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => runtimeStore.resetRuntime()} disabled={!runtimeStore.isRunning && Object.values(runtimeStore.nodeState).length === 0} className="gap-1 text-red-600 hover:text-red-700">
+        
+        {/* Debug controls */}
+        {runtimeStore.isPaused ? (
+          <Button 
+            size="sm" 
+            variant="default" 
+            onClick={handleContinue} 
+            className="bg-blue-600 hover:bg-blue-700 gap-1"
+            title="Continue (resume execution)"
+          >
+            <Play size={16} /> Continue
+          </Button>
+        ) : (
+          <>
+            <Button 
+              size="sm" 
+              variant="default" 
+              onClick={handleRun} 
+              disabled={runtimeStore.isRunning} 
+              className="bg-green-600 hover:bg-green-700 gap-1"
+            >
+              <Play size={16} /> Run
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={handleStepRun} 
+              disabled={runtimeStore.isRunning} 
+              className="gap-1 border-purple-300 text-purple-600 hover:bg-purple-50"
+              title="Step through nodes one by one"
+            >
+              <StepForward size={16} /> Step
+            </Button>
+          </>
+        )}
+        
+        <Button size="sm" variant="outline" onClick={() => runtimeStore.resetRuntime()} disabled={!runtimeStore.isRunning && !runtimeStore.isPaused && Object.values(runtimeStore.nodeState).length === 0} className="gap-1 text-red-600 hover:text-red-700">
           <Square size={16} /> Stop / Reset
         </Button>
       </div>
 
       <div className="flex items-center gap-4 text-sm text-gray-500">
         <div className="flex items-center gap-1.5">
-           <span className={`w-2 h-2 rounded-full ${runtimeStore.isRunning ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`}></span>
+           <span className={`w-2 h-2 rounded-full ${
+             runtimeStore.isPaused ? 'bg-yellow-500 animate-pulse' :
+             runtimeStore.isRunning ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+           }`}></span>
            {currentStatus}
         </div>
         <div className="w-px h-6 bg-gray-200"></div>

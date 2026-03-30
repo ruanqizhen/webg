@@ -3,12 +3,19 @@ import { NodeRegistry } from '../../../engine/registry';
 import { getNodeColor, getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
+import { useGraphStore } from '../../../store/useGraphStore';
 
 export function BaseNode({ id, data, type, selected }: any) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
   const portValues = useRuntimeStore(s => s.portValues);
+  const currentStepNode = useRuntimeStore(s => s.currentStepNode);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
+  const { updateNode, nodes } = useGraphStore();
+  
+  const node = nodes.find(n => n.id === id);
+  const hasBreakpoint = node?.breakpoint || false;
+  const isCurrentStep = currentStepNode === id;
 
   if (!def) return <div className="p-2 bg-red-500 text-white rounded">Unknown Node: {type}</div>;
 
@@ -20,6 +27,16 @@ export function BaseNode({ id, data, type, selected }: any) {
   if (nodeState === 'error') stateBorder = 'ring-2 ring-red-500 shadow-red-500/50';
   else if (nodeState === 'running') stateBorder = 'ring-2 ring-blue-500 animate-pulse';
   else if (nodeState === 'done') stateBorder = 'ring-2 ring-green-500';
+  
+  // Highlight for current step in debug mode
+  if (isCurrentStep) {
+    stateBorder = 'ring-4 ring-yellow-400 shadow-yellow-400/50 animate-pulse';
+  }
+
+  const toggleBreakpoint = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateNode(id, { breakpoint: !hasBreakpoint });
+  };
 
   return (
     <div 
@@ -27,11 +44,25 @@ export function BaseNode({ id, data, type, selected }: any) {
       onClick={() => setSelectedNodeId(id)}
     >
       {/* Header */}
-      <div 
+      <div
          className="px-2 py-1 text-white text-xs font-semibold flex justify-between items-center"
          style={{ backgroundColor: headerColor }}
       >
         <span>{def.label}</span>
+        {/* Breakpoint toggle button */}
+        <button
+          className={`w-4 h-4 rounded-full border border-white/50 flex items-center justify-center transition-colors ${
+            hasBreakpoint ? 'bg-red-500 hover:bg-red-600' : 'bg-transparent hover:bg-white/20'
+          }`}
+          onClick={toggleBreakpoint}
+          title={hasBreakpoint ? 'Remove breakpoint' : 'Add breakpoint'}
+        >
+          {hasBreakpoint && (
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Body / Ports */}

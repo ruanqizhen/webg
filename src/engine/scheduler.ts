@@ -2,22 +2,31 @@ import type { Graph, Edge } from '../types/graph';
 import { NodeRegistry } from './registry';
 import type { NodeState, RuntimeMemory } from '../types/runtime';
 
+interface DebugCallbacks {
+  onNodeStart?: (nodeId: string) => void;
+  onNodeFinish?: (nodeId: string) => void;
+  shouldPause?: (nodeId: string) => Promise<boolean>;
+}
+
 export class ExecutionEngine {
   private graph: Graph;
   private runtime: RuntimeMemory;
   private updateNodeState: (id: string, s: NodeState) => void;
   private updatePortValue: (id: string, v: any) => void;
+  private debugCallbacks?: DebugCallbacks;
 
   constructor(
-    graph: Graph, 
-    initialRuntime: RuntimeMemory, 
+    graph: Graph,
+    initialRuntime: RuntimeMemory,
     updateNodeState: (id: string, s: NodeState) => void,
-    updatePortValue: (id: string, v: any) => void
+    updatePortValue: (id: string, v: any) => void,
+    debugCallbacks?: DebugCallbacks
   ) {
     this.graph = graph;
     this.runtime = initialRuntime;
     this.updateNodeState = updateNodeState;
     this.updatePortValue = updatePortValue;
+    this.debugCallbacks = debugCallbacks;
   }
 
   // Find the ancestor of nodeId that sits exactly in the current parentId level
@@ -109,6 +118,27 @@ export class ExecutionEngine {
       const node = nodesInLevel.find(n => n.id === nodeId);
       if (!node) continue;
 
+      // Check if we should pause (breakpoint or step mode)
+      if (this.debugCallbacks?.shouldPause) {
+        const shouldPause = await this.debugCallbacks.shouldPause(node.id);
+        if (shouldPause) {
+          this.updateNodeState(node.id, 'running');
+          // Wait for user to continue
+          await new Promise<void>((resolve) => {
+            const checkPause = setInterval(() => {
+              // This is a simplified approach - in production, use a proper signal
+              if (!(this.debugCallbacks as any)._isPaused) {
+                clearInterval(checkPause);
+                resolve();
+              }
+            }, 100);
+          });
+        }
+      }
+
+      if (this.debugCallbacks?.onNodeStart) {
+        this.debugCallbacks.onNodeStart(node.id);
+      }
       this.updateNodeState(node.id, 'running');
 
       try {
@@ -181,10 +211,10 @@ export class ExecutionEngine {
         for (const port of def.outputs) {
            const key = port.name;
            const val = result[key];
-           
+
            if (val !== undefined) {
              this.updatePortValue(`${node.id}_${key}`, val);
-             
+
              // Direct edge propagation across anywhere in the graph!
              const outEdges = edgeByPort.get(key) || [];
              for (const edge of outEdges) {
@@ -196,6 +226,10 @@ export class ExecutionEngine {
         }
 
         this.updateNodeState(node.id, 'done');
+        
+        if (this.debugCallbacks?.onNodeFinish) {
+          this.debugCallbacks.onNodeFinish(node.id);
+        }
 
       } catch (err: any) {
         this.updateNodeState(node.id, 'error');
