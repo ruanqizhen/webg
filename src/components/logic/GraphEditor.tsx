@@ -1,9 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  Panel
+  Panel,
+  useReactFlow,
+  ReactFlowProvider
 } from 'reactflow';
 import type {
   Connection,
@@ -21,6 +23,7 @@ import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 // Define nodeTypes and edgeTypes outside component to avoid recreation on each render
 const nodeTypes = {
@@ -35,27 +38,29 @@ const edgeTypes = {
   custom: CustomEdge
 };
 
-export function GraphEditor() {
-  const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
+// Inner component that uses useReactFlow - rendered INSIDE ReactFlow
+function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
+  const reactFlow = useReactFlow();
   const { setSelectedNodeId, setSelectedEdgeId } = useUIStore();
   const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
 
-  const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => ({
-    id: n.id,
-    type: 'custom',
-    position: n.position,
-    data: { def: NodeRegistry[n.type], caseId: n.caseId },
-    parentNode: n.parent,
-  })), [nodes]);
+  // Setup keyboard shortcuts
+  useKeyboardShortcuts({
+    onZoomFit: () => {
+      reactFlow.fitView({ padding: 0.2 });
+    }
+  });
 
-  const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => ({
-    id: e.id,
-    source: e.sourceNode,
-    target: e.targetNode,
-    sourceHandle: e.sourcePort,
-    targetHandle: e.targetPort,
-    type: 'custom',
-  })), [edges]);
+  // Register zoom fit function with parent ref
+  useEffect(() => {
+    if (onZoomFitRef) {
+      onZoomFitRef.current = () => {
+        reactFlow.fitView({ padding: 0.2 });
+      };
+    }
+  }, [reactFlow, onZoomFitRef]);
+
+  const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode } = useGraphStore();
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -111,11 +116,24 @@ export function GraphEditor() {
     [nodes, addGraphEdge]
   );
 
+  const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => ({
+    id: n.id,
+    type: 'custom',
+    position: n.position,
+    data: { def: NodeRegistry[n.type], caseId: n.caseId },
+    parentNode: n.parent,
+  })), [nodes]);
+
+  const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => ({
+    id: e.id,
+    source: e.sourceNode,
+    target: e.targetNode,
+    sourceHandle: e.sourcePort,
+    targetHandle: e.targetPort,
+    type: 'custom',
+  })), [edges]);
+
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
-    // Basic bounds checking for parent assignment
-    // React Flow position is relative to parent!
-    // So if it ALREADY has a parent, we don't dynamically reparent easily unless we do absolute coordinate math.
-    // For simplicity in this demo, we only assign parent if it has NO parent and is dropped into a structure.
     if (!node.parentNode) {
        const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
        for (const s of structures) {
@@ -125,7 +143,6 @@ export function GraphEditor() {
           const sH = s.height || 200;
           if (node.position.x > sX && node.position.x < sX + sW &&
               node.position.y > sY && node.position.y < sY + sH) {
-             // Check if it's a Case Structure - assign caseId based on active case
              const isCaseStructure = s.type === 'structure.case';
              const caseStructureNode = nodes.find(n => n.id === s.id);
              const activeCase = caseStructureNode?.params?.activeCase;
@@ -139,13 +156,11 @@ export function GraphEditor() {
           }
        }
     } else {
-       // If it is dragged OUTSIDE its parent bounds, un-parent it.
        const parentNode = flowNodes.find(n => n.id === node.parentNode);
        if (parentNode) {
           const pW = parentNode.width || 300;
           const pH = parentNode.height || 200;
           if (node.position.x < 0 || node.position.x > pW || node.position.y < 0 || node.position.y > pH) {
-             // Detach
              updateNode(node.id, {
                  parent: undefined,
                  position: { x: parentNode.position.x + node.position.x, y: parentNode.position.y + node.position.y },
@@ -155,11 +170,9 @@ export function GraphEditor() {
        }
     }
     
-    // Handle moving nodes between cases within a Case Structure
     if (node.parentNode) {
       const parentNode = nodes.find(n => n.id === node.parentNode);
       if (parentNode?.type === 'structure.case') {
-        // Node is inside a Case Structure - update its caseId based on current active case
         const activeCase = parentNode.params?.activeCase;
         const nodeCaseId = node.data?.caseId;
         if (activeCase && nodeCaseId !== activeCase) {
@@ -170,8 +183,7 @@ export function GraphEditor() {
   }, [flowNodes, updateNode, nodes]);
 
   return (
-    <div className="w-full h-full flex-grow relative" onClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}>
-      {/* Type mismatch toast */}
+    <>
       {typeMismatch && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -204,6 +216,27 @@ export function GraphEditor() {
           Block Diagram
         </Panel>
       </ReactFlow>
+    </>
+  );
+}
+
+// Wrapper component that provides ReactFlow context
+function GraphEditorWithProvider({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
+  return (
+    <ReactFlowProvider>
+      <FlowContent onZoomFitRef={onZoomFitRef} />
+    </ReactFlowProvider>
+  );
+}
+
+interface GraphEditorProps {
+  onZoomFitRef?: React.MutableRefObject<(() => void) | null>;
+}
+
+export function GraphEditor({ onZoomFitRef }: GraphEditorProps) {
+  return (
+    <div className="w-full h-full flex-grow relative" onClick={() => { }}>
+      <GraphEditorWithProvider onZoomFitRef={onZoomFitRef} />
     </div>
   );
 }

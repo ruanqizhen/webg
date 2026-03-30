@@ -14,113 +14,274 @@ interface GraphState extends Graph {
   removeUIControl: (id: string) => void;
 
   clearGraph: () => void;
-  
+
   // File operations
   loadGraph: (graph: Graph) => void;
   exportGraph: () => Graph;
+
+  // Copy/Paste
+  copyNode: (nodeId: string) => void;
+  pasteNode: (position: { x: number; y: number }) => { nodeId: string | null; controlId: string | null };
+  getClipboard: () => { node: NodeInstance | null; control: UIControl | null } | null;
+
+  // History for Undo/Redo
+  pushHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
-export const useGraphStore = create<GraphState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  uiControls: [],
+// History stack limits
+const MAX_HISTORY = 50;
 
-  addNode: (node) => set((state) => ({ nodes: [...state.nodes, node] })),
+export const useGraphStore = create<GraphState>((set, get) => {
+  // Clipboard for copy/paste
+  let clipboard: { node: NodeInstance | null; control: UIControl | null } | null = null;
 
-  updateNode: (id, updates) => set((state) => ({
-    nodes: state.nodes.map(n => n.id === id ? { ...n, ...updates } : n)
-  })),
+  // History stacks for undo/redo
+  let historyStack: Graph[] = [];
+  let redoStack: Graph[] = [];
 
-  removeNode: (id) => set((state) => {
-    // Remove node
-    const nodes = state.nodes.filter(n => n.id !== id);
-    // Remove connected edges
-    const edges = state.edges.filter(e => e.sourceNode !== id && e.targetNode !== id);
-    // Remove associated UI control if it's a terminal
-    const uiControls = state.uiControls.filter(c => c.bindingNodeId !== id);
-    return { nodes, edges, uiControls };
-  }),
-
-  addEdge: (newEdge) => set((state) => {
-    const sourceNode = state.nodes.find(n => n.id === newEdge.sourceNode);
-    const targetNode = state.nodes.find(n => n.id === newEdge.targetNode);
-
-    const filteredEdges = state.edges.filter(e => 
-      !(e.targetNode === newEdge.targetNode && e.targetPort === newEdge.targetPort)
-    );
-
-    if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
-       const tunnelId = crypto.randomUUID();
-       // Attach tunnel to the inner nested level visually
-       const tunnelParent = targetNode.parent ? targetNode.parent : sourceNode.parent;
-       
-       const tunnelNode: NodeInstance = {
-         id: tunnelId,
-         type: 'io.tunnel',
-         position: { x: 10, y: 10 }, 
-         parent: tunnelParent,
-         inputs: [], outputs: [], params: {}
-       };
-       const edge1: Edge = {
-         id: `e_${newEdge.sourceNode}_${newEdge.sourcePort}-${tunnelId}_input`,
-         sourceNode: newEdge.sourceNode, sourcePort: newEdge.sourcePort,
-         targetNode: tunnelId, targetPort: 'input'
-       };
-       const edge2: Edge = {
-         id: `e_${tunnelId}_output-${newEdge.targetNode}_${newEdge.targetPort}`,
-         sourceNode: tunnelId, sourcePort: 'output',
-         targetNode: newEdge.targetNode, targetPort: newEdge.targetPort
-       };
-       return { nodes: [...state.nodes, tunnelNode], edges: [...filteredEdges, edge1, edge2] };
-    }
-
-    return { edges: [...filteredEdges, newEdge] };
-  }),
-
-  removeEdge: (id) => set((state) => ({
-    edges: state.edges.filter(e => e.id !== id)
-  })),
-
-  addUIControl: (control, terminalNode) => set((state) => ({
-    uiControls: [...state.uiControls, control],
-    nodes: [...state.nodes, terminalNode]
-  })),
-
-  updateUIControl: (id, updates) => set((state) => ({
-    uiControls: state.uiControls.map(c => c.id === id ? { ...c, ...updates } : c)
-  })),
-
-  removeUIControl: (id) => set((state) => {
-    const control = state.uiControls.find(c => c.id === id);
-    const uiControls = state.uiControls.filter(c => c.id !== id);
-    let nodes = state.nodes;
-    let edges = state.edges;
-    if (control) {
-      // Remove the corresponding terminal node
-      nodes = nodes.filter(n => n.id !== control.bindingNodeId);
-      edges = edges.filter(e => e.sourceNode !== control.bindingNodeId && e.targetNode !== control.bindingNodeId);
-    }
-    return { uiControls, nodes, edges };
-  }),
-
-  clearGraph: () => set({ nodes: [], edges: [], uiControls: [] }),
-  
-  // Export current graph state
-  exportGraph: () => {
+  const saveToHistory = () => {
     const state = get();
-    return {
-      nodes: state.nodes,
-      edges: state.edges,
-      uiControls: state.uiControls
+    const snapshot: Graph = {
+      nodes: [...state.nodes],
+      edges: [...state.edges],
+      uiControls: [...state.uiControls]
     };
-  },
-  
-  // Load graph from external data
-  loadGraph: (graph: Graph) => {
-    set({
-      nodes: graph.nodes || [],
-      edges: graph.edges || [],
-      uiControls: graph.uiControls || []
-    });
-  }
-}));
+    historyStack.push(snapshot);
+    if (historyStack.length > MAX_HISTORY) {
+      historyStack.shift();
+    }
+    redoStack = []; // Clear redo stack on new action
+  };
+
+  return {
+    nodes: [],
+    edges: [],
+    uiControls: [],
+
+    addNode: (node) => {
+      saveToHistory();
+      set((state) => ({ nodes: [...state.nodes, node] }));
+    },
+
+    updateNode: (id, updates) => {
+      saveToHistory();
+      set((state) => ({
+        nodes: state.nodes.map(n => n.id === id ? { ...n, ...updates } : n)
+      }));
+    },
+
+    removeNode: (id) => {
+      saveToHistory();
+      set((state) => {
+        const nodes = state.nodes.filter(n => n.id !== id);
+        const edges = state.edges.filter(e => e.sourceNode !== id && e.targetNode !== id);
+        const uiControls = state.uiControls.filter(c => c.bindingNodeId !== id);
+        return { nodes, edges, uiControls };
+      });
+    },
+
+    addEdge: (newEdge) => {
+      saveToHistory();
+      set((state) => {
+        const sourceNode = state.nodes.find(n => n.id === newEdge.sourceNode);
+        const targetNode = state.nodes.find(n => n.id === newEdge.targetNode);
+
+        const filteredEdges = state.edges.filter(e =>
+          !(e.targetNode === newEdge.targetNode && e.targetPort === newEdge.targetPort)
+        );
+
+        if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
+          const tunnelId = crypto.randomUUID();
+          const tunnelParent = targetNode.parent ? targetNode.parent : sourceNode.parent;
+
+          const tunnelNode: NodeInstance = {
+            id: tunnelId,
+            type: 'io.tunnel',
+            position: { x: 10, y: 10 },
+            parent: tunnelParent,
+            inputs: [],
+            outputs: [],
+            params: {}
+          };
+          const edge1: Edge = {
+            id: `e_${newEdge.sourceNode}_${newEdge.sourcePort}-${tunnelId}_input`,
+            sourceNode: newEdge.sourceNode,
+            sourcePort: newEdge.sourcePort,
+            targetNode: tunnelId,
+            targetPort: 'input'
+          };
+          const edge2: Edge = {
+            id: `e_${tunnelId}_output-${newEdge.targetNode}_${newEdge.targetPort}`,
+            sourceNode: tunnelId,
+            sourcePort: 'output',
+            targetNode: newEdge.targetNode,
+            targetPort: newEdge.targetPort
+          };
+          return { nodes: [...state.nodes, tunnelNode], edges: [...filteredEdges, edge1, edge2] };
+        }
+
+        return { edges: [...filteredEdges, newEdge] };
+      });
+    },
+
+    removeEdge: (id) => {
+      saveToHistory();
+      set((state) => ({
+        edges: state.edges.filter(e => e.id !== id)
+      }));
+    },
+
+    addUIControl: (control, terminalNode) => {
+      saveToHistory();
+      set((state) => ({
+        uiControls: [...state.uiControls, control],
+        nodes: [...state.nodes, terminalNode]
+      }));
+    },
+
+    updateUIControl: (id, updates) => {
+      saveToHistory();
+      set((state) => ({
+        uiControls: state.uiControls.map(c => c.id === id ? { ...c, ...updates } : c)
+      }));
+    },
+
+    removeUIControl: (id) => {
+      saveToHistory();
+      set((state) => {
+        const control = state.uiControls.find(c => c.id === id);
+        const uiControls = state.uiControls.filter(c => c.id !== id);
+        let nodes = state.nodes;
+        let edges = state.edges;
+        if (control) {
+          nodes = nodes.filter(n => n.id !== control.bindingNodeId);
+          edges = edges.filter(e => e.sourceNode !== control.bindingNodeId && e.targetNode !== control.bindingNodeId);
+        }
+        return { uiControls, nodes, edges };
+      });
+    },
+
+    clearGraph: () => {
+      saveToHistory();
+      set({ nodes: [], edges: [], uiControls: [] });
+    },
+
+    exportGraph: () => {
+      const state = get();
+      return {
+        nodes: state.nodes,
+        edges: state.edges,
+        uiControls: state.uiControls
+      };
+    },
+
+    loadGraph: (graph: Graph) => {
+      saveToHistory();
+      set({
+        nodes: graph.nodes || [],
+        edges: graph.edges || [],
+        uiControls: graph.uiControls || []
+      });
+    },
+
+    copyNode: (nodeId) => {
+      const state = get();
+      const node = state.nodes.find(n => n.id === nodeId);
+      const control = state.uiControls.find(c => c.bindingNodeId === nodeId);
+
+      if (node) {
+        clipboard = {
+          node: { ...node, id: '', position: { x: 0, y: 0 } },
+          control: control ? { ...control, id: '', bindingNodeId: '' } : null
+        };
+      }
+    },
+
+    pasteNode: (position) => {
+      if (!clipboard || !clipboard.node) {
+        return { nodeId: null, controlId: null };
+      }
+
+      const newNodeId = crypto.randomUUID();
+      const newControlId = clipboard.control ? crypto.randomUUID() : null;
+
+      const newNode: NodeInstance = {
+        ...clipboard.node,
+        id: newNodeId,
+        position: { ...position },
+        inputs: [...clipboard.node.inputs],
+        outputs: [...clipboard.node.outputs],
+        params: { ...clipboard.node.params }
+      };
+
+      get().addNode(newNode);
+
+      if (clipboard.control && newControlId) {
+        const newControl: UIControl = {
+          ...clipboard.control,
+          id: newControlId,
+          bindingNodeId: newNodeId,
+          x: position.x - 100,
+          y: position.y
+        };
+        get().addUIControl(newControl, newNode);
+      }
+
+      return { nodeId: newNodeId, controlId: newControlId };
+    },
+
+    getClipboard: () => clipboard,
+
+    pushHistory: () => saveToHistory(),
+
+    undo: () => {
+      if (historyStack.length === 0) return;
+
+      const state = get();
+      const currentState: Graph = {
+        nodes: [...state.nodes],
+        edges: [...state.edges],
+        uiControls: [...state.uiControls]
+      };
+      redoStack.push(currentState);
+
+      const previousState = historyStack.pop();
+      if (previousState) {
+        set({
+          nodes: previousState.nodes,
+          edges: previousState.edges,
+          uiControls: previousState.uiControls
+        });
+      }
+    },
+
+    redo: () => {
+      if (redoStack.length === 0) return;
+
+      const state = get();
+      const currentState: Graph = {
+        nodes: [...state.nodes],
+        edges: [...state.edges],
+        uiControls: [...state.uiControls]
+      };
+      historyStack.push(currentState);
+
+      const nextState = redoStack.pop();
+      if (nextState) {
+        set({
+          nodes: nextState.nodes,
+          edges: nextState.edges,
+          uiControls: nextState.uiControls
+        });
+      }
+    },
+
+    canUndo: () => historyStack.length > 0,
+
+    canRedo: () => redoStack.length > 0
+  };
+});

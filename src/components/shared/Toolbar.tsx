@@ -1,4 +1,4 @@
-import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen } from 'lucide-react';
+import { Play, Square, Trash2, MousePointer2, Network, Save, FolderOpen, ZoomIn } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -6,7 +6,7 @@ import { ExecutionEngine } from '../../engine/scheduler';
 import { Button } from '../ui/button';
 import { useRef } from 'react';
 
-export function Toolbar() {
+export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   const { viewMode, setViewMode } = useUIStore();
   const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
@@ -117,6 +117,9 @@ export function Toolbar() {
         </Button>
         <Button size="sm" variant="outline" onClick={handleLoad} className="gap-1">
           <FolderOpen size={16} /> Load
+        </Button>
+        <Button size="sm" variant="outline" onClick={onZoomFit} className="gap-1" title="Zoom Fit (Ctrl+0)">
+          <ZoomIn size={16} /> Fit
         </Button>
         <Button size="sm" variant="default" onClick={handleRun} disabled={runtimeStore.isRunning} className="bg-green-600 hover:bg-green-700 gap-1">
           <Play size={16} /> Run

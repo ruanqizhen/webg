@@ -4,12 +4,17 @@ import { Palette } from '../shared/Palette';
 import { PropertiesPanel } from '../shared/PropertiesPanel';
 import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor } from '../logic/GraphEditor';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 
 export function IdeLayout() {
   const { viewMode } = useUIStore();
   const { addNode } = useGraphStore();
+  const zoomFitRef = useRef<(() => void) | null>(null);
+
+  const handleZoomFit = useCallback(() => {
+    zoomFitRef.current?.();
+  }, []);
 
   const handleDropLogic = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -36,17 +41,17 @@ export function IdeLayout() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-white overflow-hidden text-gray-800 font-sans">
-      <Toolbar />
+      <Toolbar onZoomFit={handleZoomFit} />
       <div className="flex flex-1 overflow-hidden relative">
          <Palette />
          
-         <div 
+         <div
            className="flex-1 flex overflow-hidden relative"
            onDrop={viewMode === 'logic' ? handleDropLogic : undefined}
            onDragOver={viewMode === 'logic' ? handleDragOver : undefined}
          >
             {viewMode === 'ui' && <FrontPanel />}
-            {viewMode === 'logic' && <GraphEditor />}
+            {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
          </div>
 
          <PropertiesPanel />
