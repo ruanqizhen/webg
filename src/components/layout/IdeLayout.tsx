@@ -25,13 +25,7 @@ export function IdeLayout() {
 
   // Load from storage on mount and start auto-save
   useEffect(() => {
-    // Try to load from storage
-    const loaded = loadFromStorage();
-    if (!loaded) {
-      // No saved project, continue with empty canvas
-    }
-    
-    // Start auto-save
+    loadFromStorage();
     const cleanup = startAutoSave();
     return cleanup;
   }, [loadFromStorage, startAutoSave]);
@@ -50,7 +44,7 @@ export function IdeLayout() {
       outputs: [],
       params: {}
     });
-  }, [addNode, generateId]);
+  }, [addNode]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

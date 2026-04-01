@@ -242,8 +242,10 @@ export function BaseNode({ id, data, type, selected }: any) {
       <div className="flex p-2 justify-between gap-4 text-xs relative">
         {/* Input Ports */}
         <div className="flex flex-col gap-2 min-w-[20px]">
-          {def.inputs.map((port: any) => (
-             <div key={port.name} className="flex items-center gap-1 h-4 relative">
+          {def.inputs.map((port: any) => {
+             const inputVal = portValues[`${id}_${port.name}`];
+             return (
+             <div key={port.name} className="flex items-center gap-1 h-4 relative group">
                 <Handle 
                   type="target" 
                   position={Position.Left} 
@@ -251,9 +253,15 @@ export function BaseNode({ id, data, type, selected }: any) {
                   style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }} 
                   title={`${port.name} (${port.type})`}
                 />
+                {inputVal !== undefined && (
+                   <span className="hidden group-hover:block absolute left-[-10px] -top-5 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap pointer-events-none">
+                     {String(inputVal)}
+                   </span>
+                )}
                 <span className="text-gray-600 pl-1">{port.name}</span>
              </div>
-          ))}
+             );
+          })}
         </div>
 
         {/* Output Ports */}

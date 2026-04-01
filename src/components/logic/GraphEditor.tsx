@@ -112,12 +112,20 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     [nodes, addGraphEdge]
   );
 
+  const getFlowNodeType = (nodeType: string): string => {
+    if (nodeType.startsWith('structure.')) return nodeType;
+    if (nodeType === 'io.tunnel') return nodeType;
+    return 'custom';
+  };
+
   const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => ({
     id: n.id,
-    type: 'custom',
+    type: getFlowNodeType(n.type),
     position: n.position,
     data: { def: NodeRegistry[n.type], caseId: n.caseId },
     parentNode: n.parent,
+    ...(n.width ? { width: n.width } : {}),
+    ...(n.height ? { height: n.height } : {}),
   })), [nodes]);
 
   const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => ({

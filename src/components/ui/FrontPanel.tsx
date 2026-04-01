@@ -239,7 +239,12 @@ export function FrontPanel() {
 
   return (
     <div 
-      className="w-full h-full relative overflow-hidden bg-[url('radial-gradient(#cbd5e1_1px,transparent_1px)')] [background-size:16px_16px] bg-slate-50 flex-grow"
+      className="w-full h-full relative overflow-hidden flex-grow"
+      style={{
+        backgroundColor: '#f8fafc',
+        backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+        backgroundSize: '16px 16px',
+      }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) setSelectedControlId(null);
       }}

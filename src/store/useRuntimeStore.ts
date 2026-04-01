@@ -3,9 +3,11 @@ import type { NodeState, RuntimeMemory } from '../types/runtime';
 
 interface RuntimeState extends RuntimeMemory {
   isRunning: boolean;
+  errorMessage: string | null;
   setRunning: (running: boolean) => void;
   setNodeState: (nodeId: string, state: NodeState) => void;
   setPortValue: (portId: string, value: any) => void;
+  setError: (message: string | null) => void;
   resetRuntime: () => void;
 
   // Debug controls
@@ -28,6 +30,7 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
   
   return {
     isRunning: false,
+    errorMessage: null,
     nodeState: {},
     portValues: {},
     
@@ -38,6 +41,8 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
     
     setRunning: (running) => set({ isRunning: running }),
     
+    setError: (message) => set({ errorMessage: message }),
+    
     setNodeState: (nodeId, state) => set((prev) => ({
       nodeState: { ...prev.nodeState, [nodeId]: state }
     })),
@@ -47,7 +52,7 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
     })),
     
     resetRuntime: () => {
-      set({ isRunning: false, nodeState: {}, portValues: {} });
+      set({ isRunning: false, errorMessage: null, nodeState: {}, portValues: {} });
       get().resetDebug();
     },
     

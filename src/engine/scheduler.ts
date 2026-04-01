@@ -122,13 +122,14 @@ export class ExecutionEngine {
     }
 
     // Resolve cross-hierarchy edges into level-specific dependencies
-    const edgeByPort = new Map<string, Edge[]>();
+    const edgeByNodePort = new Map<string, Edge[]>();
 
     for (const edge of this.graph.edges) {
-      // track global edge-by-port for direct value propagation
-      const pEdges = edgeByPort.get(edge.sourcePort) || [];
+      // track global edge-by-node-port for direct value propagation
+      const edgeKey = `${edge.sourceNode}_${edge.sourcePort}`;
+      const pEdges = edgeByNodePort.get(edgeKey) || [];
       pEdges.push(edge);
-      edgeByPort.set(edge.sourcePort, pEdges);
+      edgeByNodePort.set(edgeKey, pEdges);
 
       const sourceAncestor = this.getAncestorInLevel(edge.sourceNode, parentId);
       const targetAncestor = this.getAncestorInLevel(edge.targetNode, parentId);
@@ -263,7 +264,7 @@ export class ExecutionEngine {
              this.updatePortValue(`${node.id}_${key}`, val);
 
              // Direct edge propagation across anywhere in the graph!
-             const outEdges = edgeByPort.get(key) || [];
+             const outEdges = edgeByNodePort.get(`${node.id}_${key}`) || [];
              for (const edge of outEdges) {
                 if (edge.sourceNode === node.id) {
                    this.updatePortValue(`${edge.targetNode}_${edge.targetPort}`, val);
