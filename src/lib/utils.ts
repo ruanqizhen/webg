@@ -33,3 +33,20 @@ export function deepClone<T>(obj: T): T {
   // Fallback for older browsers
   return JSON.parse(JSON.stringify(obj));
 }
+
+/**
+ * Generate a unique label by appending a number if the base label already exists
+ */
+export function generateUniqueLabel(baseLabel: string, existingLabels: string[]): string {
+  if (!existingLabels.includes(baseLabel)) {
+    return baseLabel;
+  }
+
+  let counter = 2;
+  let newLabel = `${baseLabel} ${counter}`;
+  while (existingLabels.includes(newLabel)) {
+    counter++;
+    newLabel = `${baseLabel} ${counter}`;
+  }
+  return newLabel;
+}

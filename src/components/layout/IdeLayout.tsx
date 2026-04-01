@@ -7,7 +7,7 @@ import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor } from '../logic/GraphEditor';
 import { useCallback, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
-import { generateId } from '../../lib/utils';
+import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { ReactFlowProvider, useReactFlow } from 'reactflow';
 
@@ -21,7 +21,7 @@ export function IdeLayout() {
 
 function IdeLayoutInner() {
   const { viewMode, setViewMode } = useUIStore();
-  const { addNode, addUIControl, loadFromStorage, startAutoSave } = useGraphStore();
+  const { addNode, addUIControl, uiControls, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
   const reactFlow = useReactFlow();
   const frontPanelRef = useRef<HTMLDivElement>(null);
@@ -104,11 +104,14 @@ function IdeLayoutInner() {
         indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
       };
 
+      const existingLabels = uiControls.map(c => c.label);
+      const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);
+
       addUIControl({
         id: ctrlId,
         type: controlDef.type,
         direction,
-        label: controlDef.label,
+        label: uniqueLabel,
         defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
         bindingNodeId: termId,
         x,

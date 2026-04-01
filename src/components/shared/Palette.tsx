@@ -3,7 +3,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { NodeRegistry } from '../../engine/registry';
 import { getNodeColor } from '../../lib/colors';
 import { useGraphStore } from '../../store/useGraphStore';
-import { generateId } from '../../lib/utils';
+import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { 
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
@@ -52,7 +52,7 @@ const UI_CONTROLS = [
 
 export function Palette() {
   const { viewMode } = useUIStore();
-  const { addNode, addUIControl } = useGraphStore();
+  const { addNode, addUIControl, uiControls } = useGraphStore();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleDragStartLogic = (e: React.DragEvent, nodeType: string) => {
@@ -109,11 +109,14 @@ export function Palette() {
       indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
     };
 
+    const existingLabels = uiControls.map(c => c.label);
+    const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);
+
     addUIControl({
       id: ctrlId,
       type: controlDef.type,
       direction,
-      label: controlDef.label,
+      label: uniqueLabel,
       defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
       bindingNodeId: termId,
       x: 50,
