@@ -153,6 +153,36 @@ export function PropertiesPanel() {
               </div>
 
               <div className="flex flex-col gap-1">
+                 <label className="text-gray-500 font-semibold">Direction</label>
+                 <select
+                    value={activeControl.direction || 'control'}
+                    onChange={(e) => {
+                      const newDirection = e.target.value as 'control' | 'indicator';
+                      updateUIControl(activeControl.id, { direction: newDirection });
+                      // Update terminal node ports to match direction
+                      const termNode = nodes.find(n => n.id === activeControl.bindingNodeId);
+                      if (termNode) {
+                        if (newDirection === 'indicator') {
+                          updateNode(termNode.id, {
+                            inputs: [{ name: 'input', type: 'any', direction: 'input', id: 'input' }],
+                            outputs: []
+                          });
+                        } else {
+                          updateNode(termNode.id, {
+                            inputs: [],
+                            outputs: [{ name: 'output', type: 'any', direction: 'output', id: 'output' }]
+                          });
+                        }
+                      }
+                    }}
+                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
+                 >
+                    <option value="control">▶ Control (Input)</option>
+                    <option value="indicator">◀ Indicator (Output)</option>
+                 </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
                  <label className="text-gray-500 font-semibold">Label</label>
                  <input
                     value={activeControl.label}

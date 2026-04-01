@@ -113,6 +113,9 @@ function ControlItem({ control }: { control: UIControl }) {
   const inputVal = portValues[`${terminalId}_input`];
   const displayVal = inputVal !== undefined ? inputVal : control.defaultValue;
 
+  const isIndicatorDir = (control.direction || 'control') === 'indicator';
+  const isControlDir = !isIndicatorDir;
+
   // Control dimensions
   const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
   const height = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
@@ -134,9 +137,11 @@ function ControlItem({ control }: { control: UIControl }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <label className="text-xs font-bold text-gray-600 drop-shadow-sm pointer-events-none mb-1 cursor-inherit select-none text-center">
-        {control.label}
-      </label>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-bold text-gray-600 drop-shadow-sm pointer-events-none cursor-inherit select-none">
+          {control.label}
+        </label>
+      </div>
 
       {control.type === 'numberInput' && (
          <div 
@@ -145,13 +150,14 @@ function ControlItem({ control }: { control: UIControl }) {
          >
            <input
              type="number"
-             value={control.defaultValue}
-             onChange={handleChange}
+             value={isIndicatorDir ? displayVal : control.defaultValue}
+             onChange={isIndicatorDir ? undefined : handleChange}
              min={min}
              max={max}
              step={step}
              className="bg-transparent text-right font-mono font-semibold text-gray-800 w-full focus:outline-none focus:text-blue-600"
-             disabled={isRunning}
+             disabled={isRunning || isIndicatorDir}
+             readOnly={isIndicatorDir}
            />
          </div>
       )}

@@ -42,12 +42,12 @@ const LOGIC_ICONS: Record<string, any> = {
 };
 
 const UI_CONTROLS = [
-  { type: 'numberInput', label: 'Number Input' },
-  { type: 'button', label: 'Button' },
-  { type: 'numberIndicator', label: 'Number Indicator' },
-  { type: 'textLabel', label: 'Text Label' },
-  { type: 'gauge', label: 'Gauge' },
-  { type: 'indicatorLight', label: 'Indicator Light' },
+  { type: 'numberInput', label: 'Number Input', direction: 'control' as const },
+  { type: 'button', label: 'Button', direction: 'control' as const },
+  { type: 'numberIndicator', label: 'Number Indicator', direction: 'indicator' as const },
+  { type: 'textLabel', label: 'Text Label', direction: 'indicator' as const },
+  { type: 'gauge', label: 'Gauge', direction: 'indicator' as const },
+  { type: 'indicatorLight', label: 'Indicator Light', direction: 'indicator' as const },
 ];
 
 export function Palette() {
@@ -76,7 +76,8 @@ export function Palette() {
     const termId = generateId();
     const ctrlId = generateId();
 
-    const isIndicator = controlDef.type.includes('Indicator') || controlDef.type.includes('Label') || controlDef.type.includes('Light') || controlDef.type === 'gauge';
+    const direction: 'control' | 'indicator' = controlDef.direction || 'control';
+    const isIndicator = direction === 'indicator';
 
     const terminalDef: any = {
       id: termId,
@@ -106,6 +107,7 @@ export function Palette() {
     addUIControl({
       id: ctrlId,
       type: controlDef.type,
+      direction,
       label: controlDef.label,
       defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
       bindingNodeId: termId,
@@ -182,21 +184,45 @@ export function Palette() {
              </div>
           ))
         ) : (
-          <div className="flex flex-col gap-2">
-             <div className="text-xs font-semibold text-gray-500 px-1">CONTROLS & INDICATORS</div>
-             {filteredUIControls.map((ctrl) => {
-               const Icon = UI_ICONS[ctrl.type] || Box;
-               return (
-                 <div
-                   key={ctrl.type}
-                   className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-purple-300 transition-all active:scale-95 flex items-center"
-                   onClick={() => handleClickUI(ctrl)}
-                 >
-                   <Icon className="w-4 h-4 mr-2 text-purple-500" />
-                   {ctrl.label}
-                 </div>
-               );
-             })}
+          <div className="flex flex-col gap-4">
+             {/* Controls (Input) */}
+             <div className="flex flex-col gap-2">
+               <div className="text-xs font-semibold text-gray-500 px-1 flex items-center gap-1">
+                 <span className="text-green-500">▶</span> CONTROLS (Input)
+               </div>
+               {filteredUIControls.filter(c => c.direction === 'control').map((ctrl) => {
+                 const Icon = UI_ICONS[ctrl.type] || Box;
+                 return (
+                   <div
+                     key={ctrl.type}
+                     className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all active:scale-95 flex items-center border-l-4 border-l-green-400"
+                     onClick={() => handleClickUI(ctrl)}
+                   >
+                     <Icon className="w-4 h-4 mr-2 text-green-500" />
+                     {ctrl.label}
+                   </div>
+                 );
+               })}
+             </div>
+             {/* Indicators (Output) */}
+             <div className="flex flex-col gap-2">
+               <div className="text-xs font-semibold text-gray-500 px-1 flex items-center gap-1">
+                 <span className="text-orange-500">◀</span> INDICATORS (Output)
+               </div>
+               {filteredUIControls.filter(c => c.direction === 'indicator').map((ctrl) => {
+                 const Icon = UI_ICONS[ctrl.type] || Box;
+                 return (
+                   <div
+                     key={ctrl.type}
+                     className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all active:scale-95 flex items-center border-l-4 border-l-orange-400"
+                     onClick={() => handleClickUI(ctrl)}
+                   >
+                     <Icon className="w-4 h-4 mr-2 text-orange-500" />
+                     {ctrl.label}
+                   </div>
+                 );
+               })}
+             </div>
           </div>
         )}
         
