@@ -122,7 +122,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     id: n.id,
     type: getFlowNodeType(n.type),
     position: n.position,
-    data: { def: NodeRegistry[n.type], caseId: n.caseId },
+    data: { def: NodeRegistry[n.type], nodeType: n.type, caseId: n.caseId },
     parentNode: n.parent,
     ...(n.width ? { width: n.width } : {}),
     ...(n.height ? { height: n.height } : {}),

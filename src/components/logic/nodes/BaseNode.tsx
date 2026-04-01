@@ -1,72 +1,155 @@
 import { Handle, Position } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
-import { getNodeColor, getTypeColor } from '../../../lib/colors';
+import { getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
 
-// Colors for different cases inside Case Structure
-const CASE_COLORS: Record<string, string> = {
-  'true': '#10b981',    // green
-  'false': '#ef4444',   // red
-  '0': '#3b82f6',       // blue
-  '1': '#f59e0b',       // amber
-  '2': '#8b5cf6',       // purple
-  '3': '#ec4899',       // pink
-  'default': '#6b7280', // gray
+/* ═══════════════════════════════════════════════════════
+   LabVIEW-Inspired Icon Definitions
+   ═══════════════════════════════════════════════════════ */
+
+interface IconDef {
+  shape: string;
+  bg: string;
+  stroke: string;
+  symbol: string;
+  symbolColor: string;
+  w: number;
+  h: number;
+}
+
+const NODE_ICONS: Record<string, IconDef> = {
+  // ── Math ── Amber chevron ──
+  'math.add':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'+',  symbolColor:'#78350F', w:56, h:44 },
+  'math.subtract': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'−',  symbolColor:'#78350F', w:56, h:44 },
+  'math.multiply': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'×',  symbolColor:'#78350F', w:56, h:44 },
+  'math.divide':   { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'÷',  symbolColor:'#78350F', w:56, h:44 },
+  // ── Comparison ── Orange hexagon ──
+  'logic.greater': { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'>',  symbolColor:'#7C2D12', w:48, h:42 },
+  'logic.less':    { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'<',  symbolColor:'#7C2D12', w:48, h:42 },
+  'logic.equal':   { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'=',  symbolColor:'#7C2D12', w:48, h:42 },
+  // ── Boolean Gates ── Blue ──
+  'logic.and': { shape:'and-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'&',   symbolColor:'#1E3A8A', w:56, h:44 },
+  'logic.or':  { shape:'or-gate',  bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'≥1',  symbolColor:'#1E3A8A', w:56, h:44 },
+  'logic.not': { shape:'not-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'',    symbolColor:'#1E3A8A', w:52, h:42 },
+  // ── Constants ──
+  'source.numberConstant':  { shape:'constant', bg:'#DBEAFE', stroke:'#3B82F6', symbol:'#',   symbolColor:'#1E40AF', w:80, h:34 },
+  'source.booleanConstant': { shape:'constant', bg:'#D1FAE5', stroke:'#10B981', symbol:'T/F', symbolColor:'#065F46', w:80, h:34 },
+  'source.stringConstant':  { shape:'constant', bg:'#FCE7F3', stroke:'#DB2777', symbol:'abc', symbolColor:'#9D174D', w:80, h:34 },
+  // ── Sink ──
+  'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
 };
 
-const SHAPE_CONFIGS: Record<string, any> = {
-  'math.add': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '+', size: 48 },
-  'math.subtract': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '-', size: 48 },
-  'math.multiply': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '×', size: 48 },
-  'math.divide': { shape: 'triangle', color: '#fef08a', borderColor: '#ca8a04', symbol: '÷', size: 48 },
-  'logic.greater': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '>', size: 40 },
-  'logic.less': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '<', size: 40 },
-  'logic.equal': { shape: 'square', color: '#ffedd5', borderColor: '#ea580c', symbol: '=', size: 40 },
-  'logic.and': { shape: 'and-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '&', size: 48 },
-  'logic.or': { shape: 'or-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '≥1', size: 48 },
-  'logic.not': { shape: 'not-gate', color: '#dbeafe', borderColor: '#2563eb', symbol: '!', size: 48 },
-};
+/* ═══════════════════════════════════════════════════════
+   SVG Shape Renderers
+   ═══════════════════════════════════════════════════════ */
 
-function renderShape(config: any) {
-  const { shape, color, borderColor } = config;
-  if (shape === 'triangle') {
-    return (
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
-        <polygon points="5,5 95,50 5,95" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
-      </svg>
-    );
-  } else if (shape === 'square') {
-    return (
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
-        <rect x="5" y="5" width="90" height="90" rx="15" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
-      </svg>
-    );
-  } else if (shape === 'and-gate') {
-    return (
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
-        <path d="M 5,5 L 50,5 A 45,45 0 0 1 50,95 L 5,95 Z" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
-      </svg>
-    );
-  } else if (shape === 'or-gate') {
-    return (
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
-        <path d="M 5,5 C 35,5 65,30 95,50 C 65,70 35,95 5,95 C 25,70 25,30 5,5 Z" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
-      </svg>
-    );
-  } else if (shape === 'not-gate') {
-    return (
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full drop-shadow-md">
-        <polygon points="5,20 65,50 5,80" fill={color} stroke={borderColor} strokeWidth="6" strokeLinejoin="round" />
-        <circle cx="80" cy="50" r="12" fill={color} stroke={borderColor} strokeWidth="6" />
-      </svg>
-    );
+function renderShape(shape: string, w: number, h: number, bg: string, stroke: string) {
+  const s = 2;
+  switch (shape) {
+    case 'chevron':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <polygon
+            points={`${s},${s} ${w*0.65},${s} ${w-s},${h/2} ${w*0.65},${h-s} ${s},${h-s}`}
+            fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'hexagon':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <polygon
+            points={`${s},${h/2} ${w*0.22},${s} ${w*0.78},${s} ${w-s},${h/2} ${w*0.78},${h-s} ${w*0.22},${h-s}`}
+            fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'and-gate':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <path
+            d={`M ${s},${s} L ${w*0.45},${s} A ${h/2},${h/2} 0 0 1 ${w*0.45},${h-s} L ${s},${h-s} Z`}
+            fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'or-gate':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <path
+            d={`M ${s},${s} Q ${w*0.35},${s} ${w*0.5},${s+2} Q ${w*0.82},${h*0.2} ${w-s},${h/2} Q ${w*0.82},${h*0.8} ${w*0.5},${h-s-2} Q ${w*0.35},${h-s} ${s},${h-s} Q ${w*0.18},${h/2} ${s},${s} Z`}
+            fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'not-gate':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <polygon
+            points={`${s},${s} ${w*0.7},${h/2} ${s},${h-s}`}
+            fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
+          />
+          <circle cx={w*0.82} cy={h/2} r={h*0.12}
+            fill={bg} stroke={stroke} strokeWidth={s}
+          />
+        </svg>
+      );
+    case 'constant':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={5}
+            fill={bg} stroke={stroke} strokeWidth={s}
+          />
+        </svg>
+      );
+    case 'indicator':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={5}
+            fill={bg} stroke={stroke} strokeWidth={s}
+          />
+          <rect x={s+4} y={s+4} width={w-2*s-8} height={h-2*s-8} rx={3}
+            fill="#111827" opacity="0.85"
+          />
+        </svg>
+      );
+    default:
+      return null;
   }
 }
 
+/* ═══════════════════════════════════════════════════════
+   Handle position helpers
+   ═══════════════════════════════════════════════════════ */
+
+function spreadPositions(count: number): number[] {
+  if (count === 1) return [50];
+  if (count === 2) return [30, 70];
+  return Array.from({ length: count }, (_, i) => 15 + (i * 70 / Math.max(count - 1, 1)));
+}
+
+/* ═══════════════════════════════════════════════════════
+   State ring CSS helper
+   ═══════════════════════════════════════════════════════ */
+
+function stateRingClass(nodeState: string, selected: boolean, isCurrentStep: boolean): string {
+  if (isCurrentStep) return 'ring-[3px] ring-yellow-400 shadow-lg shadow-yellow-400/40 animate-pulse';
+  if (nodeState === 'error') return 'ring-2 ring-red-500 shadow-md shadow-red-500/30';
+  if (nodeState === 'running') return 'ring-2 ring-blue-500 animate-pulse';
+  if (nodeState === 'done') return 'ring-2 ring-green-500';
+  if (selected) return 'ring-2 ring-blue-400 shadow-md';
+  return '';
+}
+
+/* ═══════════════════════════════════════════════════════
+   Main BaseNode Component
+   ═══════════════════════════════════════════════════════ */
+
 export function BaseNode({ id, data, type, selected }: any) {
-  const def = NodeRegistry[type] || data?.def;
+  const actualType: string = data?.nodeType || type;
+  const def = NodeRegistry[actualType] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
   const portValues = useRuntimeStore(s => s.portValues);
   const currentStepNode = useRuntimeStore(s => s.currentStepNode);
@@ -76,215 +159,188 @@ export function BaseNode({ id, data, type, selected }: any) {
   const node = nodes.find(n => n.id === id);
   const hasBreakpoint = node?.breakpoint || false;
   const isCurrentStep = currentStepNode === id;
-  const caseId = node?.caseId;
-  const parentId = node?.parent;
-  
-  // Find parent case structure to get active case
-  const parentCase = parentId ? nodes.find(n => n.id === parentId) : undefined;
-  const isCaseStructure = parentCase?.type === 'structure.case';
-  const activeCase = parentCase?.params?.activeCase;
-  const isNodeInActiveCase = caseId === activeCase;
 
-  if (!def) return <div className="p-2 bg-red-500 text-white rounded">Unknown Node: {type}</div>;
+  if (!def) return <div className="p-2 bg-red-500 text-white rounded text-xs">Unknown: {actualType}</div>;
 
-  const category = type.split('.')[0];
-  const headerColor = getNodeColor(category);
+  const iconDef = NODE_ICONS[actualType];
+
+  /* ── Icon-based rendering (all primitives) ────────── */
+  if (iconDef) {
+    const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
+    const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
+    const inputPositions = spreadPositions(def.inputs.length);
+    const outputPositions = spreadPositions(def.outputs.length);
+
+    const isConstant = shape === 'constant';
+    const isIndicator = shape === 'indicator';
+    const paramValue = node?.params?.value;
+
+    // Determine display value
+    let displayValue = '';
+    if (isConstant) {
+      displayValue = paramValue !== undefined ? String(paramValue) : '';
+    } else if (isIndicator) {
+      const inVal = portValues[`${id}_input`];
+      displayValue = inVal !== undefined ? (typeof inVal === 'number' ? inVal.toFixed(2) : String(inVal)) : '---';
+    }
+
+    return (
+      <div
+        className={`relative cursor-pointer transition-all rounded-lg ${ringCls}`}
+        style={{ width: w, height: h }}
+        onClick={() => setSelectedNodeId(id)}
+        title={def.label}
+      >
+        {/* SVG Shape */}
+        <div className="absolute inset-0">
+          {renderShape(shape, w, h, bg, stroke)}
+        </div>
+
+        {/* Symbol / Value overlay */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10">
+          {(isConstant || isIndicator) ? (
+            <span
+              className="font-mono font-bold text-xs truncate max-w-[90%] px-1"
+              style={{ color: isIndicator ? '#39ff14' : symbolColor,
+                       textShadow: isIndicator ? '0 0 6px rgba(57,255,20,0.7)' : 'none' }}
+            >
+              {displayValue || symbol}
+            </span>
+          ) : (
+            <span className="font-bold select-none" style={{ color: symbolColor, fontSize: h * 0.45 }}>
+              {symbol}
+            </span>
+          )}
+        </div>
+
+        {/* Label below */}
+        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-gray-400 font-medium pointer-events-none select-none">
+          {def.label}
+        </div>
+
+        {/* Breakpoint dot */}
+        {hasBreakpoint && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border border-white z-20" />
+        )}
+
+        {/* Input handles */}
+        {def.inputs.map((port: any, i: number) => {
+          const topPct = inputPositions[i];
+          const val = portValues[`${id}_${port.name}`];
+          return (
+            <div key={port.name} className="group">
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={port.name}
+                style={{
+                  top: `${topPct}%`,
+                  background: getTypeColor(port.type),
+                  width: 10, height: 10,
+                  border: '2px solid white',
+                  left: -5,
+                }}
+              />
+              {/* Hover tooltip */}
+              <div
+                className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
+                style={{ top: `${topPct}%`, left: -8, transform: 'translate(-100%, -50%)' }}
+              >
+                {port.name}{val !== undefined ? `: ${String(val)}` : ''}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Output handles */}
+        {def.outputs.map((port: any, i: number) => {
+          const topPct = outputPositions[i];
+          const val = portValues[`${id}_${port.name}`];
+          return (
+            <div key={port.name} className="group">
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={port.name}
+                style={{
+                  top: `${topPct}%`,
+                  background: getTypeColor(port.type),
+                  width: 10, height: 10,
+                  border: '2px solid white',
+                  right: -5,
+                }}
+              />
+              <div
+                className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
+                style={{ top: `${topPct}%`, right: -8, transform: 'translate(100%, -50%)' }}
+              >
+                {port.name}{val !== undefined ? `: ${String(val)}` : ''}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  /* ── Fallback: generic rectangular node ────────────── */
+  const category = actualType.split('.')[0];
+  const headerColor = category === 'source' ? '#388E3C' : category === 'math' ? '#1565C0'
+    : category === 'logic' ? '#6A1B9A' : category === 'sink' ? '#E65100' : '#546E7A';
 
   let stateBorder = 'ring-1 ring-gray-300';
   if (selected) stateBorder = 'ring-2 ring-blue-400 shadow-lg';
-  if (nodeState === 'error') stateBorder = 'ring-2 ring-red-500 shadow-red-500/50';
+  if (nodeState === 'error') stateBorder = 'ring-2 ring-red-500';
   else if (nodeState === 'running') stateBorder = 'ring-2 ring-blue-500 animate-pulse';
   else if (nodeState === 'done') stateBorder = 'ring-2 ring-green-500';
+  if (isCurrentStep) stateBorder = 'ring-4 ring-yellow-400 animate-pulse';
 
-  // Highlight for current step in debug mode
-  if (isCurrentStep) {
-    stateBorder = 'ring-4 ring-yellow-400 shadow-yellow-400/50 animate-pulse';
-  }
-
-  // Case Structure visual feedback
-  let caseIndicator = null;
-  let nodeOpacity = 1;
-  let caseBorder = '';
-  
-  if (isCaseStructure && caseId) {
-    const caseColor = CASE_COLORS[caseId] || CASE_COLORS['default'];
-    
-    // Add colored top border based on case
-    caseBorder = `border-t-4`;
-    
-    // Show case indicator badge
-    caseIndicator = (
-      <span
-        className="ml-1 px-1.5 py-0.5 text-[8px] font-bold rounded text-white"
-        style={{ backgroundColor: caseColor }}
-      >
-        {caseId}
-      </span>
-    );
-    
-    // Dim nodes not in active case
-    if (!isNodeInActiveCase) {
-      nodeOpacity = 0.5;
-    }
-  }
-
-  const toggleBreakpoint = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    updateNode(id, { breakpoint: !hasBreakpoint });
-  };
-
-  const shapeConfig = SHAPE_CONFIGS[type];
-  const isCustomShape = !!shapeConfig;
-
-  // Render logic for custom SVG icon shapes
-  if (isCustomShape) {
-    const size = shapeConfig.size || 50;
-    const { inputs, outputs } = def;
-
-    return (
-      <div 
-        className={`relative flex items-center justify-center transition-all ${selected ? 'ring-2 ring-blue-500 rounded-full bg-blue-500/10' : ''} ${isCurrentStep ? 'ring-4 ring-yellow-400 rounded-lg shadow-yellow-400/50 animate-pulse' : ''} ${caseBorder}`}
-        style={{ width: size, height: size, opacity: nodeOpacity }}
-        onClick={() => setSelectedNodeId(id)}
-      >
-        {renderShape(shapeConfig)}
-        <span 
-          className="relative z-10 font-bold pointer-events-none" 
-          style={{ 
-            color: shapeConfig.borderColor, 
-            fontSize: size * 0.4, 
-            transform: shapeConfig.shape === 'triangle' ? 'translateX(-5px)' : 'none',
-          }}
-        >
-          {shapeConfig.symbol}
-        </span>
-        
-        {/* Handles */}
-        {inputs.map((port: any, idx: number) => {
-           let top = 50;
-           if (inputs.length > 1) {
-             top = 25 + (idx * (50 / (inputs.length - 1)));
-           }
-           if (shapeConfig.shape === 'triangle') top = 30 + (idx * 40); // slightly spread out for triangle flat side
-
-           return (
-             <Handle 
-               key={port.name}
-               type="target" 
-               position={Position.Left} 
-               id={port.name} 
-               style={{ background: getTypeColor(port.type), width: 10, height: 10, left: -6, top: `${top}%` }} 
-               title={`${port.name} (${port.type})`}
-             />
-           );
-        })}
-
-        {outputs.map((port: any, idx: number) => {
-           let top = 50;
-           if (outputs.length > 1) {
-             top = 25 + (idx * (50 / (outputs.length - 1)));
-           }
-           const val = portValues[`${id}_${port.name}`];
-           return (
-             <div key={port.name} className="absolute group" style={{ top: `${top}%`, left: '100%', transform: 'translateY(-50%)' }}>
-               <Handle 
-                 type="source" 
-                 position={Position.Right} 
-                 id={port.name} 
-                 style={{ background: getTypeColor(port.type), width: 10, height: 10, right: 'auto', left: -4, top: '50%' }}
-                 title={`${port.name} (${port.type})`}
-               />
-               {val !== undefined && (
-                 <span className="hidden group-hover:block absolute left-4 -top-3 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-50 whitespace-nowrap pointer-events-none">
-                   {String(val)}
-                 </span>
-               )}
-             </div>
-           );
-        })}
-      </div>
-    );
-  }
-
-  // Generic rectangular node fallback
   return (
     <div
-      className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder} ${caseBorder}`}
-      style={{ opacity: nodeOpacity }}
+      className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder}`}
       onClick={() => setSelectedNodeId(id)}
     >
-      {/* Header */}
-      <div
-         className="px-2 py-1 text-white text-xs font-semibold flex justify-between items-center"
-         style={{ backgroundColor: headerColor }}
-      >
-        <div className="flex items-center gap-1">
-          <span>{def.label}</span>
-          {caseIndicator}
-        </div>
-        {/* Breakpoint toggle button */}
+      <div className="px-2 py-1 text-white text-xs font-semibold flex justify-between items-center"
+           style={{ backgroundColor: headerColor }}>
+        <span>{def.label}</span>
         <button
-          className={`w-4 h-4 rounded-full border border-white/50 flex items-center justify-center transition-colors ${
-            hasBreakpoint ? 'bg-red-500 hover:bg-red-600' : 'bg-transparent hover:bg-white/20'
-          }`}
-          onClick={toggleBreakpoint}
-          title={hasBreakpoint ? 'Remove breakpoint' : 'Add breakpoint'}
+          className={`w-4 h-4 rounded-full border border-white/50 flex items-center justify-center transition-colors ${hasBreakpoint ? 'bg-red-500' : 'bg-transparent hover:bg-white/20'}`}
+          onClick={(e) => { e.stopPropagation(); updateNode(id, { breakpoint: !hasBreakpoint }); }}
         >
-          {hasBreakpoint && (
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
-              <circle cx="12" cy="12" r="8" />
-            </svg>
-          )}
+          {hasBreakpoint && <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="8"/></svg>}
         </button>
       </div>
-
-      {/* Body / Ports */}
       <div className="flex p-2 justify-between gap-4 text-xs relative">
-        {/* Input Ports */}
         <div className="flex flex-col gap-2 min-w-[20px]">
           {def.inputs.map((port: any) => {
-             const inputVal = portValues[`${id}_${port.name}`];
-             return (
-             <div key={port.name} className="flex items-center gap-1 h-4 relative group">
-                <Handle 
-                  type="target" 
-                  position={Position.Left} 
-                  id={port.name} 
-                  style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }} 
-                  title={`${port.name} (${port.type})`}
-                />
-                {inputVal !== undefined && (
-                   <span className="hidden group-hover:block absolute left-[-10px] -top-5 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap pointer-events-none">
-                     {String(inputVal)}
-                   </span>
+            const v = portValues[`${id}_${port.name}`];
+            return (
+              <div key={port.name} className="flex items-center gap-1 h-4 relative group">
+                <Handle type="target" position={Position.Left} id={port.name}
+                  style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }}
+                  title={`${port.name} (${port.type})`} />
+                {v !== undefined && (
+                  <span className="hidden group-hover:block absolute left-[-10px] -top-5 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap pointer-events-none">{String(v)}</span>
                 )}
                 <span className="text-gray-600 pl-1">{port.name}</span>
-             </div>
-             );
+              </div>
+            );
           })}
         </div>
-
-        {/* Output Ports */}
         <div className="flex flex-col gap-2 min-w-[20px] items-end">
           {def.outputs.map((port: any) => {
-             const val = portValues[`${id}_${port.name}`];
-             return (
-             <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
-                {val !== undefined && (
-                   <span className="hidden group-hover:block absolute right-8 -top-4 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap">
-                     {String(val)}
-                   </span>
+            const v = portValues[`${id}_${port.name}`];
+            return (
+              <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
+                {v !== undefined && (
+                  <span className="hidden group-hover:block absolute right-8 -top-4 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap">{String(v)}</span>
                 )}
                 <span className="text-gray-600 pr-1">{port.name}</span>
-                <Handle 
-                  type="source" 
-                  position={Position.Right} 
-                  id={port.name} 
+                <Handle type="source" position={Position.Right} id={port.name}
                   style={{ background: getTypeColor(port.type), width: 12, height: 12, right: -14 }}
-                  title={`${port.name} (${port.type})`}
-                />
-             </div>
-             )
+                  title={`${port.name} (${port.type})`} />
+              </div>
+            );
           })}
         </div>
       </div>
