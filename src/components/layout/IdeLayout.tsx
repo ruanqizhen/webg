@@ -9,11 +9,22 @@ import { useCallback, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { ReactFlowProvider, useReactFlow } from 'reactflow';
 
 export function IdeLayout() {
+  return (
+    <ReactFlowProvider>
+      <IdeLayoutInner />
+    </ReactFlowProvider>
+  );
+}
+
+function IdeLayoutInner() {
   const { viewMode, setViewMode } = useUIStore();
-  const { addNode, loadFromStorage, startAutoSave } = useGraphStore();
+  const { addNode, addUIControl, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
+  const reactFlow = useReactFlow();
+  const frontPanelRef = useRef<HTMLDivElement>(null);
 
   const handleZoomFit = useCallback(() => {
     zoomFitRef.current?.();
@@ -30,21 +41,88 @@ export function IdeLayout() {
     return cleanup;
   }, [loadFromStorage, startAutoSave]);
 
-  const handleDropLogic = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const type = e.dataTransfer.getData('application/reactflow');
-    if (!type) return;
+    
+    // 1. Logic Node Drop
+    const nodeType = e.dataTransfer.getData('application/node-type');
+    if (nodeType && viewMode === 'logic') {
+      const position = reactFlow.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+      
+      const id = generateId();
+      addNode({
+        id,
+        type: nodeType,
+        position,
+        inputs: [],
+        outputs: [],
+        params: {}
+      });
+      return;
+    }
 
-    const id = generateId();
-    addNode({
-      id,
-      type,
-      position: { x: e.clientX - 250, y: e.clientY - 60 },
-      inputs: [],
-      outputs: [],
-      params: {}
-    });
-  }, [addNode]);
+    // 2. UI Control Drop
+    const controlDataRaw = e.dataTransfer.getData('application/ui-control');
+    if (controlDataRaw && viewMode === 'ui') {
+      const controlDef = JSON.parse(controlDataRaw);
+      const rect = frontPanelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const termId = generateId();
+      const ctrlId = generateId();
+      const direction: 'control' | 'indicator' = controlDef.direction || 'control';
+      const isIndicator = direction === 'indicator';
+
+      const terminalDef: any = {
+        id: termId,
+        type: 'io.terminal',
+        position: { x: Math.random() * 200 + 50, y: Math.random() * 200 + 50 },
+        inputs: [],
+        outputs: [],
+        params: { value: controlDef.type === 'button' ? false : 0 }
+      };
+
+      if (isIndicator) {
+        terminalDef.inputs = [{ name: 'input', type: 'any', direction: 'input', id: 'input' }];
+      } else {
+        terminalDef.outputs = [{ name: 'output', type: 'any', direction: 'output', id: 'output' }];
+      }
+
+      // Default properties for different control types
+      const controlDefaults: Record<string, any> = {
+        numberInput: { min: 0, max: 100, step: 1, defaultValue: 0 },
+        button: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
+        numberIndicator: { defaultValue: 0 },
+        textLabel: { defaultValue: '' },
+        gauge: { min: 0, max: 100, colorOn: '#4CAF50', defaultValue: 0 },
+        indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
+      };
+
+      addUIControl({
+        id: ctrlId,
+        type: controlDef.type,
+        direction,
+        label: controlDef.label,
+        defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
+        bindingNodeId: termId,
+        x,
+        y,
+        width: controlDefaults[controlDef.type]?.width,
+        height: controlDefaults[controlDef.type]?.height,
+        min: controlDefaults[controlDef.type]?.min,
+        max: controlDefaults[controlDef.type]?.max,
+        step: controlDefaults[controlDef.type]?.step,
+        colorOn: controlDefaults[controlDef.type]?.colorOn,
+        colorOff: controlDefaults[controlDef.type]?.colorOff,
+      }, terminalDef);
+    }
+  }, [addNode, addUIControl, viewMode, reactFlow]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -77,10 +155,10 @@ export function IdeLayout() {
             {/* Tab Contents */}
             <div
               className="flex-1 flex overflow-hidden relative bg-white"
-              onDrop={viewMode === 'logic' ? handleDropLogic : undefined}
-              onDragOver={viewMode === 'logic' ? handleDragOver : undefined}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
             >
-               {viewMode === 'ui' && <FrontPanel />}
+               {viewMode === 'ui' && <FrontPanel containerRef={frontPanelRef} />}
                {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
             </div>
          </div>

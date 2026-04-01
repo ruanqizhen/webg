@@ -4,7 +4,6 @@ import ReactFlow, {
   Controls,
   MiniMap,
   useReactFlow,
-  ReactFlowProvider
 } from 'reactflow';
 import type {
   Connection,
@@ -224,9 +223,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 // Wrapper component that provides ReactFlow context
 function GraphEditorWithProvider({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
   return (
-    <ReactFlowProvider>
-      <FlowContent onZoomFitRef={onZoomFitRef} />
-    </ReactFlowProvider>
+    <FlowContent onZoomFitRef={onZoomFitRef} />
   );
 }
 

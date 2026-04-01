@@ -114,7 +114,6 @@ function ControlItem({ control }: { control: UIControl }) {
   const displayVal = inputVal !== undefined ? inputVal : control.defaultValue;
 
   const isIndicatorDir = (control.direction || 'control') === 'indicator';
-  const isControlDir = !isIndicatorDir;
 
   // Control dimensions
   const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
@@ -239,12 +238,13 @@ function ControlItem({ control }: { control: UIControl }) {
   );
 }
 
-export function FrontPanel() {
+export function FrontPanel({ containerRef }: { containerRef?: React.RefObject<HTMLDivElement | null> }) {
   const { uiControls } = useGraphStore();
   const { setSelectedControlId } = useUIStore();
 
   return (
     <div 
+      ref={containerRef}
       className="w-full h-full relative overflow-hidden flex-grow"
       style={{
         backgroundColor: '#f8fafc',

@@ -56,7 +56,12 @@ export function Palette() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleDragStartLogic = (e: React.DragEvent, nodeType: string) => {
-    e.dataTransfer.setData('application/reactflow', nodeType);
+    e.dataTransfer.setData('application/node-type', nodeType);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragStartUI = (e: React.DragEvent, controlDef: any) => {
+    e.dataTransfer.setData('application/ui-control', JSON.stringify(controlDef));
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -193,11 +198,13 @@ export function Palette() {
                {filteredUIControls.filter(c => c.direction === 'control').map((ctrl) => {
                  const Icon = UI_ICONS[ctrl.type] || Box;
                  return (
-                   <div
-                     key={ctrl.type}
-                     className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-green-300 transition-all active:scale-95 flex items-center border-l-4 border-l-green-400"
-                     onClick={() => handleClickUI(ctrl)}
-                   >
+                    <div
+                      key={ctrl.type}
+                      className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md hover:border-green-300 transition-all flex items-center border-l-4 border-l-green-400"
+                      onClick={() => handleClickUI(ctrl)}
+                      onDragStart={(e) => handleDragStartUI(e, ctrl)}
+                      draggable
+                    >
                      <Icon className="w-4 h-4 mr-2 text-green-500" />
                      {ctrl.label}
                    </div>
@@ -212,11 +219,13 @@ export function Palette() {
                {filteredUIControls.filter(c => c.direction === 'indicator').map((ctrl) => {
                  const Icon = UI_ICONS[ctrl.type] || Box;
                  return (
-                   <div
-                     key={ctrl.type}
-                     className="bg-white border p-2 rounded text-sm cursor-pointer hover:shadow-md hover:border-orange-300 transition-all active:scale-95 flex items-center border-l-4 border-l-orange-400"
-                     onClick={() => handleClickUI(ctrl)}
-                   >
+                    <div
+                      key={ctrl.type}
+                      className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md hover:border-orange-300 transition-all flex items-center border-l-4 border-l-orange-400"
+                      onClick={() => handleClickUI(ctrl)}
+                      onDragStart={(e) => handleDragStartUI(e, ctrl)}
+                      draggable
+                    >
                      <Icon className="w-4 h-4 mr-2 text-orange-500" />
                      {ctrl.label}
                    </div>
