@@ -39,6 +39,8 @@ const NODE_ICONS: Record<string, IconDef> = {
   'source.string':  { shape:'constant', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:64, h:32 },
   // ── Sink ──
   'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
+  // ── Terminal fallback ──
+  'io.terminal': { shape:'terminal', bg:'#EFF6FF', stroke:'#3B82F6', symbol:'T', symbolColor:'#1E40AF', w:40, h:40 },
 };
 
 /* ═══════════════════════════════════════════════════════
@@ -110,12 +112,26 @@ function renderShape(shape: string, w: number, h: number, bg: string, stroke: st
     case 'indicator':
       return (
         <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
-          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={5}
+          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={4}
             fill={bg} stroke={stroke} strokeWidth={s}
           />
-          <rect x={s+4} y={s+4} width={w-2*s-8} height={h-2*s-8} rx={3}
+          <rect x={s+4} y={s+4} width={w-2*s-8} height={h-2*s-8} rx={2}
             fill="#111827" opacity="0.85"
           />
+        </svg>
+      );
+    case 'term-cntl': // LabVIEW Control (Output on right)
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-sm">
+          <rect x={s} y={s} width={w-s-8} height={h-2*s} rx={1} fill={bg} stroke={stroke} strokeWidth={s} />
+          <polygon points={`${w-s-8},${h/4} ${w-s},${h/2} ${w-s-8},${h*3/4}`} fill={stroke} />
+        </svg>
+      );
+    case 'term-ind': // LabVIEW Indicator (Input on left)
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-sm">
+          <rect x={s+8} y={s} width={w-s-8} height={h-2*s} rx={1} fill={bg} stroke={stroke} strokeWidth={s} />
+          <polygon points={`${s+8},${h/4} ${s},${h/2} ${s+8},${h*3/4}`} fill={stroke} />
         </svg>
       );
     default:
@@ -157,7 +173,7 @@ export function BaseNode({ id, data, type, selected }: any) {
   const portValues = useRuntimeStore(s => s.portValues);
   const currentStepNode = useRuntimeStore(s => s.currentStepNode);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
-  const { updateNode, nodes } = useGraphStore();
+  const { updateNode, nodes, uiControls } = useGraphStore();
 
   const node = nodes.find(n => n.id === id);
   const hasBreakpoint = node?.breakpoint || false;
@@ -165,9 +181,39 @@ export function BaseNode({ id, data, type, selected }: any) {
 
   if (!def) return <div className="p-2 bg-red-500 text-white rounded text-xs">Unknown: {actualType}</div>;
 
-  const iconDef = NODE_ICONS[actualType];
+  let iconDef = NODE_ICONS[actualType];
 
-  /* ── Icon-based rendering (all primitives) ────────── */
+  /* ── Special handling for io.terminal ────────── */
+  if (actualType === 'io.terminal') {
+    const boundControl = uiControls.find(c => c.bindingNodeId === id);
+    const isIndicator = boundControl?.direction === 'indicator';
+    const ctrlType = boundControl?.type || 'numberInput';
+    
+    let color = '#3B82F6'; // Default Blue (Numeric/I32)
+    let symbol = 'DBL';
+    if (ctrlType === 'button' || ctrlType === 'indicatorLight') {
+      color = '#059669'; // Green (Boolean)
+      symbol = 'TF';
+    } else if (ctrlType === 'textLabel') {
+       color = '#DB2777'; // Pink (String)
+       symbol = 'abc';
+    } else if (ctrlType === 'gauge') {
+       color = '#EA580C'; // Orange (Indicator color)
+       symbol = 'DBL';
+    }
+
+    iconDef = {
+      shape: isIndicator ? 'term-ind' : 'term-cntl',
+      bg: `${color}15`, // Very light version of color
+      stroke: color,
+      symbol,
+      symbolColor: color,
+      w: 64,
+      h: 36
+    };
+  }
+
+  /* ── Icon-based rendering ────────── */
   if (iconDef) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
@@ -218,7 +264,7 @@ export function BaseNode({ id, data, type, selected }: any) {
 
         {/* Label below */}
         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-gray-400 font-medium pointer-events-none select-none">
-          {def.label}
+          {actualType === 'io.terminal' ? (uiControls.find(c => c.bindingNodeId === id)?.label || def.label) : def.label}
         </div>
 
         {/* Breakpoint dot */}
