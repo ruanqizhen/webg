@@ -33,10 +33,10 @@ const NODE_ICONS: Record<string, IconDef> = {
   'logic.and': { shape:'and-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'&',   symbolColor:'#1E3A8A', w:56, h:44 },
   'logic.or':  { shape:'or-gate',  bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'≥1',  symbolColor:'#1E3A8A', w:56, h:44 },
   'logic.not': { shape:'not-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'',    symbolColor:'#1E3A8A', w:52, h:42 },
-  // ── Constants ──
-  'source.numberConstant':  { shape:'constant', bg:'#DBEAFE', stroke:'#3B82F6', symbol:'#',   symbolColor:'#1E40AF', w:80, h:34 },
-  'source.booleanConstant': { shape:'constant', bg:'#D1FAE5', stroke:'#10B981', symbol:'T/F', symbolColor:'#065F46', w:80, h:34 },
-  'source.stringConstant':  { shape:'constant', bg:'#FCE7F3', stroke:'#DB2777', symbol:'abc', symbolColor:'#9D174D', w:80, h:34 },
+  // ── Constants ── LabVIEW-style color coding ──
+  'source.number':  { shape:'constant', bg:'#FFFBEB', stroke:'#D97706', symbol:'#',   symbolColor:'#78350F', w:64, h:32 },
+  'source.boolean': { shape:'constant', bg:'#F0FDF4', stroke:'#15803D', symbol:'T/F', symbolColor:'#065F46', w:64, h:32 },
+  'source.string':  { shape:'constant', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:64, h:32 },
   // ── Sink ──
   'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
 };
@@ -98,10 +98,13 @@ function renderShape(shape: string, w: number, h: number, bg: string, stroke: st
       );
     case 'constant':
       return (
-        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
-          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={5}
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-sm">
+          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={2}
             fill={bg} stroke={stroke} strokeWidth={s}
           />
+          {/* Subtle LabVIEW inner bezel-like effect */}
+          <line x1={s+2} y1={s+2} x2={w-s-2} y2={s+2} stroke="white" strokeWidth="1" opacity="0.6" />
+          <line x1={s+2} y1={s+2} x2={s+2} y2={h-s-2} stroke="white" strokeWidth="1" opacity="0.6" />
         </svg>
       );
     case 'indicator':
