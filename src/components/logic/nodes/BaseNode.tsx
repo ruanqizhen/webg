@@ -217,8 +217,10 @@ export function BaseNode({ id, data, type, selected }: any) {
   if (iconDef) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
-    const inputPositions = spreadPositions(def.inputs.length);
-    const outputPositions = spreadPositions(def.outputs.length);
+    const nodeInputs = node?.inputs || def.inputs || [];
+    const nodeOutputs = node?.outputs || def.outputs || [];
+    const inputPositions = spreadPositions(nodeInputs.length);
+    const outputPositions = spreadPositions(nodeOutputs.length);
 
     const isConstant = shape === 'constant';
     const isIndicator = shape === 'indicator';
@@ -228,9 +230,13 @@ export function BaseNode({ id, data, type, selected }: any) {
     let displayValue = '';
     if (isConstant) {
       displayValue = paramValue !== undefined ? String(paramValue) : '';
-    } else if (isIndicator) {
-      const inVal = portValues[`${id}_input`];
-      displayValue = inVal !== undefined ? (typeof inVal === 'number' ? inVal.toFixed(2) : String(inVal)) : '---';
+    } else if (isIndicator || actualType === 'io.terminal') {
+      const inPortId = `${id}_input`;
+      const outPortId = `${id}_output`;
+      const inVal = portValues[inPortId];
+      const outVal = portValues[outPortId];
+      const currentVal = inVal !== undefined ? inVal : (outVal !== undefined ? outVal : paramValue);
+      displayValue = currentVal !== undefined ? (typeof currentVal === 'number' ? currentVal.toFixed(2) : String(currentVal)) : (actualType === 'io.terminal' ? symbol : '');
     }
 
     return (
@@ -273,7 +279,7 @@ export function BaseNode({ id, data, type, selected }: any) {
         )}
 
         {/* Input handles */}
-        {def.inputs.map((port: any, i: number) => {
+        {nodeInputs.map((port: any, i: number) => {
           const topPct = inputPositions[i];
           const val = portValues[`${id}_${port.name}`];
           return (
@@ -302,7 +308,7 @@ export function BaseNode({ id, data, type, selected }: any) {
         })}
 
         {/* Output handles */}
-        {def.outputs.map((port: any, i: number) => {
+        {nodeOutputs.map((port: any, i: number) => {
           const topPct = outputPositions[i];
           const val = portValues[`${id}_${port.name}`];
           return (
