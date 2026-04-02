@@ -189,7 +189,7 @@ export function BaseNode({ id, data, type, selected }: any) {
     const isIndicator = boundControl?.direction === 'indicator';
     const ctrlType = boundControl?.type || 'numberInput';
     
-    let color = '#3B82F6'; // Default Blue (Numeric/I32)
+    let color = '#D97706'; // Default Amber (Numeric/DBL) - matching Constant
     let symbol = 'DBL';
     if (ctrlType === 'button' || ctrlType === 'indicatorLight') {
       color = '#059669'; // Green (Boolean)
@@ -198,7 +198,7 @@ export function BaseNode({ id, data, type, selected }: any) {
        color = '#DB2777'; // Pink (String)
        symbol = 'abc';
     } else if (ctrlType === 'gauge') {
-       color = '#EA580C'; // Orange (Indicator color)
+       color = '#D97706'; // Use same amber for all numerical indicators
        symbol = 'DBL';
     }
 
@@ -218,8 +218,8 @@ export function BaseNode({ id, data, type, selected }: any) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
     const isTerminal = actualType === 'io.terminal' || actualType === 'io.tunnel';
-    const nodeInputs = (isTerminal && node?.inputs && node.inputs.length > 0) ? node.inputs : (def.inputs || []);
-    const nodeOutputs = (isTerminal && node?.outputs && node.outputs.length > 0) ? node.outputs : (def.outputs || []);
+    const nodeInputs = (isTerminal && node?.inputs) ? node.inputs : (def.inputs || []);
+    const nodeOutputs = (isTerminal && node?.outputs) ? node.outputs : (def.outputs || []);
     const inputPositions = spreadPositions(nodeInputs.length);
     const outputPositions = spreadPositions(nodeOutputs.length);
 
