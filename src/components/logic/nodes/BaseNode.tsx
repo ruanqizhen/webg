@@ -30,9 +30,9 @@ const NODE_ICONS: Record<string, IconDef> = {
   'logic.less':    { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'<',  symbolColor:'#7C2D12', w:48, h:42 },
   'logic.equal':   { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'=',  symbolColor:'#7C2D12', w:48, h:42 },
   // ── Boolean Gates ── Blue ──
-  'logic.and': { shape:'and-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'&',   symbolColor:'#1E3A8A', w:56, h:44 },
-  'logic.or':  { shape:'or-gate',  bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'≥1',  symbolColor:'#1E3A8A', w:56, h:44 },
-  'logic.not': { shape:'not-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'',    symbolColor:'#1E3A8A', w:52, h:42 },
+  'logic.and': { shape:'and-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'∧',   symbolColor:'#1E3A8A', w:56, h:44 },
+  'logic.or':  { shape:'or-gate',  bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'∨',   symbolColor:'#1E3A8A', w:56, h:44 },
+  'logic.not': { shape:'not-gate', bg:'#DBEAFE', stroke:'#1D4ED8', symbol:'',    symbolColor:'#1E3A8A', w:56, h:44 },
   // ── Constants ── LabVIEW-style color coding ──
   'source.number':  { shape:'constant', bg:'#FFFBEB', stroke:'#D97706', symbol:'#',   symbolColor:'#78350F', w:64, h:32 },
   'source.boolean': { shape:'constant', bg:'#F0FDF4', stroke:'#15803D', symbol:'T/F', symbolColor:'#065F46', w:64, h:32 },
@@ -47,7 +47,7 @@ const NODE_ICONS: Record<string, IconDef> = {
    SVG Shape Renderers
    ═══════════════════════════════════════════════════════ */
 
-function renderShape(shape: string, w: number, h: number, bg: string, stroke: string) {
+function renderShape(shape: string, w: number, h: number, bg: string, stroke: string, symbolColor?: string) {
   const s = 2;
   switch (shape) {
     case 'chevron':
@@ -70,30 +70,35 @@ function renderShape(shape: string, w: number, h: number, bg: string, stroke: st
       );
     case 'and-gate':
       return (
-        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="group-hover:drop-shadow-sm transition-all">
           <path
-            d={`M ${s},${s} L ${w*0.45},${s} A ${h/2},${h/2} 0 0 1 ${w*0.45},${h-s} L ${s},${h-s} Z`}
+            d={`M ${s},${s} L ${w*0.63},${s} A ${h/2-s},${h/2-s} 0 0 1 ${w*0.63},${h-s} L ${s},${h-s} Z`}
             fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
           />
         </svg>
       );
     case 'or-gate':
       return (
-        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="group-hover:drop-shadow-sm transition-all">
           <path
-            d={`M ${s},${s} Q ${w*0.35},${s} ${w*0.5},${s+2} Q ${w*0.82},${h*0.2} ${w-s},${h/2} Q ${w*0.82},${h*0.8} ${w*0.5},${h-s-2} Q ${w*0.35},${h-s} ${s},${h-s} Q ${w*0.18},${h/2} ${s},${s} Z`}
+             d={`M ${s},${s} Q ${w*0.3},${s} ${w*0.5},${s+2} Q ${w*0.9},${h*0.2} ${w-s},${h/2} Q ${w*0.9},${h*0.8} ${w*0.5},${h-s-2} Q ${w*0.3},${h-s} ${s},${h-s} Q ${w*0.15},${h/2} ${s},${s} Z`}
             fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
           />
         </svg>
       );
     case 'not-gate':
       return (
-        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-md">
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="group-hover:drop-shadow-sm transition-all">
           <polygon
-            points={`${s},${s} ${w*0.7},${h/2} ${s},${h-s}`}
+            points={`${s},${s} ${w*0.75},${h/2} ${s},${h-s}`}
             fill={bg} stroke={stroke} strokeWidth={s} strokeLinejoin="round"
           />
-          <circle cx={w*0.82} cy={h/2} r={h*0.12}
+          {/* Lying down L symbol (¬) */}
+          <path
+            d={`M ${w*0.2},${h*0.4} L ${w*0.4},${h*0.4} L ${w*0.4},${h*0.6}`}
+            fill="none" stroke={symbolColor} strokeWidth={s}
+          />
+          <circle cx={w*0.88} cy={h/2} r={h*0.12}
             fill={bg} stroke={stroke} strokeWidth={s}
           />
         </svg>
@@ -249,7 +254,7 @@ export function BaseNode({ id, data, type, selected }: any) {
       >
         {/* SVG Shape */}
         <div className="absolute inset-0">
-          {renderShape(shape, w, h, bg, stroke)}
+          {renderShape(shape, w, h, bg, stroke, symbolColor)}
         </div>
 
         {/* Symbol / Value overlay */}
