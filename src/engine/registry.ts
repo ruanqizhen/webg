@@ -119,7 +119,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
   },
   'sink.log': {
     type: 'sink.log',
-    label: 'Log',
+    label: 'Console Log',
     inputs: [{ name: 'value', type: 'any' }],
     outputs: [],
     executor: (ctx) => {

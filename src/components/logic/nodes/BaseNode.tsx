@@ -39,6 +39,7 @@ const NODE_ICONS: Record<string, IconDef> = {
   'source.string':  { shape:'constant', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:64, h:32 },
   // ── Sink ──
   'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
+  'sink.log':     { shape:'console',   bg:'#1F2937', stroke:'#4B5563', symbol:'', symbolColor:'#10B981', w:56, h:40 },
   // ── Terminal fallback ──
   'io.terminal': { shape:'terminal', bg:'#EFF6FF', stroke:'#3B82F6', symbol:'T', symbolColor:'#1E40AF', w:40, h:40 },
 };
@@ -137,6 +138,14 @@ function renderShape(shape: string, w: number, h: number, bg: string, stroke: st
         <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="drop-shadow-sm">
           <rect x={s+8} y={s} width={w-s-8} height={h-2*s} rx={1} fill={bg} stroke={stroke} strokeWidth={s} />
           <polygon points={`${s+8},${h/4} ${s},${h/2} ${s+8},${h*3/4}`} fill={stroke} />
+        </svg>
+      );
+    case 'console':
+      return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="group-hover:drop-shadow-sm transition-all">
+          <rect x={s} y={s} width={w-2*s} height={h-2*s} rx={2} fill="#111827" stroke={stroke} strokeWidth={s} />
+          <path d={`M ${w*0.2},${h*0.35} L ${w*0.35},${h*0.5} L ${w*0.2},${h*0.65}`} fill="none" stroke={symbolColor} strokeWidth={s+1} />
+          <rect x={w*0.45} y={h*0.65} width={w*0.3} height={s+1} fill={symbolColor} />
         </svg>
       );
     default:
