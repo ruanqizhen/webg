@@ -16,19 +16,22 @@ export class ExecutionEngine {
   private updateNodeState: (id: string, s: NodeState) => void;
   private updatePortValue: (id: string, v: any) => void;
   private debugCallbacks?: DebugCallbacks;
+  private batchMode: boolean;
 
   constructor(
     graph: Graph,
     initialRuntime: RuntimeMemory,
     updateNodeState: (id: string, s: NodeState) => void,
     updatePortValue: (id: string, v: any) => void,
-    debugCallbacks?: DebugCallbacks
+    debugCallbacks?: DebugCallbacks,
+    batchMode: boolean = false
   ) {
     this.graph = graph;
     this.runtime = initialRuntime;
     this.updateNodeState = updateNodeState;
     this.updatePortValue = updatePortValue;
     this.debugCallbacks = debugCallbacks;
+    this.batchMode = batchMode;
   }
 
   // Find the ancestor of nodeId that sits exactly in the current parentId level
@@ -187,7 +190,10 @@ export class ExecutionEngine {
       if (this.debugCallbacks?.onNodeStart) {
         this.debugCallbacks.onNodeStart(node.id);
       }
-      this.updateNodeState(node.id, 'running');
+      
+      if (!this.batchMode) {
+        this.updateNodeState(node.id, 'running');
+      }
 
       try {
         const def = NodeRegistry[node.type];
@@ -273,7 +279,9 @@ export class ExecutionEngine {
            }
         }
 
-        this.updateNodeState(node.id, 'done');
+        if (!this.batchMode) {
+          this.updateNodeState(node.id, 'done');
+        }
         
         if (this.debugCallbacks?.onNodeFinish) {
           this.debugCallbacks.onNodeFinish(node.id);

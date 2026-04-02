@@ -217,8 +217,9 @@ export function BaseNode({ id, data, type, selected }: any) {
   if (iconDef) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
-    const nodeInputs = node?.inputs || def.inputs || [];
-    const nodeOutputs = node?.outputs || def.outputs || [];
+    const isTerminal = actualType === 'io.terminal' || actualType === 'io.tunnel';
+    const nodeInputs = (isTerminal && node?.inputs && node.inputs.length > 0) ? node.inputs : (def.inputs || []);
+    const nodeOutputs = (isTerminal && node?.outputs && node.outputs.length > 0) ? node.outputs : (def.outputs || []);
     const inputPositions = spreadPositions(nodeInputs.length);
     const outputPositions = spreadPositions(nodeOutputs.length);
 

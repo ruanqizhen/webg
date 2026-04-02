@@ -21,7 +21,9 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
          { nodes, edges, uiControls },
          runtimeStore,
          runtimeStore.setNodeState,
-         runtimeStore.setPortValue
+         runtimeStore.setPortValue,
+         undefined,
+         true
       );
       await engine.executeAll();
     } catch (err: any) {
