@@ -88,10 +88,17 @@ function IdeLayoutInner() {
         params: { value: controlDef.type === 'button' ? false : 0 }
       };
 
+      const getPortType = (type: string) => {
+        if (type === 'button' || type === 'indicatorLight') return 'boolean';
+        if (type === 'textLabel') return 'string';
+        return 'number';
+      };
+      const portType = getPortType(controlDef.type);
+
       if (isIndicator) {
-        terminalDef.inputs = [{ name: 'input', type: 'any', direction: 'input', id: 'input' }];
+        terminalDef.inputs = [{ name: 'input', type: portType, direction: 'input', id: 'input' }];
       } else {
-        terminalDef.outputs = [{ name: 'output', type: 'any', direction: 'output', id: 'output' }];
+        terminalDef.outputs = [{ name: 'output', type: portType, direction: 'output', id: 'output' }];
       }
 
       // Default properties for different control types
