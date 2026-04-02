@@ -274,6 +274,8 @@ export class ExecutionEngine {
              for (const edge of outEdges) {
                 if (edge.sourceNode === node.id) {
                    this.updatePortValue(`${edge.targetNode}_${edge.targetPort}`, val);
+                   // CRITICAL: Sync engine's internal runtime memory as well!
+                   this.runtime.portValues[`${edge.targetNode}_${edge.targetPort}`] = val;
                 }
              }
            }

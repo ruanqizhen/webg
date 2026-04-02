@@ -40,7 +40,9 @@ export function CustomEdge({
   if (sourceNode && sourceHandleId) {
     const def = NodeRegistry[sourceNode.type];
     if (def) {
-      const portDef = def.outputs.find((p) => p.name === sourceHandleId);
+      // Prioritize instance ports (for terminals/tunnels) over registry defaults
+      const nodeOutputs = (sourceNode.outputs && sourceNode.outputs.length > 0) ? sourceNode.outputs : (def.outputs || []);
+      const portDef = nodeOutputs.find((p) => p.name === sourceHandleId);
       if (portDef) {
         strokeColor = getTypeColor(portDef.type);
       }
