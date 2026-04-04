@@ -270,7 +270,7 @@ function ControlItem({ control }: { control: UIControl }) {
   return (
     <div
       className={`absolute flex flex-col gap-1 p-2 rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
-      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }}
+      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'move' : 'move' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -283,9 +283,9 @@ function ControlItem({ control }: { control: UIControl }) {
       </div>
 
       {control.type === 'numberInput' && (
-         <div 
+          <div 
            className="flex bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
-           onPointerDown={e => Object.assign(e, { cancelBubble: true })}
+           onPointerDown={e => e.stopPropagation()}
          >
            <input
              type="number"
@@ -301,7 +301,7 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'button' && (
-         <div className="w-full h-full flex items-center justify-center p-1" onPointerDown={e => Object.assign(e, { cancelBubble: true })}>
+         <div className="w-full h-full flex items-center justify-center p-1" onPointerDown={e => e.stopPropagation()}>
            <label className="relative inline-flex items-center cursor-pointer select-none">
              <input
                type="checkbox"
@@ -381,13 +381,13 @@ function ControlItem({ control }: { control: UIControl }) {
             />
           </div>
           {!isIndicatorDir && (
-             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-50 m-0" />
+             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-50 m-0" />
           )}
         </div>
       )}
 
       {control.type === 'slider' && (
-         <div className="w-full h-full flex flex-col justify-center px-1" onPointerDown={e => Object.assign(e, { cancelBubble: true })}>
+         <div className="w-full h-full flex flex-col justify-center px-1" onPointerDown={e => e.stopPropagation()}>
              <input 
                 type="range"
                 min={min ?? 0}
@@ -396,7 +396,7 @@ function ControlItem({ control }: { control: UIControl }) {
                 value={displayVal}
                 onChange={handleChange}
                 disabled={isIndicatorDir}
-                className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+                className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none"
              />
              <div className="flex justify-between items-center mt-2 group px-0.5">
                  <span className="text-[9px] text-gray-400">{min ?? 0}</span>
@@ -429,7 +429,7 @@ function ControlItem({ control }: { control: UIControl }) {
                 color={colorOn}
              />
              {!isIndicatorDir && (
-                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
+                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
              )}
          </div>
       )}
