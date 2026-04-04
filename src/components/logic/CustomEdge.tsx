@@ -34,19 +34,30 @@ export function CustomEdge({
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
-  // Auto-detect color from the source graph node definition
+  const edges = useGraphStore(state => state.edges);
+  // Auto-detect color from the source graph node definition, threading through tunnels
   let strokeColor = '#b1b1b7';
-  const sourceNode = nodes.find(n => n.id === source);
-  if (sourceNode && sourceHandleId) {
-    const def = NodeRegistry[sourceNode.type];
-    if (def) {
-      // Prioritize instance ports (for terminals/tunnels) over registry defaults
-      const nodeOutputs = (sourceNode.outputs && sourceNode.outputs.length > 0) ? sourceNode.outputs : (def.outputs || []);
-      const portDef = nodeOutputs.find((p) => p.name === sourceHandleId);
-      if (portDef) {
-        strokeColor = getTypeColor(portDef.type);
-      }
-    }
+  let currId = source;
+  let currPort = sourceHandleId;
+
+  for (let i = 0; i < 50; i++) {
+     const currNode = nodes.find(n => n.id === currId);
+     if (!currNode) break;
+
+     if (currNode.type === 'io.tunnel') {
+        const inEdge = edges.find(e => e.targetNode === currId);
+        if (!inEdge) break;
+        currId = inEdge.sourceNode;
+        currPort = inEdge.sourcePort;
+     } else {
+        const def = NodeRegistry[currNode.type];
+        if (def) {
+           const nodeOutputs = (currNode.outputs && currNode.outputs.length > 0) ? currNode.outputs : (def.outputs || []);
+           const portDef = nodeOutputs.find(p => p.name === currPort);
+           if (portDef) strokeColor = getTypeColor(portDef.type);
+        }
+        break;
+     }
   }
 
   const isSelected = selectedEdgeId === id;

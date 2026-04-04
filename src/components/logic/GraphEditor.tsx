@@ -65,10 +65,12 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           if (node?.type === 'io.tunnel' && node.parent) {
              const p = nodes.find(p => p.id === node.parent);
              const pW = p?.width || 300;
+             const pH = p?.height || 200;
              // Determine if it's on the left or right border based on its last known position
              const isRight = (node.position?.x ?? 0) > pW / 2;
              const fixedX = isRight ? pW - 16 : 0; // 16px is approx tunnel width
-             updateNode(c.id, { position: { x: fixedX, y: c.position.y } });
+             const clampedY = Math.max(0, Math.min(pH - 16, c.position.y));
+             updateNode(c.id, { position: { x: fixedX, y: clampedY } });
           } else {
              updateNode(c.id, { position: c.position as any });
           }
@@ -202,7 +204,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
        }
     } else {
        const parentNode = flowNodes.find(n => n.id === node.parentNode);
-       if (parentNode) {
+       if (parentNode && node.type !== 'io.tunnel') {
           const pW = parentNode.width || 300;
           const pH = parentNode.height || 200;
           if (node.position.x < 0 || node.position.x > pW || node.position.y < 0 || node.position.y > pH) {
