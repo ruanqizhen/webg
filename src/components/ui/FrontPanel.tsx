@@ -100,15 +100,16 @@ function Knob({ value, min, max, onChange, disabled }: { value: number; min: num
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled || e.button !== 0) return;
     e.stopPropagation();
-    
+    const startX = e.clientX;
     const startY = e.clientY;
     const startVal = value;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaY = startY - moveEvent.clientY; // upward drag increases
+        const deltaX = moveEvent.clientX - startX; // rightward drag increases
         const range = max - min;
         // 150px drag = full range
-        let newVal = startVal + (deltaY / 150) * range;
+        let newVal = startVal + ((deltaY + deltaX) / 150) * range;
         newVal = Math.max(min, Math.min(max, newVal));
         onChange?.(newVal);
     };
@@ -365,7 +366,7 @@ function ControlItem({ control }: { control: UIControl }) {
                  </div>
             </div>
             {!isIndicatorDir && (
-               <input type="checkbox" checked={displayVal} onChange={handleChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50 m-0" />
+               <input type="checkbox" checked={displayVal as boolean} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50 m-0" />
             )}
          </div>
       )}

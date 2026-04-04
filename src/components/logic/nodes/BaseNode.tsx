@@ -250,8 +250,27 @@ export function BaseNode({ id, data, type, selected }: any) {
       const outPortId = `${id}_output`;
       const inVal = portValues[inPortId];
       const outVal = portValues[outPortId];
-      const currentVal = inVal !== undefined ? inVal : (outVal !== undefined ? outVal : paramValue);
-      displayValue = currentVal !== undefined ? (typeof currentVal === 'number' ? currentVal.toFixed(2) : String(currentVal)) : (actualType === 'io.terminal' ? symbol : '');
+      
+      let baseVal = paramValue;
+      if (actualType === 'io.terminal') {
+         const boundControl = uiControls.find(c => c.bindingNodeId === id);
+         baseVal = paramValue !== undefined ? paramValue : boundControl?.defaultValue;
+      }
+
+      const currentVal = inVal !== undefined ? inVal : (outVal !== undefined ? outVal : baseVal);
+      
+      if (currentVal !== undefined) {
+         if (typeof currentVal === 'number') {
+            const hasFraction = currentVal % 1 !== 0;
+            displayValue = (hasFraction && currentVal !== 0) ? currentVal.toFixed(1) : String(currentVal);
+         } else if (typeof currentVal === 'boolean') {
+            displayValue = currentVal ? 'T' : 'F';
+         } else {
+            displayValue = String(currentVal);
+         }
+      } else {
+         displayValue = actualType === 'io.terminal' ? symbol : '';
+      }
     }
 
     return (
@@ -268,13 +287,13 @@ export function BaseNode({ id, data, type, selected }: any) {
 
         {/* Symbol / Value overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10">
-          {(isConstant || isIndicator) ? (
+          {(isConstant || isIndicator || actualType === 'io.terminal') ? (
             <span
               className="font-mono font-bold text-xs truncate max-w-[90%] px-1"
               style={{ color: isIndicator ? '#39ff14' : symbolColor,
                        textShadow: isIndicator ? '0 0 6px rgba(57,255,20,0.7)' : 'none' }}
             >
-              {displayValue || symbol}
+              {displayValue}
             </span>
           ) : (
             <span className="font-bold select-none" style={{ color: symbolColor, fontSize: h * 0.45 }}>
