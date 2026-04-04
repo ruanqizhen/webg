@@ -102,13 +102,24 @@ export const useGraphStore = create<GraphState>((set, get) => {
         );
 
         if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
+          const isInputTunnel = !!targetNode.parent && targetNode.parent !== sourceNode.parent;
+          const tunnelParent = isInputTunnel ? targetNode.parent : sourceNode.parent;
           const tunnelId = generateId();
-          const tunnelParent = targetNode.parent ? targetNode.parent : sourceNode.parent;
+
+          let spawnX = 0;
+          let spawnY = 50;
+          if (isInputTunnel) {
+              spawnY = Math.max(10, (targetNode.position?.y ?? 50));
+          } else {
+              const pStruct = state.nodes.find(n => n.id === tunnelParent);
+              spawnX = (pStruct?.width || 300) - 16;
+              spawnY = Math.max(10, (sourceNode.position?.y ?? 50));
+          }
 
           const tunnelNode: NodeInstance = {
             id: tunnelId,
             type: 'io.tunnel',
-            position: { x: 10, y: 10 },
+            position: { x: spawnX, y: spawnY },
             parent: tunnelParent,
             inputs: [],
             outputs: [],

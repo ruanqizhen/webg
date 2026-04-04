@@ -103,33 +103,40 @@ export function StructureNode({ id, data, type, selected }: any) {
         )}
       </div>
 
-      {/* Case label for Case Structure */}
-      {isCaseStructure && (
-        <div className="absolute top-8 left-2 text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
-          <span>Active Case:</span>
-          <span
-            className="px-1.5 py-0.5 text-[9px] rounded text-white"
-            style={{ backgroundColor: CASE_COLORS[activeCase] || CASE_COLORS['default'] }}
-          >
-            {activeCase}
-          </span>
-        </div>
-      )}
+
 
       {/* Ports for the structure itself */}
       <div className="absolute top-8 left-0 flex flex-col gap-2">
-         {def?.inputs?.map((port: any) => (
-             <div key={port.name} className="flex items-center gap-1 h-4 relative">
-                <Handle
-                  type="target"
-                  position={Position.Left}
-                  id={port.name}
-                  style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -6 }}
-                  title={`${port.name} (${port.type})`}
-                />
-                <span className="text-gray-800 pl-2 text-[10px] font-bold uppercase">{port.name}</span>
-             </div>
-          ))}
+         {def?.inputs?.map((port: any) => {
+             const isSelector = isCaseStructure && port.name === 'selector';
+             return (
+                 <div key={port.name} className={`flex items-center gap-1 h-4 relative ${isSelector ? 'mt-4' : ''}`}>
+                    <Handle
+                      type="target"
+                      position={Position.Left}
+                      id={port.name}
+                      className={isSelector ? '!rounded-sm' : ''}
+                      style={{ 
+                          background: isSelector ? '#22c55e' : getTypeColor(port.type),
+                          width: isSelector ? 16 : 12, 
+                          height: isSelector ? 16 : 12, 
+                          left: isSelector ? -8 : -6,
+                          boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.5)',
+                          border: '1px solid #14532d',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 10
+                      }}
+                      title={`${port.name} (${port.type})`}
+                    >
+                       {isSelector && <span className="text-[10px] font-black pointer-events-none text-white drop-shadow-md leading-none select-none">?</span>}
+                    </Handle>
+                    {/* For selector we hide the text label so it looks exactly like LabVIEW */}
+                    {!isSelector && <span className="text-gray-800 pl-2 text-[10px] font-bold uppercase">{port.name}</span>}
+                 </div>
+             );
+         })}
       </div>
 
       <div className="absolute top-8 right-0 flex flex-col gap-2 items-end">

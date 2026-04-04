@@ -172,7 +172,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
   'structure.case': {
     type: 'structure.case',
     label: 'Case Structure',
-    inputs: [{ id: 'selector', name: 'selector', type: 'any', direction: 'input' }],
+    inputs: [{ id: 'selector', name: 'selector', type: 'boolean', direction: 'input' }],
     outputs: [],
     params: [
       { name: 'mode', type: 'string', defaultValue: 'boolean' }, // 'boolean' or 'number'

@@ -61,13 +61,23 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     (changes: NodeChange[]) => {
       changes.forEach(c => {
         if (c.type === 'position' && c.position) {
-          updateNode(c.id, { position: c.position as any });
+          const node = nodes.find(n => n.id === c.id);
+          if (node?.type === 'io.tunnel' && node.parent) {
+             const p = nodes.find(p => p.id === node.parent);
+             const pW = p?.width || 300;
+             // Determine if it's on the left or right border based on its last known position
+             const isRight = (node.position?.x ?? 0) > pW / 2;
+             const fixedX = isRight ? pW - 16 : 0; // 16px is approx tunnel width
+             updateNode(c.id, { position: { x: fixedX, y: c.position.y } });
+          } else {
+             updateNode(c.id, { position: c.position as any });
+          }
         } else if (c.type === 'remove') {
           removeNode(c.id);
         }
       });
     },
-    [updateNode, removeNode]
+    [updateNode, removeNode, nodes]
   );
 
   const onEdgesChange = useCallback(
@@ -117,24 +127,56 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     return 'custom';
   };
 
-  const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => ({
-    id: n.id,
-    type: getFlowNodeType(n.type),
-    position: n.position,
-    data: { def: NodeRegistry[n.type], nodeType: n.type, caseId: n.caseId },
-    parentNode: n.parent,
-    ...(n.width ? { width: n.width } : {}),
-    ...(n.height ? { height: n.height } : {}),
-  })), [nodes]);
+  const flowNodes: FlowNode[] = useMemo(() => nodes.map(n => {
+    let hidden = false;
+    if (n.parent) {
+       const parentNode = nodes.find(p => p.id === n.parent);
+       if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
+          if (n.caseId && n.caseId !== parentNode.params.activeCase) {
+             hidden = true;
+          }
+       }
+    }
+    return {
+      id: n.id,
+      type: getFlowNodeType(n.type),
+      position: n.position,
+      data: { def: NodeRegistry[n.type], nodeType: n.type, caseId: n.caseId },
+      parentNode: n.parent,
+      hidden,
+      ...(n.width ? { width: n.width } : {}),
+      ...(n.height ? { height: n.height } : {}),
+    };
+  }), [nodes]);
 
-  const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => ({
-    id: e.id,
-    source: e.sourceNode,
-    target: e.targetNode,
-    sourceHandle: e.sourcePort,
-    targetHandle: e.targetPort,
-    type: 'custom',
-  })), [edges]);
+  const flowEdges: FlowEdge[] = useMemo(() => edges.map(e => {
+     let hidden = false;
+     const sourceNode = nodes.find(n => n.id === e.sourceNode);
+     const targetNode = nodes.find(n => n.id === e.targetNode);
+     
+     const checkHidden = (n: any) => {
+        if (!n || !n.parent) return false;
+        const parentNode = nodes.find(p => p.id === n.parent);
+        if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
+           if (n.caseId && n.caseId !== parentNode.params.activeCase) return true;
+        }
+        return false;
+     };
+
+     if (checkHidden(sourceNode) || checkHidden(targetNode)) {
+         hidden = true;
+     }
+
+     return {
+       id: e.id,
+       source: e.sourceNode,
+       target: e.targetNode,
+       sourceHandle: e.sourcePort,
+       targetHandle: e.targetPort,
+       type: 'custom',
+       hidden,
+     };
+  }), [edges, nodes]);
 
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
     if (!node.parentNode) {
