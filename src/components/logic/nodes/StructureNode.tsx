@@ -44,7 +44,7 @@ export function StructureNode({ id, data, type, selected }: any) {
 
   return (
     <div
-      className={`relative rounded bg-gray-100/30 min-w-[300px] min-h-[200px] w-full h-full ${stateBorder} backdrop-blur-[2px]`}
+      className={`relative rounded bg-gray-100/30 min-w-[300px] min-h-[200px] w-full h-full ${stateBorder}`}
       onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
     >
       <NodeResizer color="#ff0071" isVisible={selected} minWidth={300} minHeight={200} />
