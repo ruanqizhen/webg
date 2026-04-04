@@ -33,7 +33,7 @@ export interface Edge {
 
 export interface UIControl {
   id: string;
-  type: 'numberInput' | 'button' | 'numberIndicator' | 'textLabel' | 'gauge' | 'indicatorLight';
+  type: 'numberInput' | 'button' | 'numberIndicator' | 'textLabel' | 'gauge' | 'indicatorLight' | 'slider' | 'knob' | 'tank';
   direction: 'control' | 'indicator';
   label: string;
   defaultValue: any;

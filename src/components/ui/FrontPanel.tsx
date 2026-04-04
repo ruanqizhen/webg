@@ -50,6 +50,72 @@ function Gauge({ value, min, max, color }: { value: number; min: number; max: nu
   );
 }
 
+function Knob({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange?: (v: number) => void; disabled?: boolean }) {
+  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  const rotation = percentage * 2.7 - 135; // mapping 0-100% to -135deg to +135deg
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (disabled || e.button !== 0) return;
+    e.stopPropagation();
+    
+    const startY = e.clientY;
+    const startVal = value;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+        const deltaY = startY - moveEvent.clientY; // upward drag increases
+        const range = max - min;
+        // 150px drag = full range
+        let newVal = startVal + (deltaY / 150) * range;
+        newVal = Math.max(min, Math.min(max, newVal));
+        onChange?.(newVal);
+    };
+
+    const handlePointerUp = () => {
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+  };
+
+  return (
+    <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-400 shadow-xl border-4 border-gray-100 touch-none flex items-center justify-center cursor-ns-resize mx-auto"
+         onPointerDown={handlePointerDown}
+    >
+      <div 
+         className="w-[46px] h-[46px] rounded-full bg-gradient-to-tr from-gray-300 to-gray-500 shadow-inner transition-transform duration-75 relative z-10 pointer-events-none"
+         style={{ transform: `rotate(${rotation}deg)` }}
+      >
+         <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-3 bg-gray-800 rounded-full shadow-[0_1px_1px_rgba(255,255,255,0.5)]"></div>
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-gray-400/50"></div>
+      </div>
+      <div className="absolute -bottom-3 text-[9px] text-gray-500 font-mono w-full text-center pointer-events-none">{Number(value).toFixed(1)}</div>
+    </div>
+  );
+}
+
+function Tank({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
+  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  
+  return (
+    <div className="relative w-12 h-full min-h-[100px] bg-gray-200 rounded-md border-[3px] border-[#9ca3af] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-end mx-auto">
+       <div 
+          className="w-full transition-all duration-300 opacity-90 shadow-[0_-2px_10px_rgba(0,0,0,0.3)] relative group"
+          style={{ height: `${percentage}%`, backgroundColor: color }}
+       >
+          <div className="w-full h-1 bg-white/40"></div>
+          {/* Bubbles effect */}
+          <div className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full bg-white/30"></div>
+          <div className="absolute bottom-6 left-6 w-2 h-2 rounded-full bg-white/30"></div>
+          <div className="absolute bottom-4 right-3 w-1 h-1 rounded-full bg-white/30"></div>
+       </div>
+       <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-white/20 pointer-events-none border border-black/10"></div>
+       <div className="absolute bottom-0 w-full bg-black/30 backdrop-blur-[1px] text-center text-white text-[10px] font-mono font-bold drop-shadow-md z-10 py-0.5 pointer-events-none select-none">{Number(value).toFixed(1)}</div>
+    </div>
+  );
+}
+
 function ControlItem({ control }: { control: UIControl }) {
   const { updateUIControl, updateNode } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
@@ -233,6 +299,49 @@ function ControlItem({ control }: { control: UIControl }) {
             color={colorOn}
           />
         </div>
+      )}
+
+      {control.type === 'slider' && (
+         <div className="w-full h-full flex flex-col justify-center px-1" onPointerDown={e => Object.assign(e, { cancelBubble: true })}>
+             <input 
+                type="range"
+                min={min ?? 0}
+                max={max ?? 100}
+                step={step ?? 1}
+                value={isIndicatorDir ? displayVal : control.defaultValue}
+                onChange={isIndicatorDir ? undefined : handleChange}
+                disabled={isRunning || isIndicatorDir}
+                className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+             />
+             <div className="flex justify-between items-center mt-2 group px-0.5">
+                 <span className="text-[9px] text-gray-400">{min ?? 0}</span>
+                 <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">{Number(displayVal).toFixed(1)}</span>
+                 <span className="text-[9px] text-gray-400">{max ?? 100}</span>
+             </div>
+         </div>
+      )}
+
+      {control.type === 'knob' && (
+         <div className="w-full h-full flex flex-col justify-center flex-1 py-2">
+             <Knob
+                value={isIndicatorDir ? displayVal : control.defaultValue}
+                min={min ?? 0}
+                max={max ?? 100}
+                onChange={(v) => { if (!isIndicatorDir && !isRunning) handleChange({ target: { value: String(v) } } as any); }}
+                disabled={isRunning || isIndicatorDir}
+             />
+         </div>
+      )}
+
+      {control.type === 'tank' && (
+         <div className="w-full h-full flex items-center justify-center flex-1 py-2">
+             <Tank
+                value={Number(displayVal) || 0}
+                min={min ?? 0}
+                max={max ?? 100}
+                color={colorOn}
+             />
+         </div>
       )}
     </div>
   );

@@ -7,7 +7,8 @@ import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { 
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
-  EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box
+  EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box,
+  SlidersHorizontal, CircleDot, Database
 } from 'lucide-react';
 
 const UI_ICONS: Record<string, any> = {
@@ -17,6 +18,9 @@ const UI_ICONS: Record<string, any> = {
   textLabel: Type,
   gauge: Gauge,
   indicatorLight: Lightbulb,
+  slider: SlidersHorizontal,
+  knob: CircleDot,
+  tank: Database,
 };
 
 const LOGIC_ICONS: Record<string, any> = {
@@ -48,6 +52,9 @@ const UI_CONTROLS = [
   { type: 'textLabel', label: 'Text Label', direction: 'indicator' as const },
   { type: 'gauge', label: 'Gauge', direction: 'indicator' as const },
   { type: 'indicatorLight', label: 'Indicator Light', direction: 'indicator' as const },
+  { type: 'slider', label: 'Slider', direction: 'control' as const },
+  { type: 'knob', label: 'Knob', direction: 'control' as const },
+  { type: 'tank', label: 'Tank', direction: 'indicator' as const },
 ];
 
 export function Palette() {

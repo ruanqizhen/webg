@@ -213,8 +213,8 @@ export function PropertiesPanel() {
                  />
               </div>
 
-              {/* Min/Max/Step for numberInput and gauge */}
-              {['numberInput', 'gauge'].includes(activeControl.type) && (
+              {/* Min/Max/Step for numeric controls */}
+              {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
                 <>
                   <div className="flex flex-col gap-1">
                     <label className="text-gray-500 font-semibold">Min</label>
@@ -238,7 +238,7 @@ export function PropertiesPanel() {
                     />
                   </div>
 
-                  {activeControl.type === 'numberInput' && (
+                  {['numberInput', 'slider', 'knob'].includes(activeControl.type) && (
                     <div className="flex flex-col gap-1">
                       <label className="text-gray-500 font-semibold">Step</label>
                       <input
@@ -252,8 +252,8 @@ export function PropertiesPanel() {
                 </>
               )}
 
-              {/* Color On/Off for button and indicatorLight */}
-              {['button', 'indicatorLight', 'gauge'].includes(activeControl.type) && (
+              {/* Color On/Off for boolean and some indicators */}
+              {['button', 'indicatorLight', 'gauge', 'tank'].includes(activeControl.type) && (
                 <>
                   <div className="flex flex-col gap-1">
                     <label className="text-gray-500 font-semibold">Color (On/Active)</label>
