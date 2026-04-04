@@ -6,46 +6,89 @@ import type { UIControl } from '../../types/graph';
 
 function Gauge({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
   const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
-  const rotation = (percentage / 100) * 180 - 90; // -90 to 90 degrees
+  const rotation = percentage * 1.8 - 90; // -90 to 90 degrees
 
   return (
-    <div className="relative w-24 h-12 overflow-hidden">
-      {/* Silver Bezel */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[104px] h-[104px] rounded-full border-[2px] border-gray-400 bg-gradient-to-br from-gray-100 to-gray-300 shadow-md"
-        style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
-      />
-      {/* Gauge background (semi-circle) */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-[12px] border-[#e0e0e0] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] z-10"
-        style={{ borderTopLeftRadius: '100%', borderTopRightRadius: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
-      />
-      {/* Colored arc overlay */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-24"
-        style={{
-          background: `conic-gradient(from 180deg at 50% 50%, ${color} 0deg, ${color} ${percentage * 1.8}deg, transparent ${percentage * 1.8}deg, transparent 180deg)`,
-          borderTopLeftRadius: '100%',
-          borderTopRightRadius: '100%',
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-        }}
-      />
-      {/* Center cap - Metallic */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gradient-to-br from-gray-400 to-gray-700 shadow-[0_2px_4px_rgba(0,0,0,0.5)] z-30 flex items-center justify-center">
-         <div className="w-2 h-2 rounded-full bg-gray-800 shadow-inner"></div>
+    <div className="relative w-[144px] h-[76px] flex justify-center items-end drop-shadow-md pb-2">
+      {/* Outer Casing - Metallic */}
+      <div className="absolute -bottom-[2px] w-[136px] h-[68px] rounded-t-full bg-gradient-to-b from-gray-200 to-gray-500 border-[3px] border-b-0 border-[#d1d5db] shadow-xl overflow-hidden">
+          {/* Inner dark dial */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[116px] h-[58px] rounded-t-full bg-[#111] shadow-[inset_0_5px_10px_rgba(0,0,0,0.9)] border border-b-0 border-gray-600">
+          </div>
       </div>
-      {/* Needle */}
-      <div
-        className="absolute bottom-0 left-1/2 w-0.5 h-10 bg-red-600 origin-bottom transition-transform duration-300 shadow-md z-20"
-        style={{
-          transform: `translateX(-50%) rotate(${rotation}deg)`,
-          bottom: '1px',
 
-        }}
-      />
-      {/* Min/Max labels */}
-      <span className="absolute bottom-0 left-0 text-[9px] text-gray-500">{min}</span>
-      <span className="absolute bottom-0 right-0 text-[9px] text-gray-500">{max}</span>
+      {/* SVG Arc and Ticks */}
+      <div className="absolute bottom-0 w-[116px] h-[58px] overflow-visible mix-blend-screen isolate pointer-events-none z-10 rounded-t-full">
+         <svg viewBox="0 0 116 58" className="w-full h-full overflow-visible">
+            {/* Background Arc */}
+            <path d="M 13 58 A 45 45 0 0 1 103 58" fill="none" stroke="#333" strokeWidth="6" strokeLinecap="round" />
+            
+            {/* Active Color Sweep */}
+            <path 
+               d="M 13 58 A 45 45 0 0 1 103 58" 
+               fill="none" 
+               stroke={color} 
+               strokeWidth="6" 
+               strokeDasharray="141.37" 
+               strokeDashoffset={141.37 - (percentage / 100) * 141.37} 
+               strokeLinecap="round" 
+               style={{ transition: 'stroke-dashoffset 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+            />
+
+            {/* Ticks */}
+            {[...Array(21)].map((_, i) => {
+              const angle = 180 - (i * 9); // 180 to 0
+              const rad = (angle * Math.PI) / 180;
+              const isMajor = i % 5 === 0;
+              const r1 = isMajor ? 50 : 54;
+              const r2 = 58;
+              const x1 = 58 + r1 * Math.cos(rad);
+              const y1 = 58 - r1 * Math.sin(rad);
+              const x2 = 58 + r2 * Math.cos(rad);
+              const y2 = 58 - r2 * Math.sin(rad);
+              // Calculate text positions for major ticks
+              const tx = 58 + 40 * Math.cos(rad);
+              const ty = 58 - 38 * Math.sin(rad);
+              const tickVal = min + (i / 20) * (max - min);
+              
+              return (
+                <g key={i}>
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isMajor ? '#e5e7eb' : '#6b7280'} strokeWidth={isMajor ? 2 : 1} />
+                  {isMajor && angle !== 0 && angle !== 180 && (
+                    <text x={tx} y={ty} fill="#9ca3af" fontSize="6px" fontWeight="bold" fontFamily="monospace" textAnchor="middle" dominantBaseline="middle" opacity="0.8">
+                      {Math.round(tickVal)}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+         </svg>
+      </div>
+
+      {/* Min/Max/Current Value Labels */}
+      <span className="absolute bottom-1 left-3 text-[8px] font-mono font-bold text-gray-300 z-20 drop-shadow-md">{min}</span>
+      <span className="absolute bottom-1 right-3 text-[8px] font-mono font-bold text-gray-300 z-20 drop-shadow-md">{max}</span>
+      
+      <div className="absolute bottom-[20px] text-[10px] font-mono font-bold text-[#0f0] drop-shadow-[0_0_3px_#0f0] z-20 bg-black/60 px-1.5 py-0.5 rounded shadow-inner leading-none border border-gray-800 tracking-wider">
+         {Number(value).toFixed(1)}
+      </div>
+
+      {/* Realistic Needle */}
+      <div className="absolute bottom-[-5px] left-1/2 w-[5px] h-[58px] -translate-x-1/2 origin-[center_100%] transition-transform duration-300 ease-out z-30 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter"
+           style={{ transform: `rotate(${rotation}deg)` }}
+      >
+         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[2.5px] border-r-[2.5px] border-b-[58px] border-l-transparent border-r-transparent border-b-[#dc2626]"></div>
+         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[1.25px] border-r-[1.25px] border-b-[58px] border-l-transparent border-r-transparent border-b-white/30"></div>
+      </div>
+
+      {/* Center cap - Brushed metal look */}
+      <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gradient-to-br from-gray-300 to-gray-600 shadow-[0_3px_6px_rgba(0,0,0,0.7)] z-40 flex items-center justify-center border-2 border-gray-400">
+         <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 shadow-[inset_0_1px_3px_rgba(0,0,0,1)] flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-gray-500"></div>
+         </div>
+         <div className="absolute w-[80%] h-px bg-white/40 rotate-45 shadow-[0_1px_0_rgba(0,0,0,0.2)]"></div>
+         <div className="absolute w-px h-[80%] bg-white/40 rotate-45 shadow-[1px_0_0_rgba(0,0,0,0.2)]"></div>
+      </div>
     </div>
   );
 }
@@ -304,8 +347,8 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'indicatorLight' && (
-         <div className="flex-1 flex items-center justify-center overflow-hidden">
-            <div style={{ transform: `scale(${Math.min(width / 60, height / 60)})`, transformOrigin: 'center center' }}>
+         <div className="flex-1 flex items-center justify-center">
+            <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 40, (height - 40) / 40))})`, transformOrigin: 'center center' }}>
                  <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
                     {/* Inner Dark Cavity */}
                     <div className="w-full h-full rounded-full bg-[#333] p-[2px] shadow-[inset_0_3px_5px_rgba(0,0,0,0.8)] border border-gray-600">
@@ -328,8 +371,8 @@ function ControlItem({ control }: { control: UIControl }) {
 
       {control.type === 'gauge' && (
         <div className="flex-1 flex items-center justify-center overflow-hidden">
-          <div style={{ transform: `scale(${Math.min(width / 110, height / 80)})`, transformOrigin: 'center center' }}>
-            <Gauge
+          <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 144, (height - 40) / 84))})`, transformOrigin: 'center center' }}>
+             <Gauge
               value={Number(displayVal) || 0}
               min={min ?? 0}
               max={max ?? 100}
@@ -360,8 +403,8 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'knob' && (
-         <div className="w-full h-full flex flex-col justify-center items-center flex-1 py-2 overflow-hidden">
-             <div style={{ transform: `scale(${Math.min(width / 75, height / 75)})`, transformOrigin: 'center center' }}>
+         <div className="w-full h-full flex flex-col justify-center items-center flex-1 py-1">
+             <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 64, (height - 40) / 72))})`, transformOrigin: 'center center' }}>
                  <Knob
                     value={isIndicatorDir ? displayVal : control.defaultValue}
                     min={min ?? 0}
