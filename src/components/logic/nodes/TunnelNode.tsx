@@ -14,8 +14,8 @@ export function TunnelNode({ id, selected }: any) {
       onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       title={val !== undefined ? String(val) : 'Tunnel'}
     >
-      <Handle type="target" position={Position.Left} id="input" style={{ opacity: 0, width: 20, height: 20, left: -8, top: -2 }} />
-      <Handle type="source" position={Position.Right} id="output" style={{ opacity: 0, width: 20, height: 20, right: -8, top: -2 }} />
+      <Handle type="target" position={Position.Left} id="input" style={{ opacity: 0, width: 2, height: 2, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} />
+      <Handle type="source" position={Position.Right} id="output" style={{ opacity: 0, width: 2, height: 2, right: '50%', top: '50%', transform: 'translate(50%, -50%)' }} />
     </div>
   );
 }
