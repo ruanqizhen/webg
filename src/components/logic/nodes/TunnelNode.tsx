@@ -16,13 +16,6 @@ export function TunnelNode({ id, selected }: any) {
     >
       <Handle type="target" position={Position.Left} id="input" style={{ opacity: 0, width: 20, height: 20, left: -8, top: -2 }} />
       <Handle type="source" position={Position.Right} id="output" style={{ opacity: 0, width: 20, height: 20, right: -8, top: -2 }} />
-      
-      {/* Tooltip for runtime value */}
-      {val !== undefined && (
-         <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap">
-           {String(val)}
-         </span>
-      )}
     </div>
   );
 }
