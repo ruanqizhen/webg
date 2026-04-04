@@ -239,19 +239,18 @@ function ControlItem({ control }: { control: UIControl }) {
     };
   }, []);
 
+  const isIndicatorDir = (control.direction || 'control') === 'indicator';
+  const inputVal = portValues[`${terminalId}_input`];
+  const displayVal = (isIndicatorDir && inputVal !== undefined) ? inputVal : control.defaultValue;
+
   const handleChange = (e: any) => {
     let newVal = e.target.value;
-    if (control.type === 'numberInput') newVal = Number(newVal);
-    if (control.type === 'button') newVal = e.target.checked;
+    if (['numberInput', 'slider', 'knob', 'gauge', 'tank'].includes(control.type)) newVal = Number(newVal);
+    if (['button', 'indicatorLight'].includes(control.type)) newVal = e.target.checked;
 
     updateUIControl(control.id, { defaultValue: newVal });
     updateNode(terminalId, { params: { value: newVal } });
   }
-
-  const inputVal = portValues[`${terminalId}_input`];
-  const displayVal = inputVal !== undefined ? inputVal : control.defaultValue;
-
-  const isIndicatorDir = (control.direction || 'control') === 'indicator';
 
   // Control dimensions
   const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
@@ -290,14 +289,13 @@ function ControlItem({ control }: { control: UIControl }) {
          >
            <input
              type="number"
-             value={isIndicatorDir ? displayVal : control.defaultValue}
-             onChange={isIndicatorDir ? undefined : handleChange}
+             value={displayVal}
+             onChange={handleChange}
              min={min}
              max={max}
              step={step}
              className="bg-transparent text-right font-mono font-semibold text-gray-800 w-full focus:outline-none focus:text-blue-600"
-             disabled={isRunning || isIndicatorDir}
-             readOnly={isIndicatorDir}
+             disabled={isIndicatorDir}
            />
          </div>
       )}
@@ -307,15 +305,15 @@ function ControlItem({ control }: { control: UIControl }) {
            <label className="relative inline-flex items-center cursor-pointer select-none">
              <input
                type="checkbox"
-               checked={control.defaultValue}
+               checked={displayVal as boolean}
                onChange={handleChange}
-               disabled={isRunning}
+               disabled={isIndicatorDir}
                className="sr-only peer"
              />
              <div className={`w-14 h-8 rounded-full shadow-[inset_0_3px_6px_rgba(0,0,0,0.4)] border border-gray-400 transition-colors drop-shadow-sm`} 
-                  style={{ backgroundColor: control.defaultValue ? colorOn : colorOff }}
+                  style={{ backgroundColor: displayVal ? colorOn : colorOff }}
              >
-                <div className={`absolute top-[2px] left-[2px] bg-gradient-to-b from-gray-100 to-gray-400 border border-gray-500 shadow-[0_2px_4px_rgba(0,0,0,0.5)] rounded-full h-6 w-6 transition-all duration-200 flex items-center justify-center ${control.defaultValue ? 'translate-x-[24px]' : ''}`}>
+                <div className={`absolute top-[2px] left-[2px] bg-gradient-to-b from-gray-100 to-gray-400 border border-gray-500 shadow-[0_2px_4px_rgba(0,0,0,0.5)] rounded-full h-6 w-6 transition-all duration-200 flex items-center justify-center ${displayVal ? 'translate-x-[24px]' : ''}`}>
                    <div className="flex gap-[2px]">
                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
@@ -347,7 +345,7 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'indicatorLight' && (
-         <div className="flex-1 flex items-center justify-center">
+         <div className="flex-1 flex items-center justify-center relative">
             <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 40, (height - 40) / 40))})`, transformOrigin: 'center center' }}>
                  <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
                     {/* Inner Dark Cavity */}
@@ -366,11 +364,14 @@ function ControlItem({ control }: { control: UIControl }) {
                     </div>
                  </div>
             </div>
+            {!isIndicatorDir && (
+               <input type="checkbox" checked={displayVal} onChange={handleChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50 m-0" />
+            )}
          </div>
       )}
 
       {control.type === 'gauge' && (
-        <div className="flex-1 flex items-center justify-center overflow-hidden">
+        <div className="flex-1 flex items-center justify-center overflow-hidden relative">
           <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 144, (height - 40) / 84))})`, transformOrigin: 'center center' }}>
              <Gauge
               value={Number(displayVal) || 0}
@@ -379,6 +380,9 @@ function ControlItem({ control }: { control: UIControl }) {
               color={colorOn}
             />
           </div>
+          {!isIndicatorDir && (
+             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-50 m-0" />
+          )}
         </div>
       )}
 
@@ -389,9 +393,9 @@ function ControlItem({ control }: { control: UIControl }) {
                 min={min ?? 0}
                 max={max ?? 100}
                 step={step ?? 1}
-                value={isIndicatorDir ? displayVal : control.defaultValue}
-                onChange={isIndicatorDir ? undefined : handleChange}
-                disabled={isRunning || isIndicatorDir}
+                value={displayVal}
+                onChange={handleChange}
+                disabled={isIndicatorDir}
                 className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
              />
              <div className="flex justify-between items-center mt-2 group px-0.5">
@@ -406,24 +410,27 @@ function ControlItem({ control }: { control: UIControl }) {
          <div className="w-full h-full flex flex-col justify-center items-center flex-1 py-1">
              <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 64, (height - 40) / 72))})`, transformOrigin: 'center center' }}>
                  <Knob
-                    value={isIndicatorDir ? displayVal : control.defaultValue}
+                    value={displayVal}
                     min={min ?? 0}
                     max={max ?? 100}
-                    onChange={(v) => { if (!isIndicatorDir && !isRunning) handleChange({ target: { value: String(v) } } as any); }}
-                    disabled={isRunning || isIndicatorDir}
+                    onChange={(v) => handleChange({ target: { value: String(v) } })}
+                    disabled={isIndicatorDir}
                  />
              </div>
          </div>
       )}
 
       {control.type === 'tank' && (
-         <div className="w-full h-full flex items-center justify-center flex-1 py-2">
+         <div className="w-full h-full flex items-center justify-center flex-1 py-1 relative">
              <Tank
                 value={Number(displayVal) || 0}
                 min={min ?? 0}
                 max={max ?? 100}
                 color={colorOn}
              />
+             {!isIndicatorDir && (
+                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
+             )}
          </div>
       )}
 
