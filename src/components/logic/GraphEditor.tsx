@@ -217,7 +217,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
        }
     }
 
-    if (node.parentNode) {
+    if (node.parentNode && node.type !== 'io.tunnel') {
       const parentNode = nodes.find(n => n.id === node.parentNode);
       if (parentNode?.type === 'structure.case') {
         const activeCase = parentNode.params?.activeCase;
