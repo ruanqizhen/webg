@@ -99,7 +99,7 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
   const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
   
   return (
-    <div className="relative w-12 h-full min-h-[100px] bg-gray-200 rounded-md border-[3px] border-[#9ca3af] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-end mx-auto">
+    <div className="relative w-full max-w-[60%] h-full min-h-[50px] bg-gray-200 rounded-md border-[3px] border-[#9ca3af] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-end mx-auto">
        <div 
           className="w-full transition-all duration-300 opacity-90 shadow-[0_-2px_10px_rgba(0,0,0,0.3)] relative group"
           style={{ height: `${percentage}%`, backgroundColor: color }}
@@ -124,11 +124,23 @@ function ControlItem({ control }: { control: UIControl }) {
 
   const terminalId = control.bindingNodeId;
   const [isDragging, setIsDragging] = useState(false);
+  const [resizeMode, setResizeMode] = useState<string | null>(null);
   const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
 
   const onPointerDown = (e: React.PointerEvent) => {
     setSelectedControlId(control.id);
     setIsDragging(true);
+    setResizeMode(null);
+    dragRef.current.pointerId = e.pointerId;
+    dragRef.current.element = e.currentTarget;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    setSelectedControlId(control.id);
+    setIsDragging(true);
+    setResizeMode(mode);
     dragRef.current.pointerId = e.pointerId;
     dragRef.current.element = e.currentTarget;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -136,15 +148,32 @@ function ControlItem({ control }: { control: UIControl }) {
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (isDragging) {
-      updateUIControl(control.id, {
-        x: (control.x || 0) + e.movementX,
-        y: (control.y || 0) + e.movementY,
-      });
+      if (!resizeMode) {
+        updateUIControl(control.id, {
+          x: (control.x || 0) + e.movementX,
+          y: (control.y || 0) + e.movementY,
+        });
+      } else {
+        const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
+        const currentHeight = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
+        
+        let newWidth = currentWidth;
+        let newHeight = currentHeight;
+        
+        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX);
+        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY);
+        
+        updateUIControl(control.id, {
+          width: newWidth,
+          height: newHeight,
+        });
+      }
     }
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
+    setResizeMode(null);
     dragRef.current.pointerId = null;
     dragRef.current.element = null;
     try {
@@ -194,13 +223,16 @@ function ControlItem({ control }: { control: UIControl }) {
   const max = control.max !== undefined ? control.max : undefined;
   const step = control.step !== undefined ? control.step : 1;
 
+  const isSelected = selectedControlId === control.id;
+
   return (
     <div
-      className={`absolute flex flex-col gap-1 p-2 rounded ${selectedControlId === control.id ? 'bg-blue-50/50 outline outline-1 outline-blue-400 cursor-grabbing' : 'hover:outline hover:outline-1 hover:outline-gray-300 cursor-grab'} select-none transition-all duration-200`}
-      style={{ left: control.x || 50, top: control.y || 50, width: width, minHeight: height }}
+      className={`absolute flex flex-col gap-1 p-2 rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
+      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
     >
       <div className="flex items-center justify-between mb-1">
         <label className="text-xs font-bold text-gray-600 drop-shadow-sm pointer-events-none cursor-inherit select-none">
@@ -272,32 +304,38 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'indicatorLight' && (
-         <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
-            {/* Inner Dark Cavity */}
-            <div className="w-full h-full rounded-full bg-[#333] p-[2px] shadow-[inset_0_3px_5px_rgba(0,0,0,0.8)] border border-gray-600">
-               {/* Glowing Bulb Surface */}
-               <div
-                 className="w-full h-full rounded-full transition-all duration-300 relative overflow-hidden"
-                 style={{
-                   background: displayVal ? `radial-gradient(circle at 35% 35%, #fff 5%, ${colorOn} 40%, #000 95%)` : `radial-gradient(circle at 35% 35%, #666 5%, #222 40%, #000 95%)`,
-                   boxShadow: displayVal ? `0 0 15px 3px ${colorOn}` : 'none',
-                 }}
-               >
-                 {displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-70 blur-[1px] rotate-[-40deg]" />}
-                 {!displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-10 blur-[1px] rotate-[-40deg]" />}
-               </div>
+         <div className="flex-1 flex items-center justify-center overflow-hidden">
+            <div style={{ transform: `scale(${Math.min(width / 60, height / 60)})`, transformOrigin: 'center center' }}>
+                 <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
+                    {/* Inner Dark Cavity */}
+                    <div className="w-full h-full rounded-full bg-[#333] p-[2px] shadow-[inset_0_3px_5px_rgba(0,0,0,0.8)] border border-gray-600">
+                       {/* Glowing Bulb Surface */}
+                       <div
+                         className="w-full h-full rounded-full transition-all duration-300 relative overflow-hidden"
+                         style={{
+                           background: displayVal ? `radial-gradient(circle at 35% 35%, #fff 5%, ${colorOn} 40%, #000 95%)` : `radial-gradient(circle at 35% 35%, #666 5%, #222 40%, #000 95%)`,
+                           boxShadow: displayVal ? `0 0 15px 3px ${colorOn}` : 'none',
+                         }}
+                       >
+                         {displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-70 blur-[1px] rotate-[-40deg]" />}
+                         {!displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-10 blur-[1px] rotate-[-40deg]" />}
+                       </div>
+                    </div>
+                 </div>
             </div>
          </div>
       )}
 
       {control.type === 'gauge' && (
-        <div className="flex-1 flex items-center justify-center">
-          <Gauge
-            value={Number(displayVal) || 0}
-            min={min ?? 0}
-            max={max ?? 100}
-            color={colorOn}
-          />
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <div style={{ transform: `scale(${Math.min(width / 110, height / 80)})`, transformOrigin: 'center center' }}>
+            <Gauge
+              value={Number(displayVal) || 0}
+              min={min ?? 0}
+              max={max ?? 100}
+              color={colorOn}
+            />
+          </div>
         </div>
       )}
 
@@ -322,14 +360,16 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'knob' && (
-         <div className="w-full h-full flex flex-col justify-center flex-1 py-2">
-             <Knob
-                value={isIndicatorDir ? displayVal : control.defaultValue}
-                min={min ?? 0}
-                max={max ?? 100}
-                onChange={(v) => { if (!isIndicatorDir && !isRunning) handleChange({ target: { value: String(v) } } as any); }}
-                disabled={isRunning || isIndicatorDir}
-             />
+         <div className="w-full h-full flex flex-col justify-center items-center flex-1 py-2 overflow-hidden">
+             <div style={{ transform: `scale(${Math.min(width / 75, height / 75)})`, transformOrigin: 'center center' }}>
+                 <Knob
+                    value={isIndicatorDir ? displayVal : control.defaultValue}
+                    min={min ?? 0}
+                    max={max ?? 100}
+                    onChange={(v) => { if (!isIndicatorDir && !isRunning) handleChange({ target: { value: String(v) } } as any); }}
+                    disabled={isRunning || isIndicatorDir}
+                 />
+             </div>
          </div>
       )}
 
@@ -342,6 +382,27 @@ function ControlItem({ control }: { control: UIControl }) {
                 color={colorOn}
              />
          </div>
+      )}
+
+      {/* Resize Handles */}
+      {isSelected && (
+         <>
+           {/* East Handle */}
+           <div 
+             className="absolute top-0 right-[-4px] bottom-0 w-[8px] cursor-e-resize z-50 hover:bg-blue-400/50 transition-colors"
+             onPointerDown={onResizePointerDown('e')}
+           />
+           {/* South Handle */}
+           <div 
+             className="absolute bottom-[-4px] left-0 right-0 h-[8px] cursor-s-resize z-50 hover:bg-blue-400/50 transition-colors"
+             onPointerDown={onResizePointerDown('s')}
+           />
+           {/* South-East Handle */}
+           <div 
+             className="absolute bottom-[-6px] right-[-6px] w-[12px] h-[12px] bg-white border-2 border-blue-500 cursor-se-resize z-50 rounded-full shadow-sm hover:scale-125 transition-transform"
+             onPointerDown={onResizePointerDown('se')}
+           />
+         </>
       )}
     </div>
   );
