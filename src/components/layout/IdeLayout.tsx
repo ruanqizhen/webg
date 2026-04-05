@@ -24,7 +24,8 @@ function IdeLayoutInner() {
   const { addNode, addUIControl, uiControls, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
   const reactFlow = useReactFlow();
-  const frontPanelRef = useRef<HTMLDivElement>(null);
+  const frontPanelRef = useRef<{ screenToPanelPosition: (x: number, y: number) => { x: number, y: number } }>(null);
+  const frontPanelDivRef = useRef<HTMLDivElement>(null);
 
   const handleZoomFit = useCallback(() => {
     zoomFitRef.current?.();
@@ -68,11 +69,10 @@ function IdeLayoutInner() {
     const controlDataRaw = e.dataTransfer.getData('application/ui-control');
     if (controlDataRaw && viewMode === 'ui') {
       const controlDef = JSON.parse(controlDataRaw);
-      const rect = frontPanelRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const pos = frontPanelRef.current?.screenToPanelPosition(e.clientX, e.clientY);
+      if (!pos) return;
 
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const { x, y } = pos;
 
       const termId = generateId();
       const ctrlId = generateId();
@@ -171,7 +171,7 @@ function IdeLayoutInner() {
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >
-               {viewMode === 'ui' && <FrontPanel containerRef={frontPanelRef} />}
+               {viewMode === 'ui' && <FrontPanel ref={frontPanelRef} containerRef={frontPanelDivRef} />}
                {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
             </div>
          </div>

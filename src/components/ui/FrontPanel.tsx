@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -160,7 +160,7 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
   );
 }
 
-function ControlItem({ control }: { control: UIControl }) {
+function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
   const { updateUIControl, updateNode } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
   const portValues = useRuntimeStore(s => s.portValues);
@@ -194,8 +194,8 @@ function ControlItem({ control }: { control: UIControl }) {
     if (isDragging) {
       if (!resizeMode) {
         updateUIControl(control.id, {
-          x: (control.x || 0) + e.movementX,
-          y: (control.y || 0) + e.movementY,
+          x: (control.x || 0) + e.movementX / transform.scale,
+          y: (control.y || 0) + e.movementY / transform.scale,
         });
       } else {
         const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
@@ -204,8 +204,8 @@ function ControlItem({ control }: { control: UIControl }) {
         let newWidth = currentWidth;
         let newHeight = currentHeight;
         
-        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX);
-        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY);
+        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX / transform.scale);
+        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY / transform.scale);
         
         updateUIControl(control.id, {
           width: newWidth,
@@ -285,7 +285,7 @@ function ControlItem({ control }: { control: UIControl }) {
 
       {control.type === 'numberInput' && (
           <div 
-           className="flex bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
+           className="flex-1 flex items-center bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
            onPointerDown={e => e.stopPropagation()}
          >
            <input
@@ -295,35 +295,38 @@ function ControlItem({ control }: { control: UIControl }) {
              min={min}
              max={max}
              step={step}
-             className="bg-transparent text-right font-mono font-semibold text-gray-800 w-full focus:outline-none focus:text-blue-600"
+             className="bg-transparent text-center font-mono font-semibold text-gray-800 w-full h-full focus:outline-none focus:text-blue-600"
+             style={{ fontSize: `${Math.max(14, Math.min(height / 2, width / 6))}px` }}
              disabled={isIndicatorDir}
            />
          </div>
       )}
 
       {control.type === 'button' && (
-         <div className="w-full h-full flex items-center justify-center p-1" onPointerDown={e => e.stopPropagation()}>
-           <label className="relative inline-flex items-center cursor-pointer select-none">
-             <input
-               type="checkbox"
-               checked={displayVal as boolean}
-               onChange={handleChange}
-               disabled={isIndicatorDir}
-               className="sr-only peer"
-             />
-             <div className={`w-14 h-8 rounded-full shadow-[inset_0_3px_6px_rgba(0,0,0,0.4)] border border-gray-400 transition-colors drop-shadow-sm`} 
-                  style={{ backgroundColor: displayVal ? colorOn : colorOff }}
-             >
-                <div className={`absolute top-[2px] left-[2px] bg-gradient-to-b from-gray-100 to-gray-400 border border-gray-500 shadow-[0_2px_4px_rgba(0,0,0,0.5)] rounded-full h-6 w-6 transition-all duration-200 flex items-center justify-center ${displayVal ? 'translate-x-[24px]' : ''}`}>
-                   <div className="flex gap-[2px]">
-                      <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                      <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                      <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                   </div>
-                </div>
-             </div>
-           </label>
-         </div>
+          <div className="w-full h-full flex items-center justify-center p-1" onPointerDown={e => e.stopPropagation()}>
+            <label className="relative inline-flex items-center cursor-pointer select-none"
+                   style={{ transform: `scale(${Math.max(0.5, Math.min((width - 8) / 60, (height - 30) / 40))})`, transformOrigin: 'center center' }}
+            >
+              <input
+                type="checkbox"
+                checked={displayVal as boolean}
+                onChange={handleChange}
+                disabled={isIndicatorDir}
+                className="sr-only peer"
+              />
+              <div className={`w-14 h-8 rounded-full shadow-[inset_0_3px_6px_rgba(0,0,0,0.4)] border border-gray-400 transition-colors drop-shadow-sm`} 
+                   style={{ backgroundColor: displayVal ? colorOn : colorOff }}
+              >
+                 <div className={`absolute top-[2px] left-[2px] bg-gradient-to-b from-gray-100 to-gray-400 border border-gray-500 shadow-[0_2px_4px_rgba(0,0,0,0.5)] rounded-full h-6 w-6 transition-all duration-200 flex items-center justify-center ${displayVal ? 'translate-x-[24px]' : ''}`}>
+                    <div className="flex gap-[2px]">
+                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
+                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
+                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
+                    </div>
+                 </div>
+              </div>
+            </label>
+          </div>
       )}
 
       {control.type === 'numberIndicator' && (
@@ -388,7 +391,8 @@ function ControlItem({ control }: { control: UIControl }) {
       )}
 
       {control.type === 'slider' && (
-         <div className="w-full h-full flex flex-col justify-center px-1" onPointerDown={e => e.stopPropagation()}>
+         <div className="w-full h-full flex-1 flex flex-col justify-around py-2 px-1" onPointerDown={e => e.stopPropagation()}>
+<div className="flex-1 flex flex-col justify-center">
              <input 
                 type="range"
                 min={min ?? 0}
@@ -397,9 +401,10 @@ function ControlItem({ control }: { control: UIControl }) {
                 value={displayVal}
                 onChange={handleChange}
                 disabled={isIndicatorDir}
-                className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none"
+                className="w-full h-1.5 min-h-[4px] bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none"
              />
-             <div className="flex justify-between items-center mt-2 group px-0.5">
+</div>
+             <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0">
                  <span className="text-[9px] text-gray-400">{min ?? 0}</span>
                  <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">{Number(displayVal).toFixed(1)}</span>
                  <span className="text-[9px] text-gray-400">{max ?? 100}</span>
@@ -459,27 +464,114 @@ function ControlItem({ control }: { control: UIControl }) {
   );
 }
 
-export function FrontPanel({ containerRef }: { containerRef?: React.RefObject<HTMLDivElement | null> }) {
+export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, screenY: number) => { x: number, y: number } }, { containerRef?: React.RefObject<HTMLDivElement | null> }>(({ containerRef }, ref) => {
   const { uiControls } = useGraphStore();
   const { setSelectedControlId } = useUIStore();
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const internalRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    screenToPanelPosition: (screenX: number, screenY: number) => {
+      const rect = internalRef.current?.getBoundingClientRect();
+      if (!rect) return { x: screenX, y: screenY };
+      return {
+        x: (screenX - rect.left - transform.x) / transform.scale,
+        y: (screenY - rect.top - transform.y) / transform.scale
+      };
+    }
+  }));
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const rect = internalRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const zoomFactor = Math.pow(0.999, e.deltaY);
+      const newScale = Math.max(0.1, Math.min(5, transform.scale * zoomFactor));
+
+      // Adjust x and y to zoom at mouse position
+      const newX = mouseX - (mouseX - transform.x) * (newScale / transform.scale);
+      const newY = mouseY - (mouseY - transform.y) * (newScale / transform.scale);
+
+      setTransform({ x: newX, y: newY, scale: newScale });
+    } else {
+      // Normal scroll translates
+      setTransform(t => ({
+        ...t,
+        x: t.x - e.deltaX,
+        y: t.y - e.deltaY
+      }));
+    }
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.target === e.currentTarget) {
+      setSelectedControlId(null);
+      if (e.button === 0 || e.button === 1) { // Left or middle click on background
+          setIsPanning(true);
+          e.currentTarget.setPointerCapture(e.pointerId);
+      }
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (isPanning) {
+      setTransform(t => ({
+        ...t,
+        x: t.x + e.movementX,
+        y: t.y + e.movementY
+      }));
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (isPanning) {
+      setIsPanning(false);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (err) { /* Ignore */ }
+    }
+  };
 
   return (
     <div 
-      ref={containerRef}
-      className="w-full h-full relative overflow-hidden flex-grow"
+      ref={(node) => {
+        // Handle both forwarded ref and internal ref
+        (internalRef as any).current = node;
+        if (containerRef) (containerRef as any).current = node;
+      }}
+      className={`w-full h-full relative overflow-hidden flex-grow select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         backgroundColor: '#f8fafc',
         backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
-        backgroundSize: '16px 16px',
+        backgroundSize: `${16 * transform.scale}px ${16 * transform.scale}px`,
+        backgroundPosition: `${transform.x}px ${transform.y}px`,
       }}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) setSelectedControlId(null);
-      }}
+      onWheel={handleWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
       onDragOver={(e) => e.preventDefault()}
     >
-      {uiControls.map(c => (
-        <ControlItem key={c.id} control={c} />
-      ))}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+          transformOrigin: '0 0'
+        }}
+      >
+        <div className="pointer-events-auto">
+          {uiControls.map(c => (
+            <ControlItem key={c.id} control={c} transform={transform} />
+          ))}
+        </div>
+      </div>
     </div>
   );
-}
+});
