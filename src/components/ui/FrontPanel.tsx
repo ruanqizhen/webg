@@ -164,7 +164,7 @@ function ControlItem({ control }: { control: UIControl }) {
   const { updateUIControl, updateNode } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
   const portValues = useRuntimeStore(s => s.portValues);
-  const isRunning = useRuntimeStore(s => s.isRunning);
+
 
   const terminalId = control.bindingNodeId;
   const [isDragging, setIsDragging] = useState(false);
