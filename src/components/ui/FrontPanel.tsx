@@ -270,15 +270,15 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
 
   return (
     <div
-      className={`absolute flex flex-col gap-1 p-2 rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
+      className={`absolute flex flex-col rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
       style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'move' : 'move' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-bold text-gray-600 drop-shadow-sm pointer-events-none cursor-inherit select-none">
+      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-move z-20">
+        <label className="text-xs font-bold text-gray-600 drop-shadow-sm cursor-inherit select-none">
           {control.label}
         </label>
       </div>
@@ -286,7 +286,6 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
       {control.type === 'numberInput' && (
           <div 
            className="flex-1 flex items-center bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
-           onPointerDown={e => e.stopPropagation()}
          >
            <input
              type="number"
@@ -298,14 +297,16 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
              className="bg-transparent text-center font-mono font-semibold text-gray-800 w-full h-full focus:outline-none focus:text-blue-600"
              style={{ fontSize: `${Math.max(14, Math.min(height / 2, width / 6))}px` }}
              disabled={isIndicatorDir}
+             onPointerDown={e => e.stopPropagation()}
            />
          </div>
       )}
 
       {control.type === 'button' && (
-          <div className="w-full h-full flex items-center justify-center p-1" onPointerDown={e => e.stopPropagation()}>
+          <div className="w-full h-full flex items-center justify-center p-1">
             <label className="relative inline-flex items-center cursor-pointer select-none"
                    style={{ transform: `scale(${Math.max(0.5, Math.min((width - 8) / 60, (height - 30) / 40))})`, transformOrigin: 'center center' }}
+                   onPointerDown={e => e.stopPropagation()}
             >
               <input
                 type="checkbox"
@@ -391,7 +392,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
       )}
 
       {control.type === 'slider' && (
-         <div className="w-full h-full flex-1 flex flex-col justify-around py-2 px-1" onPointerDown={e => e.stopPropagation()}>
+         <div className="w-full h-full flex-1 flex flex-col justify-around py-2 px-1">
 <div className="flex-1 flex flex-col justify-center">
              <input 
                 type="range"
@@ -402,6 +403,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
                 onChange={handleChange}
                 disabled={isIndicatorDir}
                 className="w-full h-1.5 min-h-[4px] bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none"
+                onPointerDown={e => e.stopPropagation()}
              />
 </div>
              <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0">
