@@ -31,10 +31,36 @@ export function TunnelNode({ id, selected }: any) {
   
   const bgColor = getTypeColor(tunnelType);
 
+  const node = nodes.find(n => n.id === id);
+  let isFullyWired = true;
+
+  if (node && node.parent) {
+     const pNode = nodes.find(n => n.id === node.parent);
+     if (pNode?.type === 'structure.case') {
+        const tunnelInputEdges = edges.filter(e => e.targetNode === id);
+        
+        const isOutputTunnel = tunnelInputEdges.some(e => {
+            const eNode = nodes.find(n => n.id === e.sourceNode);
+            return eNode?.parent === pNode.id; // An edge coming from inside the case
+        });
+
+        if (isOutputTunnel) {
+           const requiredCases = pNode.params?.cases || ['true', 'false'];
+           const wiredCases = new Set<string>();
+           tunnelInputEdges.forEach(e => {
+              const eNode = nodes.find(n => n.id === e.sourceNode);
+              if (eNode?.caseId) wiredCases.add(eNode.caseId);
+           });
+           
+           isFullyWired = requiredCases.every((c: string) => wiredCases.has(c));
+        }
+     }
+  }
+
   return (
     <div 
-      className={`w-4 h-4 rounded-[2px] cursor-pointer hover:scale-110 transition-transform shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.5)] ${selected ? 'ring-2 ring-blue-500' : ''} ${nodeState === 'running' ? 'animate-pulse' : ''}`}
-      style={{ backgroundColor: bgColor, border: '1px solid #111' }}
+      className={`w-4 h-4 rounded-[2px] cursor-pointer hover:scale-110 transition-transform ${isFullyWired ? 'shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.5)]' : ''} ${selected ? 'ring-2 ring-blue-500' : ''} ${nodeState === 'running' ? 'animate-pulse' : ''}`}
+      style={isFullyWired ? { backgroundColor: bgColor, border: '1px solid #111' } : { backgroundColor: '#fff', border: `3px solid ${bgColor}` }}
       onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       title={val !== undefined ? String(val) : 'Tunnel'}
     >

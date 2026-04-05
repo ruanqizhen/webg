@@ -139,12 +139,15 @@ export class ExecutionEngine {
 
       // If both ancestors exist in this level and are different, it's a structural dependency!
       if (sourceAncestor && targetAncestor && sourceAncestor !== targetAncestor) {
-         // To avoid duplicating edges between the same components
-         const currentDeps = deps.get(sourceAncestor) || [];
-         if (!currentDeps.includes(targetAncestor)) {
-             currentDeps.push(targetAncestor);
-             deps.set(sourceAncestor, currentDeps);
-             inDegree.set(targetAncestor, (inDegree.get(targetAncestor) || 0) + 1);
+         // Only add dependency if both nodes are actively participating in this level's execution!
+         // (Specifically ignores nodes filtered out by Case Structure inactive branches)
+         if (inDegree.has(sourceAncestor) && inDegree.has(targetAncestor)) {
+            const currentDeps = deps.get(sourceAncestor) || [];
+            if (!currentDeps.includes(targetAncestor)) {
+                currentDeps.push(targetAncestor);
+                deps.set(sourceAncestor, currentDeps);
+                inDegree.set(targetAncestor, (inDegree.get(targetAncestor) || 0) + 1);
+            }
          }
       }
     }

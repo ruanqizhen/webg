@@ -97,23 +97,70 @@ export const useGraphStore = create<GraphState>((set, get) => {
         const sourceNode = state.nodes.find(n => n.id === newEdge.sourceNode);
         const targetNode = state.nodes.find(n => n.id === newEdge.targetNode);
 
-        const filteredEdges = state.edges.filter(e =>
-          !(e.targetNode === newEdge.targetNode && e.targetPort === newEdge.targetPort)
-        );
+        const filteredEdges = state.edges.filter(e => {
+          if (e.targetNode === newEdge.targetNode && e.targetPort === newEdge.targetPort) {
+             const tNode = state.nodes.find(n => n.id === newEdge.targetNode);
+             if (tNode?.type === 'io.tunnel') {
+                const pNode = state.nodes.find(n => n.id === tNode.parent);
+                if (pNode?.type === 'structure.case') {
+                   // Preserve connections from OTHER branches. Replace if from the SAME branch.
+                   const eNode = state.nodes.find(n => n.id === e.sourceNode);
+                   if (eNode?.caseId === sourceNode?.caseId) {
+                       return false; 
+                   }
+                   return true;
+                }
+             }
+             return false;
+          }
+          return true;
+        });
 
         if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
           const isInputTunnel = !!targetNode.parent && targetNode.parent !== sourceNode.parent;
           const tunnelParent = isInputTunnel ? targetNode.parent : sourceNode.parent;
           const tunnelId = generateId();
 
+          const getGlobalPos = (n: any) => {
+             let x = n.position?.x || 0;
+             let y = n.position?.y || 0;
+             let currentP = n.parent;
+             while (currentP) {
+                const parentNode = state.nodes.find(p => p.id === currentP);
+                if (parentNode) {
+                   x += parentNode.position?.x || 0;
+                   y += parentNode.position?.y || 0;
+                   currentP = parentNode.parent;
+                } else break;
+             }
+             return { x, y };
+          };
+
+          const sGlobal = getGlobalPos(sourceNode);
+          const tGlobal = getGlobalPos(targetNode);
+          sGlobal.x += sourceNode.width || 60; // Approximate source port location
+          sGlobal.y += 20;
+          tGlobal.x += 0;
+          tGlobal.y += 20;
+
+          const pStruct = state.nodes.find(n => n.id === tunnelParent);
           let spawnX = 0;
           let spawnY = 50;
-          if (isInputTunnel) {
-              spawnY = Math.max(10, (targetNode.position?.y ?? 50));
-          } else {
-              const pStruct = state.nodes.find(n => n.id === tunnelParent);
-              spawnX = (pStruct?.width || 300) - 16;
-              spawnY = Math.max(10, (sourceNode.position?.y ?? 50));
+
+          if (pStruct) {
+             const structGlobal = getGlobalPos(pStruct);
+             const borderX = isInputTunnel ? structGlobal.x : structGlobal.x + (pStruct.width || 300);
+             const dx = tGlobal.x - sGlobal.x;
+             const dy = tGlobal.y - sGlobal.y;
+             let intersectYGlobal = sGlobal.y;
+             
+             if (Math.abs(dx) > 1) {
+                intersectYGlobal = sGlobal.y + dy * ((borderX - sGlobal.x) / dx);
+             }
+             
+             const localSpawnY = intersectYGlobal - structGlobal.y - 8; // -8 centers the 16px tunnel block
+             spawnX = isInputTunnel ? 0 : (pStruct.width || 300) - 16;
+             spawnY = Math.max(0, Math.min((pStruct.height || 200) - 16, localSpawnY));
           }
 
           const tunnelNode: NodeInstance = {
