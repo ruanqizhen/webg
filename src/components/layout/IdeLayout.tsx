@@ -4,7 +4,7 @@ import { Toolbar } from '../shared/Toolbar';
 import { Palette } from '../shared/Palette';
 import { PropertiesPanel } from '../shared/PropertiesPanel';
 import { FrontPanel } from '../ui/FrontPanel';
-import { GraphEditor } from '../logic/GraphEditor';
+import { GraphEditor, resolveNodeOverlaps } from '../logic/GraphEditor';
 import { useCallback, useRef, useEffect } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
@@ -54,14 +54,46 @@ function IdeLayoutInner() {
       });
       
       const id = generateId();
+      
+      const currentNodes = useGraphStore.getState().nodes;
+      const structures = currentNodes.filter(n => String(n.type).startsWith('structure'));
+      
+      let parent: string | undefined = undefined;
+      let caseId: string | undefined = undefined;
+      let localX = position.x;
+      let localY = position.y;
+      
+      const nodeCenterX = position.x + 60;
+      const nodeCenterY = position.y + 30;
+      
+      for (const s of structures) {
+          const sX = s.position?.x ?? 0;
+          const sY = s.position?.y ?? 0;
+          const sW = s.width || 300;
+          const sH = s.height || 200;
+          if (nodeCenterX > sX && nodeCenterX < sX + sW &&
+              nodeCenterY > sY && nodeCenterY < sY + sH) {
+             const isCaseStructure = s.type === 'structure.case';
+             parent = s.id;
+             localX = position.x - sX;
+             localY = position.y - sY;
+             caseId = isCaseStructure ? s.params?.activeCase : undefined;
+             break;
+          }
+      }
+
       addNode({
         id,
         type: nodeType,
-        position,
+        position: { x: localX, y: localY },
+        parent,
+        caseId,
         inputs: [],
         outputs: [],
         params: {}
       });
+      
+      resolveNodeOverlaps(id);
       return;
     }
 

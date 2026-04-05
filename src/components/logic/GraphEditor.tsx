@@ -22,6 +22,67 @@ import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
 
+export const resolveNodeOverlaps = (draggedNodeId: string) => {
+    setTimeout(() => {
+        const currentNodes = useGraphStore.getState().nodes;
+        const targetNode = currentNodes.find(n => n.id === draggedNodeId);
+        if (!targetNode || targetNode.type === 'io.tunnel') return;
+        
+        const targetParent = targetNode.parent;
+        const targetCase = targetNode.caseId;
+        
+        const rects = currentNodes
+            .filter(n => n.parent === targetParent && n.caseId === targetCase && n.type !== 'io.tunnel')
+            .map(n => ({
+                id: n.id,
+                x: n.position?.x ?? 0,
+                y: n.position?.y ?? 0,
+                w: n.width || 120,
+                h: n.height || 60
+            }));
+        
+        const rectMap = new Map(rects.map(r => [r.id, r]));
+        
+        const pushOverlaps = (id: string, visited: Set<string>) => {
+            visited.add(id);
+            const rect = rectMap.get(id);
+            if (!rect) return;
+            
+            for (const [otherId, other] of rectMap.entries()) {
+                if (visited.has(otherId)) continue;
+                
+                const isOverlap = 
+                    rect.x < other.x + other.w &&
+                    rect.x + rect.w > other.x &&
+                    rect.y < other.y + other.h &&
+                    rect.y + rect.h > other.y;
+                    
+                if (isOverlap) {
+                    const pushRight = (rect.x + rect.w) - other.x + 10;
+                    const pushDown = (rect.y + rect.h) - other.y + 10;
+                    
+                    if (pushRight < pushDown) {
+                        other.x += pushRight;
+                    } else {
+                        other.y += pushDown;
+                    }
+                    
+                    pushOverlaps(otherId, visited);
+                }
+            }
+        };
+        
+        pushOverlaps(draggedNodeId, new Set());
+        
+        for (const r of rects) {
+            const original = currentNodes.find(n => n.id === r.id);
+            if (original && (original.position?.x !== r.x || original.position?.y !== r.y)) {
+                useGraphStore.getState().updateNode(r.id, { position: { x: r.x, y: r.y } });
+            }
+        }
+    }, 50);
+};
+
 const initialNodeTypes: any = {
   custom: BaseNode,
   'structure.forLoop': StructureNode,
@@ -182,67 +243,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
      };
   }), [edges, nodes]);
 
-  const resolveOverlaps = useCallback((draggedNodeId: string) => {
-      setTimeout(() => {
-          const currentNodes = useGraphStore.getState().nodes;
-          const targetNode = currentNodes.find(n => n.id === draggedNodeId);
-          if (!targetNode || targetNode.type === 'io.tunnel') return;
-          
-          const targetParent = targetNode.parent;
-          const targetCase = targetNode.caseId;
-          
-          const rects = currentNodes
-              .filter(n => n.parent === targetParent && n.caseId === targetCase && n.type !== 'io.tunnel')
-              .map(n => ({
-                  id: n.id,
-                  x: n.position?.x ?? 0,
-                  y: n.position?.y ?? 0,
-                  w: n.width || 120,
-                  h: n.height || 60
-              }));
-          
-          const rectMap = new Map(rects.map(r => [r.id, r]));
-          
-          const pushOverlaps = (id: string, visited: Set<string>) => {
-              visited.add(id);
-              const rect = rectMap.get(id);
-              if (!rect) return;
-              
-              for (const [otherId, other] of rectMap.entries()) {
-                  if (visited.has(otherId)) continue;
-                  
-                  const isOverlap = 
-                      rect.x < other.x + other.w &&
-                      rect.x + rect.w > other.x &&
-                      rect.y < other.y + other.h &&
-                      rect.y + rect.h > other.y;
-                      
-                  if (isOverlap) {
-                      const pushRight = (rect.x + rect.w) - other.x + 10;
-                      const pushDown = (rect.y + rect.h) - other.y + 10;
-                      
-                      if (pushRight < pushDown) {
-                          other.x += pushRight;
-                      } else {
-                          other.y += pushDown;
-                      }
-                      
-                      pushOverlaps(otherId, visited);
-                  }
-              }
-          };
-          
-          pushOverlaps(draggedNodeId, new Set());
-          
-          for (const r of rects) {
-              const original = currentNodes.find(n => n.id === r.id);
-              if (original && (original.position?.x !== r.x || original.position?.y !== r.y)) {
-                  useGraphStore.getState().updateNode(r.id, { position: { x: r.x, y: r.y } });
-              }
-          }
-      }, 50);
-  }, []);
-
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
     if (!node.parentNode) {
        const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
@@ -265,7 +265,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
                  position: { x: node.position.x - sX, y: node.position.y - sY },
                  caseId: isCaseStructure ? activeCase : undefined
              });
-             resolveOverlaps(node.id);
+             resolveNodeOverlaps(node.id);
              return;
           }
        }
@@ -283,7 +283,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
                  position: { x: (parentNode.position?.x ?? 0) + node.position.x, y: (parentNode.position?.y ?? 0) + node.position.y },
                  caseId: undefined
              });
-             resolveOverlaps(node.id);
+             resolveNodeOverlaps(node.id);
              return;
           }
        }
@@ -300,8 +300,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
       }
     }
 
-    resolveOverlaps(node.id);
-  }, [flowNodes, updateNode, nodes, resolveOverlaps]);
+    resolveNodeOverlaps(node.id);
+  }, [flowNodes, updateNode, nodes]);
 
   return (
     <>
