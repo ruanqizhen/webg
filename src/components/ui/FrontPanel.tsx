@@ -393,23 +393,45 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
 
       {control.type === 'slider' && (
          <div className="w-full h-full flex-1 flex flex-col justify-around py-2 px-1">
-<div className="flex-1 flex flex-col justify-center">
-             <input 
-                type="range"
-                min={min ?? 0}
-                max={max ?? 100}
-                step={step ?? 1}
-                value={displayVal}
-                onChange={handleChange}
-                disabled={isIndicatorDir}
-                className="w-full h-1.5 min-h-[4px] bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none"
-                onPointerDown={e => e.stopPropagation()}
-             />
-</div>
-             <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0">
-                 <span className="text-[9px] text-gray-400">{min ?? 0}</span>
-                 <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">{Number(displayVal).toFixed(1)}</span>
-                 <span className="text-[9px] text-gray-400">{max ?? 100}</span>
+             <style>{`
+                .slider-${control.id}::-webkit-slider-thumb {
+                  -webkit-appearance: none;
+                  appearance: none;
+                  width: ${Math.max(16, height * 0.2)}px;
+                  height: ${Math.max(16, height * 0.2)}px;
+                  background: #2563eb;
+                  border-radius: 50%;
+                  cursor: pointer;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+                }
+                .slider-${control.id}::-moz-range-thumb {
+                  width: ${Math.max(16, height * 0.2)}px;
+                  height: ${Math.max(16, height * 0.2)}px;
+                  background: #2563eb;
+                  border-radius: 50%;
+                  cursor: pointer;
+                  border: none;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+                }
+             `}</style>
+             <div className="flex-1 flex flex-col justify-center">
+                 <input 
+                    type="range"
+                    min={min ?? 0}
+                    max={max ?? 100}
+                    step={step ?? 1}
+                    value={displayVal}
+                    onChange={handleChange}
+                    disabled={isIndicatorDir}
+                    className={`w-full bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none slider-${control.id}`}
+                    style={{ height: `${Math.max(6, height * 0.1)}px` }}
+                    onPointerDown={e => e.stopPropagation()}
+                 />
+             </div>
+             <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0" style={{ fontSize: `${Math.max(9, height * 0.15)}px` }}>
+                 <span className="text-gray-400">{min ?? 0}</span>
+                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal).toFixed(1)}</span>
+                 <span className="text-gray-400">{max ?? 100}</span>
              </div>
          </div>
       )}
