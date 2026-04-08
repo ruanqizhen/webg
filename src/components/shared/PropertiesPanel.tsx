@@ -4,7 +4,7 @@ import { NodeRegistry } from '../../engine/registry';
 
 export function PropertiesPanel() {
   const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
-  const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge } = useGraphStore();
+  const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge, removeNode } = useGraphStore();
 
   const activeNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
   const activeControl = selectedControlId ? uiControls.find(c => c.id === selectedControlId) : null;
@@ -72,13 +72,25 @@ export function PropertiesPanel() {
                       value={activeNode.params.cases?.join(', ') || ''}
                       onChange={(e) => {
                         const newCases = e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                        const finalCases = newCases.length > 0 ? newCases : ['true', 'false'];
                         updateNode(activeNode.id, { 
                           params: { 
                             ...activeNode.params, 
-                            cases: newCases.length > 0 ? newCases : ['true', 'false'],
-                            activeCase: newCases[0] || 'true'
+                            cases: finalCases,
+                            activeCase: finalCases[0] || 'true'
                           } 
                         });
+
+                        // Clean up orphaned nodes whose caseId is no longer valid
+                        const removedCases = new Set(
+                          (activeNode.params.cases || []).filter((c: string) => !finalCases.includes(c))
+                        );
+                        if (removedCases.size > 0) {
+                          const orphans = nodes.filter(
+                            n => n.parent === activeNode.id && n.caseId && removedCases.has(n.caseId)
+                          );
+                          orphans.forEach(n => removeNode(n.id));
+                        }
                       }}
                       placeholder="true, false"
                       className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"

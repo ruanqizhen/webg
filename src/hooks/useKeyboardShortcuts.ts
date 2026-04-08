@@ -40,47 +40,39 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         }
       }
 
-      // Copy (Ctrl+C)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        if (selectedNodeId) {
-          e.preventDefault();
-          copyNode(selectedNodeId);
-        }
-      }
-
-      // Paste (Ctrl+V)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        e.preventDefault();
-        // Paste at center of viewport or default position
-        pasteNode({ x: 200, y: 200 });
-      }
-
-      // Undo (Ctrl+Z)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        if (canUndo()) {
-          e.preventDefault();
-          undo();
-        }
-      }
-
-      // Redo (Ctrl+Y or Ctrl+Shift+Z)
-      if (((e.ctrlKey || e.metaKey) && e.key === 'y') || 
-          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
-          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Z')) {
+      // Redo (Ctrl+Shift+Z or Ctrl+Y) — must check before Undo to avoid Shift+Z matching both
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         if (canRedo()) {
           e.preventDefault();
           redo();
         }
-      }
-
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        if (canRedo()) {
+          e.preventDefault();
+          redo();
+        }
+      // Undo (Ctrl+Z)
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        if (canUndo()) {
+          e.preventDefault();
+          undo();
+        }
+      // Copy (Ctrl+C)
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (selectedNodeId) {
+          e.preventDefault();
+          copyNode(selectedNodeId);
+        }
+      // Paste (Ctrl+V)
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        pasteNode({ x: 200, y: 200 });
       // Zoom Fit (Ctrl+0 or Ctrl+=)
-      if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.key === '=')) {
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.key === '=')) {
         e.preventDefault();
         onZoomFit?.();
-      }
-
       // Delete (Delete or Backspace)
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeId) {
           e.preventDefault();
           removeNode(selectedNodeId);
@@ -94,10 +86,8 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
           removeUIControl(selectedControlId);
           setSelectedControlId(null);
         }
-      }
-
       // Escape (deselect all)
-      if (e.key === 'Escape') {
+      } else if (e.key === 'Escape') {
         setSelectedNodeId(null);
         setSelectedEdgeId(null);
         setSelectedControlId(null);

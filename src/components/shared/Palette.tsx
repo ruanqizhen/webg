@@ -121,6 +121,9 @@ export function Palette() {
       textLabel: { defaultValue: '' },
       gauge: { min: 0, max: 100, colorOn: '#4CAF50', defaultValue: 0 },
       indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
+      slider: { min: 0, max: 100, step: 1, defaultValue: 0, width: 160, height: 40 },
+      knob: { min: 0, max: 100, step: 1, defaultValue: 0, width: 80, height: 80 },
+      tank: { min: 0, max: 100, colorOn: '#3B82F6', defaultValue: 0, width: 60, height: 160 },
     };
 
     const existingLabels = uiControls.map(c => c.label);

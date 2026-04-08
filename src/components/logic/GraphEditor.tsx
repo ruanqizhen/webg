@@ -122,9 +122,11 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     (changes: NodeChange[]) => {
       changes.forEach(c => {
         if (c.type === 'position' && c.position) {
-          const node = nodes.find(n => n.id === c.id);
+          // Read fresh state to avoid stale closure issues with batched changes
+          const currentNodes = useGraphStore.getState().nodes;
+          const node = currentNodes.find(n => n.id === c.id);
           if (node?.type === 'io.tunnel' && node.parent) {
-             const p = nodes.find(p => p.id === node.parent);
+             const p = currentNodes.find(p => p.id === node.parent);
              const pW = p?.width || 300;
              const pH = p?.height || 200;
              // Determine if it's on the left or right border based on its last known position
@@ -142,7 +144,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         }
       });
     },
-    [updateNode, removeNode, nodes]
+    [updateNode, removeNode]
   );
 
   const onEdgesChange = useCallback(
@@ -176,7 +178,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
       }
 
       addGraphEdge({
-        id: `e_${connection.source}_${connection.sourceHandle}-${connection.target}_${connection.targetHandle}`,
+        id: `e_${connection.source}_${connection.sourceHandle}-${connection.target}_${connection.targetHandle}_${Date.now().toString(36)}`,
         sourceNode: connection.source!,
         sourcePort: connection.sourceHandle!,
         targetNode: connection.target!,
