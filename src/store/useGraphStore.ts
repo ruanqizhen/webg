@@ -7,14 +7,14 @@ const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
 
 interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
-  updateNode: (id: string, updates: Partial<NodeInstance>) => void;
+  updateNode: (id: string, updates: Partial<NodeInstance>, skipHistory?: boolean) => void;
   removeNode: (id: string) => void;
 
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
 
   addUIControl: (control: UIControl, terminalNode: NodeInstance) => void;
-  updateUIControl: (id: string, updates: Partial<UIControl>) => void;
+  updateUIControl: (id: string, updates: Partial<UIControl>, skipHistory?: boolean) => void;
   removeUIControl: (id: string) => void;
 
   clearGraph: () => void;
@@ -74,8 +74,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
       set((state) => ({ nodes: [...state.nodes, { ...node, id: node.id || generateId() }] }));
     },
 
-    updateNode: (id, updates) => {
-      saveToHistory();
+    updateNode: (id, updates, skipHistory) => {
+      if (!skipHistory) saveToHistory();
       set((state) => ({
         nodes: state.nodes.map(n => n.id === id ? { ...n, ...updates } : n)
       }));
@@ -254,8 +254,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
       }));
     },
 
-    updateUIControl: (id, updates) => {
-      saveToHistory();
+    updateUIControl: (id, updates, skipHistory) => {
+      if (!skipHistory) saveToHistory();
       set((state) => ({
         uiControls: state.uiControls.map(c => c.id === id ? { ...c, ...updates } : c)
       }));
@@ -420,7 +420,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
       }
     },
     
-    // Load from localStorage
+    // Load from localStorage (bypasses loadGraph to avoid pushing empty state to history)
     loadFromStorage: () => {
       try {
         const data = localStorage.getItem(STORAGE_KEY);
@@ -428,7 +428,11 @@ export const useGraphStore = create<GraphState>((set, get) => {
         
         const parsed = JSON.parse(data);
         if (parsed.graph) {
-          get().loadGraph(parsed.graph);
+          set({
+            nodes: parsed.graph.nodes || [],
+            edges: parsed.graph.edges || [],
+            uiControls: parsed.graph.uiControls || []
+          });
           return true;
         }
         return false;

@@ -189,24 +189,13 @@ export class ExecutionEngine {
       processedNodes.add(nodeId);
 
       // Check if we should pause (breakpoint or step mode)
+      // Note: shouldPause callback handles the actual waiting (via waitForStep),
+      // so when it resolves, execution can continue immediately.
       if (this.debugCallbacks?.shouldPause) {
-        const shouldPause = await this.debugCallbacks.shouldPause(node.id);
-        if (shouldPause) {
-          this.updateNodeState(node.id, 'running');
-          // Wait for user to continue using a proper promise-based approach
-          await new Promise<void>((resolve) => {
-            const checkPause = () => {
-              if (!this.debugCallbacks?.isPaused?.()) {
-                this.debugCallbacks?.onContinue?.();
-                resolve();
-              } else {
-                // Check again after 100ms
-                setTimeout(checkPause, 100);
-              }
-            };
-            checkPause();
-          });
-        }
+        if (this.aborted) throw new Error("Execution Aborted");
+        this.updateNodeState(node.id, 'running');
+        await this.debugCallbacks.shouldPause(node.id);
+        if (this.aborted) throw new Error("Execution Aborted");
       }
 
       if (this.debugCallbacks?.onNodeStart) {

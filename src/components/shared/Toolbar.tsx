@@ -13,6 +13,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleRun = async () => {
     if (nodes.length === 0) return;
+    if (engineRef.current) return; // Prevent concurrent executions
     try {
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);
@@ -41,6 +42,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleStepRun = async () => {
     if (nodes.length === 0) return;
+    if (engineRef.current) return; // Prevent concurrent executions
     try {
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);

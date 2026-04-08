@@ -180,16 +180,55 @@ function stateRingClass(nodeState: string, selected: boolean, isCurrentStep: boo
    Main BaseNode Component
    ═══════════════════════════════════════════════════════ */
 
+// Helper for handle rendering to keep BaseNode clean
+function OptimizedHandle({ nodeId, port, position, topPct, isInput }: any) {
+  const val = useRuntimeStore(s => s.portValues[`${nodeId}_${port.name}`]);
+  
+  return (
+    <div className="group">
+      <Handle
+        type={isInput ? "target" : "source"}
+        position={position}
+        id={port.name}
+        style={{
+          top: `${topPct}%`,
+          background: getTypeColor(port.type),
+          width: isInput ? 10 : 10, height: 10,
+          border: '2px solid white',
+          [isInput ? 'left' : 'right']: -5,
+        }}
+      />
+      <div
+        className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
+        style={{ 
+          top: `${topPct}%`, 
+          [isInput ? 'left' : 'right']: -8, 
+          transform: isInput ? 'translate(-100%, -50%)' : 'translate(100%, -50%)' 
+        }}
+      >
+        {port.name}{val !== undefined ? `: ${String(val)}` : ''}
+      </div>
+    </div>
+  );
+}
+
 export function BaseNode({ id, data, type, selected }: any) {
   const actualType: string = data?.nodeType || type;
   const def = NodeRegistry[actualType] || data?.def;
+  
+  // Granular subscription to runtime state
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
-  const portValues = useRuntimeStore(s => s.portValues);
+  const inVal = useRuntimeStore(s => s.portValues[`${id}_input`]);
+  const outVal = useRuntimeStore(s => s.portValues[`${id}_output`]);
   const currentStepNode = useRuntimeStore(s => s.currentStepNode);
+  
+  // Granular subscription to graph state
+  const node = useGraphStore(s => s.nodes.find(n => n.id === id));
+  const boundControl = useGraphStore(s => s.uiControls.find(c => c.bindingNodeId === id));
+  const boundControlLabel = boundControl?.label;
+  const updateNode = useGraphStore(s => s.updateNode);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
-  const { updateNode, nodes, uiControls } = useGraphStore();
 
-  const node = nodes.find(n => n.id === id);
   const hasBreakpoint = node?.breakpoint || false;
   const isCurrentStep = currentStepNode === id;
 
@@ -199,7 +238,6 @@ export function BaseNode({ id, data, type, selected }: any) {
 
   /* ── Special handling for io.terminal ────────── */
   if (actualType === 'io.terminal') {
-    const boundControl = uiControls.find(c => c.bindingNodeId === id);
     const isIndicator = boundControl?.direction === 'indicator';
     const ctrlType = boundControl?.type || 'numberInput';
     
@@ -231,14 +269,14 @@ export function BaseNode({ id, data, type, selected }: any) {
   if (iconDef) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
-    const isTerminal = actualType === 'io.terminal' || actualType === 'io.tunnel';
+    const isTerminal = actualType === 'io.terminal';
     const nodeInputs = (isTerminal && node?.inputs) ? node.inputs : (def.inputs || []);
     const nodeOutputs = (isTerminal && node?.outputs) ? node.outputs : (def.outputs || []);
     const inputPositions = spreadPositions(nodeInputs.length);
     const outputPositions = spreadPositions(nodeOutputs.length);
 
     const isConstant = shape === 'constant';
-    const isIndicator = shape === 'indicator';
+    const isIndicator = shape === 'indicator' || shape === 'term-ind';
     const paramValue = node?.params?.value;
 
     // Determine display value
@@ -246,17 +284,7 @@ export function BaseNode({ id, data, type, selected }: any) {
     if (isConstant) {
       displayValue = paramValue !== undefined ? String(paramValue) : '';
     } else if (isIndicator || actualType === 'io.terminal') {
-      const inPortId = `${id}_input`;
-      const outPortId = `${id}_output`;
-      const inVal = portValues[inPortId];
-      const outVal = portValues[outPortId];
-      
-      let baseVal = paramValue;
-      if (actualType === 'io.terminal') {
-         const boundControl = uiControls.find(c => c.bindingNodeId === id);
-         baseVal = paramValue !== undefined ? paramValue : boundControl?.defaultValue;
-      }
-
+      const baseVal = actualType === 'io.terminal' ? (paramValue !== undefined ? paramValue : boundControl?.defaultValue) : paramValue;
       const currentVal = inVal !== undefined ? inVal : (outVal !== undefined ? outVal : baseVal);
       
       if (currentVal !== undefined) {
@@ -304,7 +332,7 @@ export function BaseNode({ id, data, type, selected }: any) {
 
         {/* Label below */}
         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-gray-400 font-medium pointer-events-none select-none">
-          {actualType === 'io.terminal' ? (uiControls.find(c => c.bindingNodeId === id)?.label || def.label) : def.label}
+          {actualType === 'io.terminal' ? (boundControlLabel || def.label) : def.label}
         </div>
 
         {/* Breakpoint dot */}
@@ -313,61 +341,28 @@ export function BaseNode({ id, data, type, selected }: any) {
         )}
 
         {/* Input handles */}
-        {nodeInputs.map((port: any, i: number) => {
-          const topPct = inputPositions[i];
-          const val = portValues[`${id}_${port.name}`];
-          return (
-            <div key={port.name} className="group">
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={port.name}
-                style={{
-                  top: `${topPct}%`,
-                  background: getTypeColor(port.type),
-                  width: 10, height: 10,
-                  border: '2px solid white',
-                  left: -5,
-                }}
-              />
-              {/* Hover tooltip */}
-              <div
-                className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
-                style={{ top: `${topPct}%`, left: -8, transform: 'translate(-100%, -50%)' }}
-              >
-                {port.name}{val !== undefined ? `: ${String(val)}` : ''}
-              </div>
-            </div>
-          );
-        })}
+        {nodeInputs.map((port: any, i: number) => (
+          <OptimizedHandle 
+            key={port.name} 
+            nodeId={id} 
+            port={port} 
+            position={Position.Left} 
+            isInput={true} 
+            topPct={inputPositions[i]} 
+          />
+        ))}
 
         {/* Output handles */}
-        {nodeOutputs.map((port: any, i: number) => {
-          const topPct = outputPositions[i];
-          const val = portValues[`${id}_${port.name}`];
-          return (
-            <div key={port.name} className="group">
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={port.name}
-                style={{
-                  top: `${topPct}%`,
-                  background: getTypeColor(port.type),
-                  width: 10, height: 10,
-                  border: '2px solid white',
-                  right: -5,
-                }}
-              />
-              <div
-                className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
-                style={{ top: `${topPct}%`, right: -8, transform: 'translate(100%, -50%)' }}
-              >
-                {port.name}{val !== undefined ? `: ${String(val)}` : ''}
-              </div>
-            </div>
-          );
-        })}
+        {nodeOutputs.map((port: any, i: number) => (
+          <OptimizedHandle 
+            key={port.name} 
+            nodeId={id} 
+            port={port} 
+            position={Position.Right} 
+            isInput={false} 
+            topPct={outputPositions[i]} 
+          />
+        ))}
       </div>
     );
   }
@@ -401,38 +396,39 @@ export function BaseNode({ id, data, type, selected }: any) {
       </div>
       <div className="flex p-2 justify-between gap-4 text-xs relative">
         <div className="flex flex-col gap-2 min-w-[20px]">
-          {def.inputs.map((port: any) => {
-            const v = portValues[`${id}_${port.name}`];
-            return (
-              <div key={port.name} className="flex items-center gap-1 h-4 relative group">
-                <Handle type="target" position={Position.Left} id={port.name}
-                  style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }}
-                  title={`${port.name} (${port.type})`} />
-                {v !== undefined && (
-                  <span className="hidden group-hover:block absolute left-[-10px] -top-5 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap pointer-events-none">{String(v)}</span>
-                )}
-                <span className="text-gray-600 pl-1">{port.name}</span>
-              </div>
-            );
-          })}
+          {def.inputs.map((port: any) => (
+            <div key={port.name} className="flex items-center gap-1 h-4 relative group">
+              <Handle type="target" position={Position.Left} id={port.name}
+                style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }}
+                title={`${port.name} (${port.type})`} />
+              <PortValueTooltip nodeId={id} portName={port.name} isOutput={false} />
+              <span className="text-gray-600 pl-1">{port.name}</span>
+            </div>
+          ))}
         </div>
         <div className="flex flex-col gap-2 min-w-[20px] items-end">
-          {def.outputs.map((port: any) => {
-            const v = portValues[`${id}_${port.name}`];
-            return (
-              <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
-                {v !== undefined && (
-                  <span className="hidden group-hover:block absolute right-8 -top-4 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap">{String(v)}</span>
-                )}
-                <span className="text-gray-600 pr-1">{port.name}</span>
-                <Handle type="source" position={Position.Right} id={port.name}
-                  style={{ background: getTypeColor(port.type), width: 12, height: 12, right: -14 }}
-                  title={`${port.name} (${port.type})`} />
-              </div>
-            );
-          })}
+          {def.outputs.map((port: any) => (
+            <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
+              <PortValueTooltip nodeId={id} portName={port.name} isOutput={true} />
+              <span className="text-gray-600 pr-1">{port.name}</span>
+              <Handle type="source" position={Position.Right} id={port.name}
+                style={{ background: getTypeColor(port.type), width: 12, height: 12, right: -14 }}
+                title={`${port.name} (${port.type})`} />
+            </div>
+          ))}
         </div>
       </div>
     </div>
+  );
+}
+
+function PortValueTooltip({ nodeId, portName, isOutput }: { nodeId: string, portName: string, isOutput: boolean }) {
+  const v = useRuntimeStore(s => s.portValues[`${nodeId}_${portName}`]);
+  if (v === undefined) return null;
+  
+  return (
+    <span className={`hidden group-hover:block absolute ${isOutput ? 'right-8' : 'left-[-10px]'} -top-5 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow z-10 whitespace-nowrap pointer-events-none`}>
+      {String(v)}
+    </span>
   );
 }

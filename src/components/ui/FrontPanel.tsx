@@ -161,18 +161,18 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
 }
 
 function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
-  const { updateUIControl, updateNode } = useGraphStore();
+  const { updateUIControl, updateNode, pushHistory } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
-  const portValues = useRuntimeStore(s => s.portValues);
-
-
+  
   const terminalId = control.bindingNodeId;
+  const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
   const [isDragging, setIsDragging] = useState(false);
   const [resizeMode, setResizeMode] = useState<string | null>(null);
   const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
 
   const onPointerDown = (e: React.PointerEvent) => {
     setSelectedControlId(control.id);
+    pushHistory(); // Save state before starting drag
     setIsDragging(true);
     setResizeMode(null);
     dragRef.current.pointerId = e.pointerId;
@@ -183,6 +183,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
     e.stopPropagation();
     setSelectedControlId(control.id);
+    pushHistory(); // Save state before starting resize
     setIsDragging(true);
     setResizeMode(mode);
     dragRef.current.pointerId = e.pointerId;
@@ -196,7 +197,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
         updateUIControl(control.id, {
           x: (control.x || 0) + e.movementX / transform.scale,
           y: (control.y || 0) + e.movementY / transform.scale,
-        });
+        }, true); // skipHistory during drag
       } else {
         const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
         const currentHeight = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
@@ -210,7 +211,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
         updateUIControl(control.id, {
           width: newWidth,
           height: newHeight,
-        });
+        }, true); // skipHistory during resize
       }
     }
   };
@@ -241,7 +242,6 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   }, []);
 
   const isIndicatorDir = (control.direction || 'control') === 'indicator';
-  const inputVal = portValues[`${terminalId}_input`];
   const displayVal = (isIndicatorDir && inputVal !== undefined) ? inputVal : control.defaultValue;
 
   const handleChange = (e: any) => {
