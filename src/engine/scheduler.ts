@@ -17,6 +17,7 @@ export class ExecutionEngine {
   private updatePortValue: (id: string, v: any) => void;
   private debugCallbacks?: DebugCallbacks;
   private batchMode: boolean;
+  private aborted = false;
 
   constructor(
     graph: Graph,
@@ -27,11 +28,26 @@ export class ExecutionEngine {
     batchMode: boolean = false
   ) {
     this.graph = graph;
-    this.runtime = initialRuntime;
+    // Create independent copy to avoid mutating external store state
+    this.runtime = {
+      portValues: { ...initialRuntime.portValues },
+      nodeState: { ...initialRuntime.nodeState }
+    };
     this.updateNodeState = updateNodeState;
     this.updatePortValue = updatePortValue;
     this.debugCallbacks = debugCallbacks;
     this.batchMode = batchMode;
+  }
+
+  /** Abort a running execution */
+  public abort() {
+    this.aborted = true;
+  }
+
+  /** Update a port value in both the engine's internal runtime and the external store */
+  private setPortValue(portId: string, value: any) {
+    this.runtime.portValues[portId] = value;
+    this.updatePortValue(portId, value);
   }
 
   // Find the ancestor of nodeId that sits exactly in the current parentId level
@@ -162,6 +178,7 @@ export class ExecutionEngine {
     let deadlockCheckCount = 0;
 
     while (queue.length > 0) {
+      if (this.aborted) throw new Error("Execution Aborted");
       const nodeId = queue.shift()!;
       const node = nodesInLevel.find(n => n.id === nodeId);
       if (!node) continue;
@@ -224,12 +241,14 @@ export class ExecutionEngine {
         if (node.type === 'structure.forLoop') {
            const N = Number(inputs.N) || 0;
            for (let i = 0; i < N; i++) {
-              this.updatePortValue(`${node.id}_i`, i);
+              if (this.aborted) throw new Error("Execution Aborted");
+              this.setPortValue(`${node.id}_i`, i);
               await this.executeSubgraph(node.id);
            }
         } else if (node.type === 'structure.whileLoop') {
            let count = 0;
            while (true) {
+              if (this.aborted) throw new Error("Execution Aborted");
               await this.executeSubgraph(node.id);
               const stopCondition = Boolean(this.runtime.portValues[`${node.id}_stop`]);
               if (stopCondition) break;
@@ -269,19 +288,17 @@ export class ExecutionEngine {
            const key = port.name;
            const val = result[key];
 
-           if (val !== undefined) {
-             this.updatePortValue(`${node.id}_${key}`, val);
+            if (val !== undefined) {
+              this.setPortValue(`${node.id}_${key}`, val);
 
-             // Direct edge propagation across anywhere in the graph!
-             const outEdges = edgeByNodePort.get(`${node.id}_${key}`) || [];
-             for (const edge of outEdges) {
-                if (edge.sourceNode === node.id) {
-                   this.updatePortValue(`${edge.targetNode}_${edge.targetPort}`, val);
-                   // CRITICAL: Sync engine's internal runtime memory as well!
-                   this.runtime.portValues[`${edge.targetNode}_${edge.targetPort}`] = val;
-                }
-             }
-           }
+              // Direct edge propagation across anywhere in the graph!
+              const outEdges = edgeByNodePort.get(`${node.id}_${key}`) || [];
+              for (const edge of outEdges) {
+                 if (edge.sourceNode === node.id) {
+                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, val);
+                 }
+              }
+            }
         }
 
         if (!this.batchMode) {

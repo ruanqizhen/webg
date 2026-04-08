@@ -9,6 +9,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const engineRef = useRef<ExecutionEngine | null>(null);
 
   const handleRun = async () => {
     if (nodes.length === 0) return;
@@ -25,11 +26,15 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
          undefined,
          true
       );
+      engineRef.current = engine;
       await engine.executeAll();
     } catch (err: any) {
       console.error("Execution Error:", err);
-      runtimeStore.setError(err.message || 'Unknown execution error');
+      if (err.message !== 'Execution Aborted') {
+        runtimeStore.setError(err.message || 'Unknown execution error');
+      }
     } finally {
+      engineRef.current = null;
       runtimeStore.setRunning(false);
     }
   };
@@ -69,11 +74,15 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
            }
          }
       );
+      engineRef.current = engine;
       await engine.executeAll();
     } catch (err: any) {
       console.error("Execution Error:", err);
-      runtimeStore.setError(err.message || 'Unknown execution error');
+      if (err.message !== 'Execution Aborted') {
+        runtimeStore.setError(err.message || 'Unknown execution error');
+      }
     } finally {
+      engineRef.current = null;
       if (!runtimeStore.isPaused) {
         runtimeStore.setRunning(false);
         runtimeStore.setStepMode(false);
@@ -82,6 +91,8 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   };
 
   const handleStop = () => {
+    engineRef.current?.abort();
+    engineRef.current = null;
     runtimeStore.setRunning(false);
     runtimeStore.resetDebug();
   };
