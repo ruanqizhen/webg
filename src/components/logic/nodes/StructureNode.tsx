@@ -141,7 +141,7 @@ export function StructureNode({ id, data, type, selected }: any) {
       </div>
 
       <div className="absolute top-8 right-0 flex flex-col gap-2 items-end">
-         {def?.outputs?.map((port: any) => (
+         {def?.outputs?.filter((p: any) => !(type === 'structure.forLoop' && p.name === 'i')).map((port: any) => (
              <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
                 <span className="text-gray-800 pr-2 text-[10px] font-bold uppercase">{port.name}</span>
                 <Handle
@@ -154,6 +154,29 @@ export function StructureNode({ id, data, type, selected }: any) {
              </div>
           ))}
       </div>
+
+      {/* Internal Iterator Terminal for For Loop */}
+      {type === 'structure.forLoop' && (
+        <div 
+          className="absolute bottom-2 left-2 flex items-center bg-blue-50 border border-blue-400 rounded px-1 min-w-[24px] h-[18px] shadow-sm z-50"
+          title="Iteration count (i)"
+        >
+           <span className="text-[10px] font-black text-blue-700 select-none mr-1">i</span>
+           <Handle
+             type="source"
+             position={Position.Right}
+             id="i"
+             style={{ 
+                background: getTypeColor('number'), 
+                width: 8, height: 8, 
+                right: -4, top: '50%',
+                marginTop: -4,
+                border: '1px solid #1e3a8a',
+                borderRadius: '1px'
+             }}
+           />
+        </div>
+      )}
     </div>
   );
 }

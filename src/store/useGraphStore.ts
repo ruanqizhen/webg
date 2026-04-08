@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Edge, Graph, NodeInstance, UIControl } from '../types/graph';
+import { NodeRegistry } from '../engine/registry';
 import { generateId, deepClone } from '../lib/utils';
 
 const STORAGE_KEY = 'webg-project';
@@ -128,7 +129,28 @@ export const useGraphStore = create<GraphState>((set, get) => {
           return true;
         });
 
-        if (sourceNode && targetNode && sourceNode.parent !== targetNode.parent) {
+        const isInternalPort = (nodeType: string, portName: string, direction: 'input' | 'output'): boolean => {
+          const def = NodeRegistry[nodeType];
+          if (!def) return false;
+          const port = direction === 'input' 
+             ? def.inputs.find((p: any) => p.name === portName)
+             : def.outputs.find((p: any) => p.name === portName);
+          return !!port?.isInternal;
+        };
+
+        const isBoundaryCrossing = (source: NodeInstance, target: NodeInstance, sourcePort: string, targetPort: string): boolean => {
+          if (source.parent === target.parent) return false;
+          
+          // Check if source is the parent of target AND the port is internal
+          if (source.id === target.parent && isInternalPort(source.type, sourcePort, 'output')) return false;
+          
+          // Check if target is the parent of source AND the port is internal (e.g. while loop stop)
+          if (target.id === source.parent && isInternalPort(target.type, targetPort, 'input')) return false;
+          
+          return true;
+        };
+
+        if (sourceNode && targetNode && isBoundaryCrossing(sourceNode, targetNode, newEdge.sourcePort, newEdge.targetPort)) {
           const getGlobalPos = (n: any) => {
              let x = n.position?.x || 0;
              let y = n.position?.y || 0;

@@ -28,6 +28,7 @@ export interface PortDefinition {
   name: string;
   type: string;
   direction?: 'input' | 'output';
+  isInternal?: boolean;
 }
 
 export interface ParamDefinition {

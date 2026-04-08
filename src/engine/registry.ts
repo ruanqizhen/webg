@@ -157,7 +157,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     type: 'structure.forLoop',
     label: 'For Loop',
     inputs: [{ id: 'N', name: 'N', type: 'number', direction: 'input' }],
-    outputs: [{ id: 'i', name: 'i', type: 'number', direction: 'output' }],
+    outputs: [{ id: 'i', name: 'i', type: 'number', direction: 'output', isInternal: true }],
     params: [],
     executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   },
