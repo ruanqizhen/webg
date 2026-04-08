@@ -218,7 +218,7 @@ export function BaseNode({ id, data, type, selected }: any) {
   
   // Granular subscription to runtime state
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
-  const inVal = useRuntimeStore(s => s.portValues[`${id}_input`]);
+  const inVal = useRuntimeStore(s => s.portValues[`${id}_input`] ?? s.portValues[`${id}_value`]);
   const outVal = useRuntimeStore(s => s.portValues[`${id}_output`]);
   const currentStepNode = useRuntimeStore(s => s.currentStepNode);
   
