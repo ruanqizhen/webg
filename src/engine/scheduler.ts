@@ -18,6 +18,7 @@ export class ExecutionEngine {
   private debugCallbacks?: DebugCallbacks;
   private batchMode: boolean;
   private aborted = false;
+  private edgeByNodePort = new Map<string, Edge[]>();
 
   constructor(
     graph: Graph,
@@ -37,6 +38,7 @@ export class ExecutionEngine {
     this.updatePortValue = updatePortValue;
     this.debugCallbacks = debugCallbacks;
     this.batchMode = batchMode;
+    this.buildEdgeMap();
   }
 
   /** Abort a running execution */
@@ -48,6 +50,17 @@ export class ExecutionEngine {
   private setPortValue(portId: string, value: any) {
     this.runtime.portValues[portId] = value;
     this.updatePortValue(portId, value);
+  }
+
+  /** Build the edge lookup map once for the entire execution */
+  private buildEdgeMap() {
+    this.edgeByNodePort.clear();
+    for (const edge of this.graph.edges) {
+      const edgeKey = `${edge.sourceNode}_${edge.sourcePort}`;
+      const arr = this.edgeByNodePort.get(edgeKey) || [];
+      arr.push(edge);
+      this.edgeByNodePort.set(edgeKey, arr);
+    }
   }
 
   // Find the ancestor of nodeId that sits exactly in the current parentId level
@@ -141,22 +154,13 @@ export class ExecutionEngine {
     }
 
     // Resolve cross-hierarchy edges into level-specific dependencies
-    const edgeByNodePort = new Map<string, Edge[]>();
-
     for (const edge of this.graph.edges) {
-      // track global edge-by-node-port for direct value propagation
-      const edgeKey = `${edge.sourceNode}_${edge.sourcePort}`;
-      const pEdges = edgeByNodePort.get(edgeKey) || [];
-      pEdges.push(edge);
-      edgeByNodePort.set(edgeKey, pEdges);
-
       const sourceAncestor = this.getAncestorInLevel(edge.sourceNode, parentId);
       const targetAncestor = this.getAncestorInLevel(edge.targetNode, parentId);
 
       // If both ancestors exist in this level and are different, it's a structural dependency!
       if (sourceAncestor && targetAncestor && sourceAncestor !== targetAncestor) {
          // Only add dependency if both nodes are actively participating in this level's execution!
-         // (Specifically ignores nodes filtered out by Case Structure inactive branches)
          if (inDegree.has(sourceAncestor) && inDegree.has(targetAncestor)) {
             const currentDeps = deps.get(sourceAncestor) || [];
             if (!currentDeps.includes(targetAncestor)) {
@@ -175,7 +179,6 @@ export class ExecutionEngine {
 
     // Track nodes that have been processed
     const processedNodes = new Set<string>();
-    let deadlockCheckCount = 0;
 
     while (queue.length > 0) {
       if (this.aborted) throw new Error("Execution Aborted");
@@ -184,7 +187,6 @@ export class ExecutionEngine {
       if (!node) continue;
 
       processedNodes.add(nodeId);
-      deadlockCheckCount = 0;  // Reset deadlock counter when a node is processed
 
       // Check if we should pause (breakpoint or step mode)
       if (this.debugCallbacks?.shouldPause) {
@@ -292,7 +294,7 @@ export class ExecutionEngine {
               this.setPortValue(`${node.id}_${key}`, val);
 
               // Direct edge propagation across anywhere in the graph!
-              const outEdges = edgeByNodePort.get(`${node.id}_${key}`) || [];
+              const outEdges = this.edgeByNodePort.get(`${node.id}_${key}`) || [];
               for (const edge of outEdges) {
                  if (edge.sourceNode === node.id) {
                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, val);
@@ -322,17 +324,6 @@ export class ExecutionEngine {
          if (count === 0) queue.push(childId);
       }
       
-      // Deadlock detection: check if queue is empty but there are still nodes to process
-      if (queue.length === 0) {
-        const remainingNodes = nodesInLevel.filter(n => !processedNodes.has(n.id));
-        if (remainingNodes.length > 0) {
-          // Check if this is a deadlock situation
-          deadlockCheckCount++;
-          if (deadlockCheckCount >= 3) {  // Check a few times to avoid false positives
-            throw new Error(`Deadlock Detected: ${remainingNodes.length} nodes cannot be executed due to unresolved dependencies`);
-          }
-        }
-      }
     }
     
     // Final check: ensure all nodes were processed
@@ -349,6 +340,18 @@ export class ExecutionEngine {
 
     for (const n of this.graph.nodes) {
       this.updateNodeState(n.id, 'idle');
+    }
+
+    // Initialize control terminal port values from UI controls before execution
+    for (const control of this.graph.uiControls) {
+      const termNode = this.graph.nodes.find(n => n.id === control.bindingNodeId);
+      if (termNode && termNode.type === 'io.terminal') {
+        const value = termNode.params?.value !== undefined ? termNode.params.value : control.defaultValue;
+        if (control.direction === 'control') {
+          this.setPortValue(`${termNode.id}_output`, value);
+        }
+        // For indicators, value flows in during execution via edges
+      }
     }
 
     await this.executeSubgraph(undefined);
