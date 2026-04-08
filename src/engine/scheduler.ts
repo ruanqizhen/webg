@@ -233,7 +233,16 @@ export class ExecutionEngine {
            const N = Number(inputs.N) || 0;
            for (let i = 0; i < N; i++) {
               if (this.aborted) throw new Error("Execution Aborted");
+              
               this.setPortValue(`${node.id}_i`, i);
+              // Propagate 'i' to connected target nodes inside the loop
+              const outEdges = this.edgeByNodePort.get(`${node.id}_i`) || [];
+              for (const edge of outEdges) {
+                 if (edge.sourceNode === node.id) {
+                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, i);
+                 }
+              }
+              
               await this.executeSubgraph(node.id);
            }
         } else if (node.type === 'structure.whileLoop') {
