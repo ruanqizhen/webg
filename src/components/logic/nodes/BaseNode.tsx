@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
@@ -213,6 +214,55 @@ function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverrid
   );
 }
 
+function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, selected }: any) {
+  const [arrayIndex, setArrayIndex] = useState(0);
+  const paramValue = Array.isArray(node?.params?.value) ? node.params.value : [];
+  const elementType = node?.params?.elementType;
+  const outPort = node?.outputs?.[0] || { name: 'value', type: 'array' };
+
+  // Inner constant value proxy
+  let innerVal = paramValue[arrayIndex];
+  if (innerVal === undefined) {
+      if (elementType === 'source.number') innerVal = 0;
+      else if (elementType === 'source.boolean') innerVal = false;
+      else if (elementType === 'source.string') innerVal = '';
+  }
+
+  const handleInnerChange = (e: any) => {
+     let val = e.target.value;
+     if (elementType === 'source.number') val = Number(val);
+     if (elementType === 'source.boolean') val = e.target.checked;
+     
+     const newArr = [...paramValue];
+     newArr[arrayIndex] = val;
+     updateNode(id, { params: { ...node.params, value: newArr } });
+  };
+
+  const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
+
+  return (
+    <div className={`flex flex-row bg-[#F3F4F6] border-2 border-[#D1D5DB] rounded-sm overflow-hidden shadow-sm pointer-events-auto ${ringCls}`} style={{ width: 120, height: 40 }}>
+       <div className="w-8 flex flex-col items-stretch border-r border-[#D1D5DB] bg-[#E5E7EB] shrink-0">
+          <button onPointerDown={e => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a+1)); }} className="flex-1 flex items-center justify-center hover:bg-[#D1D5DB] border-b border-[#D1D5DB] text-[8px] cursor-pointer">▲</button>
+          <div className="flex-1 flex items-center justify-center text-[10px] font-mono font-bold">{arrayIndex}</div>
+          <button onPointerDown={e => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a-1)); }} className="flex-1 flex items-center justify-center hover:bg-[#D1D5DB] border-t border-[#D1D5DB] text-[8px] cursor-pointer">▼</button>
+       </div>
+       <div className="flex-1 flex items-center justify-center p-1 relative overflow-hidden bg-[#fff]">
+          {elementType ? (
+             <div className="w-full h-full relative" onContextMenu={e => e.stopPropagation()}>
+               {elementType === 'source.number' && <input type="number" value={innerVal || ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full text-center bg-[#FFECB3] border border-[#FFCA28] text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 nodrag" />}
+               {elementType === 'source.string' && <input type="text" value={innerVal || ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full px-1 text-left bg-[#FCE4EC] border border-[#F48FB1] text-xs font-mono focus:outline-none focus:ring-1 focus:ring-pink-500 nodrag" />}
+               {elementType === 'source.boolean' && <label className="w-full h-full flex items-center justify-center bg-[#E8F5E9] border border-[#A5D6A7] cursor-pointer nodrag"><input type="checkbox" checked={!!innerVal} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="mr-1" /><span className="text-[10px] font-bold text-green-800">{innerVal ? 'T' : 'F'}</span></label>}
+             </div>
+          ) : (
+             <span className="text-[8px] text-gray-400 font-bold uppercase text-center border border-dashed border-gray-300 w-full h-full flex items-center justify-center">Drop</span>
+          )}
+       </div>
+       <OptimizedHandle nodeId={id} port={{ ...outPort, name: 'value', type: outPort.type }} position={Position.Right} topPct={50} isInput={false} />
+    </div>
+  );
+}
+
 export function BaseNode({ id, data, type, selected }: any) {
   const actualType: string = data?.nodeType || type;
   const def = NodeRegistry[actualType] || data?.def;
@@ -234,6 +284,10 @@ export function BaseNode({ id, data, type, selected }: any) {
   const isCurrentStep = currentStepNode === id;
 
   if (!def) return <div className="p-2 bg-red-500 text-white rounded text-xs">Unknown: {actualType}</div>;
+
+  if (actualType === 'source.array') {
+    return <ArrayConstantNode id={id} node={node} updateNode={updateNode} nodeState={nodeState} isCurrentStep={isCurrentStep} selected={selected} />;
+  }
 
   let iconDef = NODE_ICONS[actualType] ? { ...NODE_ICONS[actualType] } : undefined;
 

@@ -38,7 +38,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
         try { arr = JSON.parse(arr); } catch { arr = []; }
       }
       if (!Array.isArray(arr)) arr = [];
-      return { outputs: { value: arr.map(Number) } };
+      return { outputs: { value: arr } };
     }
   },
 

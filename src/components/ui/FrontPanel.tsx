@@ -160,129 +160,9 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
   );
 }
 
-function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
-  const { updateUIControl, updateNode, pushHistory } = useGraphStore();
-  const { selectedControlId, setSelectedControlId } = useUIStore();
-  
-  const terminalId = control.bindingNodeId;
-  const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [resizeMode, setResizeMode] = useState<string | null>(null);
-  const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    setSelectedControlId(control.id);
-    pushHistory(); // Save state before starting drag
-    setIsDragging(true);
-    setResizeMode(null);
-    dragRef.current.pointerId = e.pointerId;
-    dragRef.current.element = e.currentTarget;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
-    e.stopPropagation();
-    setSelectedControlId(control.id);
-    pushHistory(); // Save state before starting resize
-    setIsDragging(true);
-    setResizeMode(mode);
-    dragRef.current.pointerId = e.pointerId;
-    dragRef.current.element = e.currentTarget;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (isDragging) {
-      if (!resizeMode) {
-        updateUIControl(control.id, {
-          x: (control.x || 0) + e.movementX / transform.scale,
-          y: (control.y || 0) + e.movementY / transform.scale,
-        }, true); // skipHistory during drag
-      } else {
-        const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
-        const currentHeight = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
-        
-        let newWidth = currentWidth;
-        let newHeight = currentHeight;
-        
-        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX / transform.scale);
-        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY / transform.scale);
-        
-        updateUIControl(control.id, {
-          width: newWidth,
-          height: newHeight,
-        }, true); // skipHistory during resize
-      }
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    setIsDragging(false);
-    setResizeMode(null);
-    dragRef.current.pointerId = null;
-    dragRef.current.element = null;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (err) {
-      // Pointer may already be released, ignore
-    }
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (dragRef.current.element && dragRef.current.pointerId !== null) {
-        try {
-          (dragRef.current.element as HTMLElement).releasePointerCapture(dragRef.current.pointerId);
-        } catch (err) {
-          // Ignore
-        }
-      }
-    };
-  }, []);
-
-  const isIndicatorDir = (control.direction || 'control') === 'indicator';
-  const displayVal = (isIndicatorDir && inputVal !== undefined) ? inputVal : control.defaultValue;
-
-  const handleChange = (e: any) => {
-    let newVal = e.target.value;
-    if (['numberInput', 'slider', 'knob', 'gauge', 'tank'].includes(control.type)) newVal = Number(newVal);
-    if (['button', 'indicatorLight'].includes(control.type)) newVal = e.target.checked;
-
-    updateUIControl(control.id, { defaultValue: newVal });
-    updateNode(terminalId, { params: { value: newVal } });
-  }
-
-  // Control dimensions
-  const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
-  const height = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
-
-  // Colors for button and indicator light
-  const colorOn = control.colorOn || '#4CAF50';
-  const colorOff = control.colorOff || '#cccccc';
-
-  // Min/Max/Step for number input
-  const min = control.min !== undefined ? control.min : undefined;
-  const max = control.max !== undefined ? control.max : undefined;
-  const step = control.step !== undefined ? control.step : 1;
-
-  const isSelected = selectedControlId === control.id;
-
+function InnerControlRender({ control, displayVal, handleChange, width, height, colorOn, colorOff, min, max, step, isIndicatorDir }: any) {
   return (
-    <div
-      className={`absolute flex flex-col rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
-      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'move' : 'move' }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-move z-20">
-        <label className="text-xs font-bold text-gray-600 drop-shadow-sm cursor-inherit select-none">
-          {control.label}
-        </label>
-      </div>
-
+    <>
       {control.type === 'numberInput' && (
           <div 
            className="flex-1 flex items-center bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
@@ -334,7 +214,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
          <div className="bg-[#111] px-3 py-2 text-xl rounded shadow-[inset_0_4px_10px_rgba(0,0,0,1)] border-b border-r border-gray-500 border-t-2 border-l-2 border-t-black border-l-black text-right font-mono flex-1 flex items-center justify-end overflow-hidden relative">
            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
            <span className="text-[#39ff14] drop-shadow-[0_0_8px_rgba(57,255,20,0.9)] z-10 select-all">
-             {Number(displayVal).toFixed(2)}
+             {Number(displayVal || 0).toFixed(2)}
            </span>
          </div>
       )}
@@ -345,7 +225,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
            <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-12"></div></div>
            <div className="absolute left-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-45"></div></div>
            <div className="absolute right-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 rotate-12"></div></div>
-           <span className="relative z-10 pointer-events-none drop-shadow-sm select-all">{String(displayVal)}</span>
+           <span className="relative z-10 pointer-events-none drop-shadow-sm select-all">{String(displayVal || '')}</span>
          </div>
       )}
 
@@ -353,9 +233,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
          <div className="flex-1 flex items-center justify-center relative">
             <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 40, (height - 40) / 40))})`, transformOrigin: 'center center' }}>
                  <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
-                    {/* Inner Dark Cavity */}
                     <div className="w-full h-full rounded-full bg-[#333] p-[2px] shadow-[inset_0_3px_5px_rgba(0,0,0,0.8)] border border-gray-600">
-                       {/* Glowing Bulb Surface */}
                        <div
                          className="w-full h-full rounded-full transition-all duration-300 relative overflow-hidden"
                          style={{
@@ -430,7 +308,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
              </div>
              <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0" style={{ fontSize: `${Math.max(9, height * 0.15)}px` }}>
                  <span className="text-gray-400">{min ?? 0}</span>
-                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal).toFixed(1)}</span>
+                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal || 0).toFixed(1)}</span>
                  <span className="text-gray-400">{max ?? 100}</span>
              </div>
          </div>
@@ -462,6 +340,275 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
                 <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
              )}
          </div>
+      )}
+    </>
+  );
+}
+
+function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
+  const { updateUIControl, updateNode, pushHistory } = useGraphStore();
+  const { selectedControlId, setSelectedControlId } = useUIStore();
+  
+  const terminalId = control.bindingNodeId;
+  const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [resizeMode, setResizeMode] = useState<string | null>(null);
+  const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
+  const originalPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    setSelectedControlId(control.id);
+    pushHistory(); // Save state before starting drag
+    setIsDragging(true);
+    setResizeMode(null);
+    dragRef.current.pointerId = e.pointerId;
+    dragRef.current.element = e.currentTarget;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    
+    // Save original position for bounce back
+    originalPosRef.current = { x: control.x ?? 50, y: control.y ?? 50 };
+  };
+
+  const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    setSelectedControlId(control.id);
+    pushHistory(); // Save state before starting resize
+    setIsDragging(true);
+    setResizeMode(mode);
+    dragRef.current.pointerId = e.pointerId;
+    dragRef.current.element = e.currentTarget;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (isDragging) {
+      if (!resizeMode) {
+        updateUIControl(control.id, {
+          x: (control.x || 0) + e.movementX / transform.scale,
+          y: (control.y || 0) + e.movementY / transform.scale,
+        }, true); // skipHistory during drag
+      } else {
+        const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
+        const currentHeight = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
+        
+        let newWidth = currentWidth;
+        let newHeight = currentHeight;
+        
+        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX / transform.scale);
+        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY / transform.scale);
+        
+        updateUIControl(control.id, {
+          width: newWidth,
+          height: newHeight,
+        }, true); // skipHistory during resize
+      }
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false);
+    setResizeMode(null);
+    dragRef.current.pointerId = null;
+    dragRef.current.element = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+
+    // Overlap resolution and Array absorption logic
+    if (isDragging && !resizeMode && originalPosRef.current) {
+        const myX = control.x ?? 50;
+        const myY = control.y ?? 50;
+        const myW = width;
+        const myH = height;
+        
+        const allControls = useGraphStore.getState().uiControls;
+        const allNodes = useGraphStore.getState().nodes;
+        
+        let overlappingArray: UIControl | null = null;
+        let hasOverlap = false;
+
+        for (const other of allControls) {
+            if (other.id === control.id) continue;
+            const oX = other.x ?? 50;
+            const oY = other.y ?? 50;
+            const oW = other.width || (other.type === 'gauge' ? 120 : other.type === 'indicatorLight' || other.type === 'button' ? 80 : 140);
+            const oH = other.height || (other.type === 'gauge' ? 100 : other.type === 'indicatorLight' || other.type === 'button' ? 60 : 60);
+            
+            if (myX < oX + oW && myX + myW > oX && myY < oY + oH && myY + myH > oY) {
+                hasOverlap = true;
+                if (other.type === 'array' && other.direction === control.direction && control.type !== 'array') {
+                    overlappingArray = other;
+                    break;
+                }
+            }
+        }
+
+        if (overlappingArray) {
+            // Absorb into array!
+            const getPortType = (type: string) => {
+                if (type === 'button' || type === 'indicatorLight') return 'boolean';
+                if (type === 'textLabel') return 'string';
+                return 'number';
+            };
+            const portType = getPortType(control.type);
+            
+            updateUIControl(overlappingArray.id, {
+                elementDef: {
+                    ...control,
+                    id: undefined // Let it be a template
+                },
+                width: Math.max(overlappingArray.width || 120, 46 + myW),
+                height: Math.max(overlappingArray.height || 60, myH)
+            });
+            
+            const currentTerminal = allNodes.find(n => n.id === overlappingArray!.bindingNodeId);
+            if (currentTerminal) {
+                const isIndicator = overlappingArray!.direction === 'indicator';
+                const newInputs = isIndicator ? currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` as any })) : currentTerminal.inputs;
+                const newOutputs = !isIndicator ? currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` as any })) : currentTerminal.outputs;
+                useGraphStore.getState().updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
+            }
+
+            // Remove the dragged control from the graph entirely
+            useGraphStore.getState().removeNode(control.bindingNodeId);
+        } else if (hasOverlap) {
+            // Bounce! Revert to original position
+            updateUIControl(control.id, { x: originalPosRef.current.x, y: originalPosRef.current.y }, true);
+        }
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (dragRef.current.element && dragRef.current.pointerId !== null) {
+        try {
+          (dragRef.current.element as HTMLElement).releasePointerCapture(dragRef.current.pointerId);
+        } catch (err) {
+          // Ignore
+        }
+      }
+    };
+  }, []);
+
+  const [arrayIndex, setArrayIndex] = useState(0);
+
+  const isIndicatorDir = (control.direction || 'control') === 'indicator';
+  const isArray = control.type === 'array';
+  
+  // For array elements, we bind to an element array.
+  let displayVal: any;
+  if (isArray) {
+     const arr = Array.isArray(inputVal) ? inputVal : (Array.isArray(control.defaultValue) ? control.defaultValue : []);
+     displayVal = arr[arrayIndex] ?? (control.elementDef?.defaultValue ?? 0);
+  } else {
+     displayVal = (isIndicatorDir && inputVal !== undefined) ? inputVal : control.defaultValue;
+  }
+
+  const handleChange = (e: any) => {
+    let newVal = e.target.value;
+    const targetType = isArray ? control.elementDef?.type : control.type;
+    
+    if (['numberInput', 'slider', 'knob', 'gauge', 'tank'].includes(targetType)) newVal = Number(newVal);
+    if (['button', 'indicatorLight'].includes(targetType)) newVal = e.target.checked;
+
+    if (isArray) {
+       const arr = Array.isArray(control.defaultValue) ? [...control.defaultValue] : [];
+       arr[arrayIndex] = newVal;
+       updateUIControl(control.id, { defaultValue: arr });
+       updateNode(terminalId, { params: { value: arr } });
+    } else {
+       updateUIControl(control.id, { defaultValue: newVal });
+       updateNode(terminalId, { params: { value: newVal } });
+    }
+  }
+
+  // Control dimensions
+  const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
+  const height = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
+
+  // Colors for button and indicator light
+  const colorOn = control.colorOn || '#4CAF50';
+  const colorOff = control.colorOff || '#cccccc';
+
+  // Min/Max/Step for number input
+  const min = control.min !== undefined ? control.min : undefined;
+  const max = control.max !== undefined ? control.max : undefined;
+  const step = control.step !== undefined ? control.step : 1;
+
+  const isSelected = selectedControlId === control.id;
+
+  return (
+    <div
+      className={`absolute flex flex-col rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
+      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'move' : 'move' }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-move z-20">
+        <label className="text-xs font-bold text-gray-600 drop-shadow-sm cursor-inherit select-none">
+          {control.label}
+        </label>
+      </div>
+
+      {control.type === 'array' ? (
+        <div className="flex-1 flex flex-row overflow-hidden border-2 border-gray-400 bg-gray-50 rounded-sm">
+           {/* Index Stepper Area */}
+           <div className="w-10 flex border-r border-gray-400 bg-gray-200 shrink-0">
+               <div className="w-4 flex flex-col justify-between border-r border-gray-300">
+                   <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 border-b border-gray-300 cursor-pointer">
+                      <span className="text-[8px]">▲</span>
+                   </button>
+                   <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 cursor-pointer">
+                      <span className="text-[8px]">▼</span>
+                   </button>
+               </div>
+               <div className="flex-1 flex items-center justify-center">
+                  <span className="font-mono text-xs font-bold">{arrayIndex}</span>
+               </div>
+           </div>
+           
+           {/* Content Area */}
+           <div className="flex-1 overflow-hidden relative border-[3px] border-transparent">
+               {control.elementDef ? (
+                 <div className="absolute inset-0.5 overflow-hidden flex items-center justify-center">
+                   <InnerControlRender 
+                     control={{...control.elementDef, id: `${control.id}_inner`}} 
+                     displayVal={displayVal} 
+                     handleChange={handleChange}
+                     width={(width-46)} 
+                     height={height}
+                     colorOn={control.elementDef.colorOn || '#4CAF50'}
+                     colorOff={control.elementDef.colorOff || '#cccccc'}
+                     min={control.elementDef.min}
+                     max={control.elementDef.max}
+                     step={control.elementDef.step}
+                     isIndicatorDir={isIndicatorDir}
+                   />
+                 </div>
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center pointer-events-none">
+                     <span className="text-[10px] text-gray-400 uppercase font-semibold border-2 border-dashed border-gray-300 px-2 py-1 bg-white/50">Drop Element</span>
+                 </div>
+               )}
+           </div>
+        </div>
+      ) : (
+        <InnerControlRender 
+          control={control} 
+          displayVal={displayVal} 
+          handleChange={handleChange}
+          width={width} 
+          height={height}
+          colorOn={colorOn}
+          colorOff={colorOff}
+          min={min}
+          max={max}
+          step={step}
+          isIndicatorDir={isIndicatorDir}
+        />
       )}
 
       {/* Resize Handles */}

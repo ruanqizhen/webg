@@ -1,5 +1,6 @@
 export const getTypeColor = (type: string) => {
-  switch(type.toLowerCase()) {
+  const baseType = type.toLowerCase().replace('[]', '');
+  switch(baseType) {
     case 'number': return '#D97706'; // Amber (LabVIEW DBL style)
     case 'integer': return '#1565C0'; // Blue (LabVIEW I32 style)
     case 'boolean': return '#388E3C'; // Green
@@ -8,6 +9,8 @@ export const getTypeColor = (type: string) => {
     default: return '#9E9E9E'; // Gray
   }
 };
+
+export const isTypeArray = (type: string) => type.endsWith('[]') || type.toLowerCase() === 'array';
 
 export const getNodeColor = (category: string) => {
   switch(category.toLowerCase()) {

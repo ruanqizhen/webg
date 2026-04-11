@@ -1,4 +1,4 @@
-export type DataType = 'number' | 'integer' | 'boolean' | 'string' | 'array' | 'any';
+export type DataType = 'number' | 'integer' | 'boolean' | 'string' | 'array' | 'any' | string;
 
 export interface Port {
   id: string;
@@ -33,7 +33,7 @@ export interface Edge {
 
 export interface UIControl {
   id: string;
-  type: 'numberInput' | 'button' | 'numberIndicator' | 'textLabel' | 'gauge' | 'indicatorLight' | 'slider' | 'knob' | 'tank';
+  type: 'numberInput' | 'button' | 'numberIndicator' | 'textLabel' | 'gauge' | 'indicatorLight' | 'slider' | 'knob' | 'tank' | 'array';
   direction: 'control' | 'indicator';
   label: string;
   defaultValue: any;
@@ -51,6 +51,8 @@ export interface UIControl {
   colorOff?: string;
   // For numeric controls: integer vs real
   numberType?: 'real' | 'integer';
+  // For array containers
+  elementDef?: any; 
 }
 
 export interface Graph {

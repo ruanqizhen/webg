@@ -8,7 +8,7 @@ import {
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
   EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box,
-  SlidersHorizontal, CircleDot, Database
+  SlidersHorizontal, CircleDot, Database, List
 } from 'lucide-react';
 
 const UI_ICONS: Record<string, any> = {
@@ -21,13 +21,14 @@ const UI_ICONS: Record<string, any> = {
   slider: SlidersHorizontal,
   knob: CircleDot,
   tank: Database,
+  array: List,
 };
 
 const LOGIC_ICONS: Record<string, any> = {
   'source.number': Hash,
   'source.boolean': ToggleLeft,
   'source.string': Type,
-  'source.array': Box,
+  'source.array': List,
   'math.add': PlusSquare,
   'math.subtract': MinusSquare,
   'math.multiply': XSquare,
@@ -49,13 +50,15 @@ const LOGIC_ICONS: Record<string, any> = {
 const UI_CONTROLS = [
   { type: 'numberInput', label: 'Number Input', direction: 'control' as const },
   { type: 'button', label: 'Button', direction: 'control' as const },
+  { type: 'slider', label: 'Slider', direction: 'control' as const },
+  { type: 'knob', label: 'Knob', direction: 'control' as const },
+  { type: 'array', label: 'Array Control', direction: 'control' as const },
   { type: 'numberIndicator', label: 'Number Indicator', direction: 'indicator' as const },
   { type: 'textLabel', label: 'Text Label', direction: 'indicator' as const },
   { type: 'gauge', label: 'Gauge', direction: 'indicator' as const },
   { type: 'indicatorLight', label: 'Indicator Light', direction: 'indicator' as const },
-  { type: 'slider', label: 'Slider', direction: 'control' as const },
-  { type: 'knob', label: 'Knob', direction: 'control' as const },
   { type: 'tank', label: 'Tank', direction: 'indicator' as const },
+  { type: 'array', label: 'Array Indicator', direction: 'indicator' as const },
 ];
 
 export function Palette() {

@@ -21,7 +21,7 @@ export function IdeLayout() {
 
 function IdeLayoutInner() {
   const { viewMode, setViewMode } = useUIStore();
-  const { addNode, addUIControl, uiControls, loadFromStorage, startAutoSave } = useGraphStore();
+  const { addNode, addUIControl, updateNode, updateUIControl, uiControls, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
   const reactFlow = useReactFlow();
   const frontPanelRef = useRef<{ screenToPanelPosition: (x: number, y: number) => { x: number, y: number } }>(null);
@@ -79,6 +79,33 @@ function IdeLayoutInner() {
              localY = position.y - sY;
              caseId = isCaseStructure ? s.params?.activeCase : undefined;
              break;
+          }
+      }
+
+      // Check for Array Constant intersection
+      const arrayNodes = currentNodes.filter(n => n.type === 'source.array');
+      for (const an of arrayNodes) {
+          const sX = an.position?.x ?? 0;
+          const sY = an.position?.y ?? 0;
+          const sW = an.width || 120;
+          const sH = an.height || 60;
+          
+          if (nodeCenterX > sX && nodeCenterX < sX + sW &&
+              nodeCenterY > sY && nodeCenterY < sY + sH) {
+              
+              if (nodeType === 'source.array') return; // no 2D array yet
+              if (!nodeType.startsWith('source.')) return; // Only allow constants
+
+              let pType = 'any';
+              if (nodeType === 'source.number') pType = 'number';
+              if (nodeType === 'source.boolean') pType = 'boolean';
+              if (nodeType === 'source.string') pType = 'string';
+
+              updateNode(an.id, {
+                  params: { ...an.params, elementType: nodeType },
+                  outputs: [{ name: 'value', type: `${pType}[]` as any, direction: 'output', id: 'value' }]
+              });
+              return;
           }
       }
 
@@ -144,7 +171,48 @@ function IdeLayoutInner() {
         slider: { min: 0, max: 100, step: 1, defaultValue: 0, width: 160, height: 40 },
         knob: { min: 0, max: 100, step: 1, defaultValue: 0, width: 80, height: 80 },
         tank: { min: 0, max: 100, colorOn: '#3B82F6', defaultValue: 0, width: 60, height: 160 },
+        array: { defaultValue: [], width: 120, height: 60 }
       };
+
+      // Check if we are dropping ON an existing Array UI Control
+      const targetArrayControl = uiControls.find(c => {
+          if (c.type !== 'array') return false;
+          // Only allow dropping indicator into array indicator, or control into array control
+          if (c.direction !== direction) return false;
+          const cx = c.x ?? 50;
+          const cy = c.y ?? 50;
+          const cw = c.width || 120;
+          const ch = c.height || 60;
+          return x > cx && x < cx + cw && y > cy && y < cy + ch;
+      });
+
+      if (targetArrayControl) {
+          if (controlDef.type === 'array') return; // no 2D array yet
+          
+          updateUIControl(targetArrayControl.id, { 
+              elementDef: {
+                 ...controlDef,
+                 defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
+                 width: controlDefaults[controlDef.type]?.width,
+                 height: controlDefaults[controlDef.type]?.height,
+                 min: controlDefaults[controlDef.type]?.min,
+                 max: controlDefaults[controlDef.type]?.max,
+                 step: controlDefaults[controlDef.type]?.step,
+                 colorOn: controlDefaults[controlDef.type]?.colorOn,
+                 colorOff: controlDefaults[controlDef.type]?.colorOff
+              },
+              width: Math.max(targetArrayControl.width || 120, 46 + (controlDefaults[controlDef.type]?.width || (controlDef.type === 'button' ? 80 : 140))),
+              height: Math.max(targetArrayControl.height || 60, controlDefaults[controlDef.type]?.height || 60)
+          });
+          
+          const currentTerminal = useGraphStore.getState().nodes.find(n => n.id === targetArrayControl.bindingNodeId);
+          if (currentTerminal) {
+              const newInputs = currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` as any }));
+              const newOutputs = currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` as any }));
+              updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
+          }
+          return;
+      }
 
       const existingLabels = uiControls.map(c => c.label);
       const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);

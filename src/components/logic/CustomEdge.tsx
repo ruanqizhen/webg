@@ -1,7 +1,7 @@
 import { BaseEdge, getBezierPath } from 'reactflow';
 import type { EdgeProps } from 'reactflow';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
-import { getTypeColor } from '../../lib/colors';
+import { getTypeColor, isTypeArray } from '../../lib/colors';
 import { NodeRegistry } from '../../engine/registry';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -38,6 +38,7 @@ export function CustomEdge({
   const edges = useGraphStore(state => state.edges);
   // Auto-detect color from the source graph node definition, threading through tunnels
   let strokeColor = '#b1b1b7';
+  let isArray = false;
   let currId = source;
   let currPort = sourceHandleId;
 
@@ -55,7 +56,10 @@ export function CustomEdge({
         if (def) {
            const nodeOutputs = (currNode.outputs && currNode.outputs.length > 0) ? currNode.outputs : (def.outputs || []);
            const portDef = nodeOutputs.find((p: any) => p.name === currPort);
-           if (portDef) strokeColor = getTypeColor(portDef.type);
+           if (portDef) {
+               strokeColor = getTypeColor(portDef.type);
+               isArray = isTypeArray(portDef.type);
+           }
            // Override for integer number constants
            if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
               strokeColor = '#1565C0';
@@ -77,17 +81,45 @@ export function CustomEdge({
   return (
     <>
       <g onClick={() => setSelectedEdgeId(id)} style={{ cursor: 'pointer' }}>
-        <BaseEdge
-          path={edgePath}
-          markerEnd={markerEnd}
-          style={{
-            ...style,
-            stroke: isSelected ? '#f59e0b' : strokeColor,
-            strokeWidth: isSelected ? 4 : 3,
-            animation: isRunning && !isSelected ? 'dashdraw 1s linear infinite' : 'none',
-            strokeDasharray: isRunning && !isSelected ? '6, 6' : 'none',
-          }}
-        />
+        {isArray && !isSelected && (
+           <>
+              <BaseEdge
+                path={edgePath}
+                markerEnd={markerEnd}
+                style={{
+                  ...style,
+                  stroke: strokeColor,
+                  strokeWidth: 5,
+                  animation: 'none',
+                  strokeDasharray: 'none',
+                }}
+              />
+              <BaseEdge
+                path={edgePath}
+                markerEnd={markerEnd}
+                style={{
+                  ...style,
+                  stroke: '#f8fafc',
+                  strokeWidth: 2,
+                  animation: isRunning ? 'dashdraw 1s linear infinite' : 'none',
+                  strokeDasharray: isRunning ? '6, 6' : 'none',
+                }}
+              />
+           </>
+        )}
+        {(!isArray || isSelected) && (
+           <BaseEdge
+             path={edgePath}
+             markerEnd={markerEnd}
+             style={{
+               ...style,
+               stroke: isSelected ? '#f59e0b' : strokeColor,
+               strokeWidth: isSelected ? 4 : 3,
+               animation: isRunning && !isSelected ? 'dashdraw 1s linear infinite' : 'none',
+               strokeDasharray: isRunning && !isSelected ? '6, 6' : 'none',
+             }}
+           />
+        )}
       </g>
       {isRunning && (
         <circle r="4" fill={strokeColor}>
