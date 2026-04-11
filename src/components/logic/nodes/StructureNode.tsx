@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
@@ -20,7 +21,10 @@ export function StructureNode({ id, data, type, selected }: any) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
-  const { updateNode } = useGraphStore();
+  const { updateNode, addNode } = useGraphStore();
+
+  const [showCtxMenu, setShowCtxMenu] = useState(false);
+  const [ctxPos, setCtxPos] = useState({ x: 0, y: 0 });
   
   const node = useGraphStore(s => s.nodes.find(n => n.id === id));
   const mode = node?.params?.mode || 'boolean';
@@ -41,12 +45,49 @@ export function StructureNode({ id, data, type, selected }: any) {
   };
 
   const isCaseStructure = type === 'structure.case';
+  const isLoop = type === 'structure.forLoop' || type === 'structure.whileLoop';
+
+  const handleStructureContextMenu = (e: React.MouseEvent) => {
+    if (!isLoop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxPos({ x: e.clientX, y: e.clientY });
+    setShowCtxMenu(true);
+  };
+
+  const addShiftRegister = () => {
+    setShowCtxMenu(false);
+    const pairId = `sr_${Date.now().toString(36)}`;
+    const nodeH = node?.height || 200;
+    const nodeW = node?.width || 300;
+    // Left register
+    addNode({
+      id: `${pairId}_L`,
+      type: 'io.shiftRegister',
+      position: { x: 0, y: nodeH / 2 - 14 },
+      parent: id,
+      inputs: [],
+      outputs: [],
+      params: { pairId, side: 'left' }
+    });
+    // Right register
+    addNode({
+      id: `${pairId}_R`,
+      type: 'io.shiftRegister',
+      position: { x: nodeW - 20, y: nodeH / 2 - 14 },
+      parent: id,
+      inputs: [],
+      outputs: [],
+      params: { pairId, side: 'right' }
+    });
+  };
 
   return (
     <div
       className={`relative rounded bg-gray-100/30 min-w-[300px] min-h-[200px] ${stateBorder}`}
       style={{ width: node?.width || 300, height: node?.height || 200 }}
       onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
+      onContextMenu={handleStructureContextMenu}
     >
       <NodeResizer color="#ff0071" isVisible={selected} minWidth={300} minHeight={200} />
 
@@ -176,6 +217,24 @@ export function StructureNode({ id, data, type, selected }: any) {
              }}
            />
         </div>
+      )}
+      {/* Context menu for loops */}
+      {showCtxMenu && (
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowCtxMenu(false)} />
+          <div 
+            className="fixed z-[9999] bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[180px] text-xs"
+            style={{ left: ctxPos.x, top: ctxPos.y }}
+          >
+            <button
+              className="w-full text-left px-3 py-1.5 hover:bg-purple-50 flex items-center gap-2"
+              onClick={addShiftRegister}
+            >
+              <span className="text-sm">↻</span>
+              Add Shift Register
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

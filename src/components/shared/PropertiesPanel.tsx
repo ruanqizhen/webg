@@ -156,6 +156,21 @@ export function PropertiesPanel() {
                         onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: e.target.checked } })}
                         className="w-4 h-4"
                       />
+                   ) : param.type === 'array' ? (
+                      <textarea
+                        value={JSON.stringify(activeNode.params[param.name] ?? [])}
+                        onChange={(e) => {
+                           try {
+                             const parsed = JSON.parse(e.target.value);
+                             if (Array.isArray(parsed)) {
+                               updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: parsed } });
+                             }
+                           } catch { /* ignore invalid JSON while typing */ }
+                        }}
+                        placeholder="[1, 2, 3]"
+                        rows={2}
+                        className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm font-mono text-xs"
+                      />
                    ) : (
                       <input
                         type={param.type === 'number' ? 'number' : 'text'}

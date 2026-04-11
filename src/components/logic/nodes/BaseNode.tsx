@@ -37,6 +37,7 @@ const NODE_ICONS: Record<string, IconDef> = {
   'source.number':  { shape:'constant', bg:'#FFFBEB', stroke:'#D97706', symbol:'#',   symbolColor:'#78350F', w:64, h:32 },
   'source.boolean': { shape:'constant', bg:'#F0FDF4', stroke:'#15803D', symbol:'T/F', symbolColor:'#065F46', w:64, h:32 },
   'source.string':  { shape:'constant', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:64, h:32 },
+  'source.array':   { shape:'constant', bg:'#FFF7ED', stroke:'#E65100', symbol:'[ ]', symbolColor:'#BF360C', w:64, h:32 },
   // ── Sink ──
   'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
   'sink.log':     { shape:'console',   bg:'#1F2937', stroke:'#4B5563', symbol:'', symbolColor:'#10B981', w:56, h:40 },
@@ -306,7 +307,12 @@ export function BaseNode({ id, data, type, selected }: any) {
     // Determine display value
     let displayValue = '';
     if (isConstant) {
-      displayValue = paramValue !== undefined ? String(paramValue) : '';
+      if (actualType === 'source.array') {
+        const arr = Array.isArray(paramValue) ? paramValue : [];
+        displayValue = `[${arr.length}]`;
+      } else {
+        displayValue = paramValue !== undefined ? String(paramValue) : '';
+      }
     } else if (isIndicator || actualType === 'io.terminal') {
       const baseVal = actualType === 'io.terminal' ? (paramValue !== undefined ? paramValue : boundControl?.defaultValue) : paramValue;
       const currentVal = inVal !== undefined ? inVal : (outVal !== undefined ? outVal : baseVal);

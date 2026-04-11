@@ -189,6 +189,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
               spawnX = isInput ? 0 : (pStruct.width || 300) - 16;
               spawnY = Math.max(0, Math.min((pStruct.height || 200) - 16, localSpawnY));
             }
+            // Auto-enable indexing on loop structure tunnels
+            const isLoopStructure = pStruct?.type === 'structure.forLoop' || pStruct?.type === 'structure.whileLoop';
             const tunnelId = generateId();
             const tunnelNode: NodeInstance = {
               id: tunnelId,
@@ -197,7 +199,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
               parent: parentId,
               inputs: [],
               outputs: [],
-              params: {}
+              params: isLoopStructure ? { indexing: true } : {}
             };
             return { tunnelId, tunnelNode };
           };

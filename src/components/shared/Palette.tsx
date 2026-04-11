@@ -27,6 +27,7 @@ const LOGIC_ICONS: Record<string, any> = {
   'source.number': Hash,
   'source.boolean': ToggleLeft,
   'source.string': Type,
+  'source.array': Box,
   'math.add': PlusSquare,
   'math.subtract': MinusSquare,
   'math.multiply': XSquare,

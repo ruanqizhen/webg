@@ -26,6 +26,21 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     params: [{ name: 'value', type: 'string', defaultValue: '' }],
     executor: (ctx) => ({ outputs: { value: String(ctx.params.value) } })
   },
+  'source.array': {
+    type: 'source.array',
+    label: 'Array Constant',
+    inputs: [],
+    outputs: [{ name: 'value', type: 'array' }],
+    params: [{ name: 'value', type: 'array', defaultValue: [] }],
+    executor: (ctx) => {
+      let arr = ctx.params.value;
+      if (typeof arr === 'string') {
+        try { arr = JSON.parse(arr); } catch { arr = []; }
+      }
+      if (!Array.isArray(arr)) arr = [];
+      return { outputs: { value: arr.map(Number) } };
+    }
+  },
 
   // Math
   'math.add': {
@@ -147,6 +162,15 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
   'io.tunnel': {
     type: 'io.tunnel',
     label: 'Tunnel',
+    inputs: [{ id: 'input', name: 'input', type: 'any', direction: 'input' }],
+    outputs: [{ id: 'output', name: 'output', type: 'any', direction: 'output' }],
+    executor: async (ctx) => {
+      return { outputs: { output: ctx.inputs.input } };
+    }
+  },
+  'io.shiftRegister': {
+    type: 'io.shiftRegister',
+    label: 'Shift Register',
     inputs: [{ id: 'input', name: 'input', type: 'any', direction: 'input' }],
     outputs: [{ id: 'output', name: 'output', type: 'any', direction: 'output' }],
     executor: async (ctx) => {

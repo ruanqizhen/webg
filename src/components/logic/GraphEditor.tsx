@@ -21,18 +21,19 @@ import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
+import { ShiftRegisterNode } from './nodes/ShiftRegisterNode';
 
 export const resolveNodeOverlaps = (draggedNodeId: string) => {
     setTimeout(() => {
         const currentNodes = useGraphStore.getState().nodes;
         const targetNode = currentNodes.find(n => n.id === draggedNodeId);
-        if (!targetNode || targetNode.type === 'io.tunnel') return;
+        if (!targetNode || targetNode.type === 'io.tunnel' || targetNode.type === 'io.shiftRegister') return;
         
         const targetParent = targetNode.parent;
         const targetCase = targetNode.caseId;
         
         const rects = currentNodes
-            .filter(n => n.parent === targetParent && n.caseId === targetCase && n.type !== 'io.tunnel')
+            .filter(n => n.parent === targetParent && n.caseId === targetCase && n.type !== 'io.tunnel' && n.type !== 'io.shiftRegister')
             .map(n => ({
                 id: n.id,
                 x: n.position?.x ?? 0,
@@ -88,7 +89,8 @@ const initialNodeTypes: any = {
   'structure.forLoop': StructureNode,
   'structure.whileLoop': StructureNode,
   'structure.case': StructureNode,
-  'io.tunnel': TunnelNode
+  'io.tunnel': TunnelNode,
+  'io.shiftRegister': ShiftRegisterNode
 };
 
 // Register all primitive and basic logic/math nodes to BaseNode custom renderer
