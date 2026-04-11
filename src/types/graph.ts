@@ -1,4 +1,4 @@
-export type DataType = 'number' | 'boolean' | 'string' | 'array' | 'any';
+export type DataType = 'number' | 'integer' | 'boolean' | 'string' | 'array' | 'any';
 
 export interface Port {
   id: string;
@@ -49,6 +49,8 @@ export interface UIControl {
   // For button and indicatorLight
   colorOn?: string;
   colorOff?: string;
+  // For numeric controls: integer vs real
+  numberType?: 'real' | 'integer';
 }
 
 export interface Graph {

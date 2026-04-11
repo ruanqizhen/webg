@@ -181,7 +181,7 @@ function stateRingClass(nodeState: string, selected: boolean, isCurrentStep: boo
    ═══════════════════════════════════════════════════════ */
 
 // Helper for handle rendering to keep BaseNode clean
-function OptimizedHandle({ nodeId, port, position, topPct, isInput }: any) {
+function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverride }: any) {
   const val = useRuntimeStore(s => s.portValues[`${nodeId}_${port.name}`]);
   
   return (
@@ -192,7 +192,7 @@ function OptimizedHandle({ nodeId, port, position, topPct, isInput }: any) {
         id={port.name}
         style={{
           top: `${topPct}%`,
-          background: getTypeColor(port.type),
+          background: colorOverride || getTypeColor(port.type),
           width: isInput ? 10 : 10, height: 10,
           border: '2px solid white',
           [isInput ? 'left' : 'right']: -5,
@@ -234,7 +234,21 @@ export function BaseNode({ id, data, type, selected }: any) {
 
   if (!def) return <div className="p-2 bg-red-500 text-white rounded text-xs">Unknown: {actualType}</div>;
 
-  let iconDef = NODE_ICONS[actualType];
+  let iconDef = NODE_ICONS[actualType] ? { ...NODE_ICONS[actualType] } : undefined;
+
+  /* ── Override source.number icon based on numberType ────────── */
+  if (actualType === 'source.number' && iconDef) {
+    const isInteger = node?.params?.numberType === 'integer';
+    if (isInteger) {
+      iconDef = {
+        ...iconDef,
+        bg: '#DBEAFE',
+        stroke: '#1565C0',
+        symbol: 'I32',
+        symbolColor: '#1E3A8A',
+      };
+    }
+  }
 
   /* ── Special handling for io.terminal ────────── */
   if (actualType === 'io.terminal') {
@@ -249,6 +263,9 @@ export function BaseNode({ id, data, type, selected }: any) {
     } else if (ctrlType === 'textLabel') {
        color = '#DB2777'; // Pink (String)
        symbol = 'abc';
+    } else if (boundControl?.numberType === 'integer') {
+       color = '#1565C0'; // Blue (Integer/I32)
+       symbol = 'I32';
     } else if (ctrlType === 'gauge') {
        color = '#D97706'; // Use same amber for all numerical indicators
        symbol = 'DBL';
@@ -270,6 +287,13 @@ export function BaseNode({ id, data, type, selected }: any) {
     const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
     const isTerminal = actualType === 'io.terminal';
+    // Determine effective port type color for handles
+    const getEffectiveColor = (_port: any) => {
+      if (actualType === 'source.number' && node?.params?.numberType === 'integer') return '#1565C0';
+      if (actualType === 'io.terminal' && boundControl?.numberType === 'integer') return '#1565C0';
+      return undefined; // use default from getTypeColor
+    };
+
     const nodeInputs = (isTerminal && node?.inputs) ? node.inputs : (def.inputs || []);
     const nodeOutputs = (isTerminal && node?.outputs) ? node.outputs : (def.outputs || []);
     const inputPositions = spreadPositions(nodeInputs.length);
@@ -348,7 +372,8 @@ export function BaseNode({ id, data, type, selected }: any) {
             port={port} 
             position={Position.Left} 
             isInput={true} 
-            topPct={inputPositions[i]} 
+            topPct={inputPositions[i]}
+            colorOverride={getEffectiveColor(port)}
           />
         ))}
 
@@ -360,7 +385,8 @@ export function BaseNode({ id, data, type, selected }: any) {
             port={port} 
             position={Position.Right} 
             isInput={false} 
-            topPct={outputPositions[i]} 
+            topPct={outputPositions[i]}
+            colorOverride={getEffectiveColor(port)}
           />
         ))}
       </div>

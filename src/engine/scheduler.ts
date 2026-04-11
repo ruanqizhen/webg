@@ -230,7 +230,7 @@ export class ExecutionEngine {
         let result: Record<string, any> = {};
 
         if (node.type === 'structure.forLoop') {
-           const N = Number(inputs.N) || 0;
+           const N = Math.trunc(Number(inputs.N) || 0);
            for (let i = 0; i < N; i++) {
               if (this.aborted) throw new Error("Execution Aborted");
               
@@ -281,6 +281,26 @@ export class ExecutionEngine {
            // Standard Node or Tunnel
            const nodeTask = await def.executor(ctx);
            result = nodeTask.outputs;
+
+           // Apply integer truncation for number constants configured as integer
+           if (node.type === 'source.number' && node.params?.numberType === 'integer') {
+              for (const key of Object.keys(result)) {
+                 if (typeof result[key] === 'number') {
+                    result[key] = Math.trunc(result[key]);
+                 }
+              }
+           }
+           // Apply integer truncation for io.terminal with integer control
+           if (node.type === 'io.terminal') {
+              const ctrl = this.graph.uiControls.find(c => c.bindingNodeId === node.id);
+              if (ctrl?.numberType === 'integer') {
+                 for (const key of Object.keys(result)) {
+                    if (typeof result[key] === 'number') {
+                       result[key] = Math.trunc(result[key]);
+                    }
+                 }
+              }
+           }
         }
 
         // Propagate outputs

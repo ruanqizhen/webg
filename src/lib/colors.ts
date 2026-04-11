@@ -1,6 +1,7 @@
 export const getTypeColor = (type: string) => {
   switch(type.toLowerCase()) {
     case 'number': return '#D97706'; // Amber (LabVIEW DBL style)
+    case 'integer': return '#1565C0'; // Blue (LabVIEW I32 style)
     case 'boolean': return '#388E3C'; // Green
     case 'string': return '#F9A825'; // Yellow
     case 'array': return '#E65100'; // Orange

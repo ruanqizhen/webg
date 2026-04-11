@@ -31,6 +31,7 @@ export function CustomEdge({
   const nodeState = useRuntimeStore((s) => s.nodeState[source]);
   const isRunning = nodeState === 'running' || nodeState === 'done';
   const nodes = useGraphStore(state => state.nodes);
+  const uiControls = useGraphStore(state => state.uiControls);
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
@@ -53,8 +54,19 @@ export function CustomEdge({
         const def = NodeRegistry[currNode.type];
         if (def) {
            const nodeOutputs = (currNode.outputs && currNode.outputs.length > 0) ? currNode.outputs : (def.outputs || []);
-           const portDef = nodeOutputs.find(p => p.name === currPort);
+           const portDef = nodeOutputs.find((p: any) => p.name === currPort);
            if (portDef) strokeColor = getTypeColor(portDef.type);
+           // Override for integer number constants
+           if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
+              strokeColor = '#1565C0';
+           }
+           // Override for integer terminal nodes
+           if (currNode.type === 'io.terminal') {
+              const ctrl = uiControls.find((c: any) => c.bindingNodeId === currNode.id);
+              if (ctrl?.numberType === 'integer') {
+                 strokeColor = '#1565C0';
+              }
+           }
         }
         break;
      }

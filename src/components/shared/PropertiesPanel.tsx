@@ -131,6 +131,21 @@ export function PropertiesPanel() {
                 </>
               )}
 
+              {/* Number Type selector for source.number */}
+              {activeNode.type === 'source.number' && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-gray-500 font-semibold">Number Type</label>
+                  <select
+                    value={activeNode.params.numberType || 'real'}
+                    onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, numberType: e.target.value } })}
+                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
+                  >
+                    <option value="real">DBL (Real)</option>
+                    <option value="integer">I32 (Integer)</option>
+                  </select>
+                </div>
+              )}
+
               {!isCaseStructure && NodeRegistry[activeNode.type]?.params?.map(param => (
                  <div key={param.name} className="flex flex-col gap-1">
                    <label className="text-gray-500 font-semibold capitalize">{param.name}</label>
@@ -224,6 +239,38 @@ export function PropertiesPanel() {
                     className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
                  />
               </div>
+
+              {/* Number Type for numeric controls */}
+              {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-gray-500 font-semibold">Number Type</label>
+                  <select
+                    value={activeControl.numberType || 'real'}
+                    onChange={(e) => {
+                      const newNumberType = e.target.value as 'real' | 'integer';
+                      updateUIControl(activeControl.id, { numberType: newNumberType });
+                      // Update terminal node port type to match
+                      const termNode = nodes.find(n => n.id === activeControl.bindingNodeId);
+                      if (termNode) {
+                        const portType = newNumberType === 'integer' ? 'integer' : 'number';
+                        if (activeControl.direction === 'indicator') {
+                          updateNode(termNode.id, {
+                            inputs: [{ name: 'input', type: portType, direction: 'input', id: 'input' }]
+                          });
+                        } else {
+                          updateNode(termNode.id, {
+                            outputs: [{ name: 'output', type: portType, direction: 'output', id: 'output' }]
+                          });
+                        }
+                      }
+                    }}
+                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
+                  >
+                    <option value="real">DBL (Real)</option>
+                    <option value="integer">I32 (Integer)</option>
+                  </select>
+                </div>
+              )}
 
               {/* Min/Max/Step for numeric controls */}
               {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
