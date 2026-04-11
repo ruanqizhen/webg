@@ -36,9 +36,9 @@ export function CustomEdge({
   const { removeEdge } = useGraphStore();
 
   const edges = useGraphStore(state => state.edges);
-  // Auto-detect color from the source graph node definition, threading through tunnels
   let strokeColor = '#b1b1b7';
-  let isArray = false;
+  let isArrayBase = false;
+  let arrayModifiers = 0;
   let currId = source;
   let currPort = sourceHandleId;
 
@@ -47,6 +47,19 @@ export function CustomEdge({
      if (!currNode) break;
 
      if (currNode.type === 'io.tunnel') {
+        const parentNode = currNode.parent ? nodes.find(n => n.id === currNode.parent) : null;
+        const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
+        const isIndexing = currNode.params?.indexing ?? (isInLoop ? true : false);
+
+        if (isIndexing && parentNode) {
+            const pW = parentNode.width || 300;
+            const isInputTunnel = (currNode.position?.x ?? 0) < pW / 2;
+            // If tracing backwards across an input tunnel, we are going from inside to outside. The base is an array, but we are inside, so -1.
+            // If tracing backwards across an output tunnel, we are going from outside to inside. The base is a scalar, but we are outside, so +1.
+            if (isInputTunnel) arrayModifiers--;
+            else arrayModifiers++;
+        }
+
         const inEdge = edges.find(e => e.targetNode === currId);
         if (!inEdge) break;
         currId = inEdge.sourceNode;
@@ -58,7 +71,7 @@ export function CustomEdge({
            const portDef = nodeOutputs.find((p: any) => p.name === currPort);
            if (portDef) {
                strokeColor = getTypeColor(portDef.type);
-               isArray = isTypeArray(portDef.type);
+               isArrayBase = isTypeArray(portDef.type);
            }
            // Override for integer number constants
            if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
@@ -77,6 +90,7 @@ export function CustomEdge({
   }
 
   const isSelected = selectedEdgeId === id;
+  const isArray = (isArrayBase ? 1 : 0) + arrayModifiers > 0;
 
   return (
     <>

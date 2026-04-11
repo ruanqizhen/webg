@@ -19,11 +19,10 @@ export function TunnelNode({ id, selected }: any) {
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
   const node = nodes.find(n => n.id === id);
-  const isIndexing = node?.params?.indexing ?? false;
-
-  // Check if parent is a loop structure (enables indexing toggle)
   const parentNode = node?.parent ? nodes.find(n => n.id === node.parent) : null;
   const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
+
+  const isIndexing = node?.params?.indexing ?? (isInLoop ? true : false);
 
   let tunnelType = 'any';
   let currId = id;
@@ -94,11 +93,11 @@ export function TunnelNode({ id, selected }: any) {
         {/* Indexing indicator */}
         {isInLoop && (
           <div 
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[7px] font-black select-none pointer-events-none"
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[12px] font-black select-none pointer-events-none tracking-tighter"
             style={{ color: isIndexing ? bgColor : '#9ca3af' }}
             title={isIndexing ? 'Indexing Enabled' : 'Indexing Disabled'}
           >
-            {isIndexing ? '▪' : '▫'}
+            {isIndexing ? '[ ]' : '■'}
           </div>
         )}
       </div>
@@ -115,7 +114,7 @@ export function TunnelNode({ id, selected }: any) {
               className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2"
               onClick={toggleIndexing}
             >
-              <span className="text-sm">{isIndexing ? '▫' : '▪'}</span>
+              <span className="text-sm font-bold">{isIndexing ? '■' : '[ ]'}</span>
               {isIndexing ? 'Disable Indexing' : 'Enable Indexing'}
             </button>
           </div>
