@@ -340,6 +340,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         nodeTypes={initialNodeTypes}
         edgeTypes={initialEdgeTypes}
         fitView
+        proOptions={{ hideAttribution: true }}
         deleteKeyCode={["Backspace", "Delete"]}
         onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
         onPaneClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
