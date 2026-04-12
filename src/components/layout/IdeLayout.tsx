@@ -255,13 +255,13 @@ function IdeLayoutInner() {
                   className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'ui' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
                   onClick={() => setViewMode('ui')}
                >
-                  <MousePointer2 size={16} /> Front Panel
+                  <MousePointer2 size={16} /> UI
                </button>
                <button 
                   className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'logic' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
                   onClick={() => setViewMode('logic')}
                >
-                  <Network size={16} /> Block Diagram
+                  <Network size={16} /> Logic
                </button>
             </div>
             
