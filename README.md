@@ -498,6 +498,6 @@ src/
 
 ---
 
-## License
+## 版权许可
 
-MIT © WebG Contributors
+MIT license
