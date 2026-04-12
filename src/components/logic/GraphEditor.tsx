@@ -126,12 +126,17 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           // Read fresh state to avoid stale closure issues with batched changes
           const currentNodes = useGraphStore.getState().nodes;
           const node = currentNodes.find(n => n.id === c.id);
-          if (node?.type === 'io.tunnel' && node.parent) {
+          if ((node?.type === 'io.tunnel' || node?.type === 'io.shiftRegister') && node.parent) {
              const p = currentNodes.find(p => p.id === node.parent);
              const pW = p?.width || 300;
              const pH = p?.height || 200;
-             // Determine if it's on the left or right border based on its last known position
-             const isRight = (node.position?.x ?? 0) > pW / 2;
+             // Determine if it's on the left or right border based on its current dragged position or side config
+             let isRight = false;
+             if (node.type === 'io.shiftRegister') {
+                 isRight = node.params?.side === 'right';
+             } else {
+                 isRight = (c.position.x ?? 0) > pW / 2;
+             }
              const fixedX = isRight ? pW - 16 : 0; // 16px is approx tunnel width
              const clampedY = Math.max(0, Math.min(pH - 16, c.position.y));
              updateNode(c.id, { position: { x: fixedX, y: clampedY } }, true); // skipHistory during drag
@@ -139,7 +144,34 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
              updateNode(c.id, { position: c.position as any }, true); // skipHistory during drag
           }
         } else if (c.type === 'dimensions' && c.dimensions) {
-          updateNode(c.id, { width: c.dimensions.width, height: c.dimensions.height });
+          const dims = c.dimensions;
+          updateNode(c.id, { width: dims.width, height: dims.height });
+          
+          // Also reposition right-side tunnels when parent resizes
+          const currentNodes = useGraphStore.getState().nodes;
+          const parentNode = currentNodes.find(n => n.id === c.id);
+          if (parentNode && String(parentNode.type).startsWith('structure')) {
+             const oldPW = parentNode.width || 300;
+             const children = currentNodes.filter(n => n.parent === c.id && (n.type === 'io.tunnel' || n.type === 'io.shiftRegister'));
+             children.forEach(child => {
+                let isRight = false;
+                if (child.type === 'io.shiftRegister') {
+                    isRight = child.params?.side === 'right';
+                } else {
+                    isRight = (child.position?.x ?? 0) > oldPW / 2;
+                }
+                
+                let newX = child.position?.x ?? 0;
+                let newY = child.position?.y ?? 0;
+                
+                if (isRight) newX = dims.width - 16;
+                newY = Math.max(0, Math.min(dims.height - 16, newY));
+                
+                if (newX !== (child.position?.x ?? 0) || newY !== (child.position?.y ?? 0)) {
+                    updateNode(child.id, { position: { x: newX, y: newY } }, true);
+                }
+             });
+          }
         } else if (c.type === 'remove') {
           removeNode(c.id);
         }
