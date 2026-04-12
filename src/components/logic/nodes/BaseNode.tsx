@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';

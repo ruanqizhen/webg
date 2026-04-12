@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
@@ -42,7 +41,6 @@ export function StructureNode({ id, data, type, selected }: any) {
   };
 
   const isCaseStructure = type === 'structure.case';
-  const isLoop = type === 'structure.forLoop' || type === 'structure.whileLoop';
 
   return (
     <div
