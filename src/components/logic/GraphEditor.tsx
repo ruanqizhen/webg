@@ -21,7 +21,6 @@ import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
 import { TunnelNode } from './nodes/TunnelNode';
-import { ShiftRegisterNode } from './nodes/ShiftRegisterNode';
 
 export const resolveNodeOverlaps = (draggedNodeId: string) => {
     setTimeout(() => {
@@ -90,7 +89,7 @@ const initialNodeTypes: any = {
   'structure.whileLoop': StructureNode,
   'structure.case': StructureNode,
   'io.tunnel': TunnelNode,
-  'io.shiftRegister': ShiftRegisterNode
+  'io.shiftRegister': TunnelNode
 };
 
 // Register all primitive and basic logic/math nodes to BaseNode custom renderer
@@ -192,7 +191,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
   const getFlowNodeType = (nodeType: string): string => {
     if (nodeType.startsWith('structure.')) return nodeType;
-    if (nodeType === 'io.tunnel') return nodeType;
+    if (nodeType === 'io.tunnel' || nodeType === 'io.shiftRegister') return nodeType;
     return 'custom';
   };
 

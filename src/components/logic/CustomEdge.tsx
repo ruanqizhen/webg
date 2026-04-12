@@ -46,10 +46,10 @@ export function CustomEdge({
      const currNode = nodes.find(n => n.id === currId);
      if (!currNode) break;
 
-     if (currNode.type === 'io.tunnel') {
+     if (currNode.type === 'io.tunnel' || currNode.type === 'io.shiftRegister') {
         const parentNode = currNode.parent ? nodes.find(n => n.id === currNode.parent) : null;
         const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
-        const isIndexing = currNode.params?.indexing ?? (isInLoop ? true : false);
+        const isIndexing = currNode.type === 'io.tunnel' ? (currNode.params?.indexing ?? (isInLoop ? true : false)) : false;
 
         if (isIndexing && parentNode) {
             const pW = parentNode.width || 300;

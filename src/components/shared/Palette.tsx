@@ -153,7 +153,7 @@ export function Palette() {
   };
 
   const categories = Object.values(NodeRegistry).reduce((acc: any, node) => {
-    if (node.type === 'io.terminal') return acc;
+    if (node.type === 'io.terminal' || node.type === 'io.tunnel' || node.type === 'io.shiftRegister') return acc;
     const cat = node.type.split('.')[0];
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(node);
