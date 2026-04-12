@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle } from 'lucide-react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
@@ -258,7 +258,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
           </Button>
         </div>
 
-        {/* Right: Status + Clear */}
+        {/* Right: Status + Help + Clear */}
         <div className="flex items-center gap-4 text-sm text-gray-500">
           <div className="flex items-center gap-1.5">
              <span className={`w-2.5 h-2.5 rounded-full ${statusColor}`}></span>
@@ -267,6 +267,15 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
           <div className="w-px h-6 bg-gray-200"></div>
           <Button size="sm" variant="ghost" onClick={clearGraph} className="gap-1 text-gray-400 hover:text-red-500">
             <Trash2 size={14} /> Clear
+          </Button>
+          <div className="w-px h-6 bg-gray-200"></div>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => window.open('https://github.com/ruanqizhen/webg/blob/main/README.md', '_blank')} 
+            className="gap-1 text-gray-400 hover:text-blue-500"
+          >
+            <HelpCircle size={14} /> Help
           </Button>
         </div>
       </div>
