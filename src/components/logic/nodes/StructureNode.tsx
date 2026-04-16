@@ -44,16 +44,18 @@ export function StructureNode({ id, data, type, selected }: any) {
 
   return (
     <div
-      className={`relative rounded bg-gray-100/30 min-w-[300px] min-h-[200px] ${stateBorder}`}
+      className={`relative rounded min-w-[300px] min-h-[200px] pointer-events-none bg-transparent ${stateBorder}`}
       style={{ width: node?.width || 300, height: node?.height || 200 }}
-      onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
     >
-      <NodeResizer color="#ff0071" isVisible={selected} minWidth={300} minHeight={200} />
+      <div className="pointer-events-auto">
+        <NodeResizer color="#ff0071" isVisible={selected} minWidth={300} minHeight={200} />
+      </div>
 
       {/* Header */}
       <div
-         className="px-2 py-1 text-white text-xs font-semibold select-none flex justify-between items-center rounded-t-sm"
+         className="px-2 py-1 text-white text-xs font-semibold select-none flex justify-between items-center rounded-t-sm pointer-events-auto cursor-pointer"
          style={{ backgroundColor: headerColor }}
+         onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       >
         <span>{def?.label || type}</span>
         {isCaseStructure && (
@@ -63,7 +65,7 @@ export function StructureNode({ id, data, type, selected }: any) {
               return (
                 <button
                   key={caseName}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 ${
+                  className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 cursor-pointer pointer-events-auto ${
                     activeCase === caseName
                       ? 'bg-white text-gray-800 font-bold shadow-sm'
                       : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
@@ -83,7 +85,7 @@ export function StructureNode({ id, data, type, selected }: any) {
             })}
             {mode === 'number' && (
               <button
-                className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 ${
+                className={`px-2 py-0.5 text-[10px] rounded transition-all flex items-center gap-1 cursor-pointer pointer-events-auto ${
                   activeCase === 'default'
                     ? 'bg-white text-gray-800 font-bold shadow-sm'
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
@@ -107,7 +109,7 @@ export function StructureNode({ id, data, type, selected }: any) {
 
 
       {/* Ports for the structure itself */}
-      <div className="absolute top-8 left-0 flex flex-col gap-2">
+      <div className="absolute top-8 left-0 flex flex-col gap-2 pointer-events-auto">
          {def?.inputs?.map((port: any) => {
              const isSelector = isCaseStructure && port.name === 'selector';
              return (
@@ -134,16 +136,16 @@ export function StructureNode({ id, data, type, selected }: any) {
                        {isSelector && <span className="text-[10px] font-black pointer-events-none text-white drop-shadow-md leading-none select-none">?</span>}
                     </Handle>
                     {/* For selector we hide the text label so it looks exactly like LabVIEW */}
-                    {!isSelector && <span className="text-gray-800 pl-2 text-[10px] font-bold uppercase">{port.name}</span>}
+                    {!isSelector && <span className="text-gray-800 pl-2 text-[10px] font-bold uppercase pointer-events-none">{port.name}</span>}
                  </div>
              );
          })}
       </div>
 
-      <div className="absolute top-8 right-0 flex flex-col gap-2 items-end">
+      <div className="absolute top-8 right-0 flex flex-col gap-2 items-end pointer-events-auto">
          {def?.outputs?.filter((p: any) => !(type === 'structure.forLoop' && p.name === 'i')).map((port: any) => (
              <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
-                <span className="text-gray-800 pr-2 text-[10px] font-bold uppercase">{port.name}</span>
+                <span className="text-gray-800 pr-2 text-[10px] font-bold uppercase pointer-events-none">{port.name}</span>
                 <Handle
                   type="source"
                   position={Position.Right}
@@ -158,7 +160,7 @@ export function StructureNode({ id, data, type, selected }: any) {
       {/* Internal Iterator Terminal for For Loop */}
       {type === 'structure.forLoop' && (
         <div 
-          className="absolute bottom-2 left-2 flex items-center bg-blue-50 border border-blue-400 rounded px-1 min-w-[24px] h-[18px] shadow-sm z-50"
+          className="absolute bottom-2 left-2 flex items-center bg-blue-50 border border-blue-400 rounded px-1 min-w-[24px] h-[18px] shadow-sm z-50 pointer-events-auto"
           title="Iteration count (i)"
         >
            <span className="text-[10px] font-black text-blue-700 select-none mr-1">i</span>

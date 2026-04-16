@@ -248,6 +248,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         hidden,
         ...(n.width ? { width: n.width } : {}),
         ...(n.height ? { height: n.height } : {}),
+        className: n.type.startsWith('structure.') ? 'pointer-events-none' : '',
+        zIndex: n.type.startsWith('structure.') ? -1 : 1,
       };
     });
   }, [nodes]);
