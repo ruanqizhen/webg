@@ -40,7 +40,7 @@ const NODE_ICONS: Record<string, IconDef> = {
   'source.string':  { shape:'constant', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:64, h:32 },
   'source.array':   { shape:'constant', bg:'#FFF7ED', stroke:'#E65100', symbol:'[ ]', symbolColor:'#BF360C', w:64, h:32 },
   // ── Sink ──
-  'sink.display': { shape:'indicator', bg:'#FFF7ED', stroke:'#EA580C', symbol:'', symbolColor:'#9A3412', w:90, h:38 },
+  'sink.display': { shape:'indicator', bg:'#e5e7eb', stroke:'#9ca3af', symbol:'', symbolColor:'#1f2937', w:90, h:38 },
   'sink.log':     { shape:'console',   bg:'#1F2937', stroke:'#4B5563', symbol:'', symbolColor:'#10B981', w:56, h:40 },
   // ── Terminal fallback ──
   'io.terminal': { shape:'terminal', bg:'#EFF6FF', stroke:'#3B82F6', symbol:'T', symbolColor:'#1E40AF', w:40, h:40 },
@@ -124,7 +124,7 @@ function renderShape(shape: string, w: number, h: number, bg: string, stroke: st
             fill={bg} stroke={stroke} strokeWidth={s}
           />
           <rect x={s+4} y={s+4} width={w-2*s-8} height={h-2*s-8} rx={2}
-            fill="#111827" opacity="0.85"
+            fill="#f9fafb"
           />
         </svg>
       );
@@ -402,8 +402,10 @@ export function BaseNode({ id, data, type, selected }: any) {
           {(isConstant || isIndicator || actualType === 'io.terminal') ? (
             <span
               className="font-mono font-bold text-xs truncate max-w-[90%] px-1"
-              style={{ color: isIndicator ? '#39ff14' : symbolColor,
-                       textShadow: isIndicator ? '0 0 6px rgba(57,255,20,0.7)' : 'none' }}
+              style={{ 
+                color: shape === 'indicator' ? '#1f2937' : (isIndicator ? '#39ff14' : symbolColor),
+                textShadow: (isIndicator && shape !== 'indicator') ? '0 0 6px rgba(57,255,20,0.7)' : 'none' 
+              }}
             >
               {displayValue}
             </span>
