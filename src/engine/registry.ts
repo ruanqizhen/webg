@@ -189,7 +189,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     type: 'structure.whileLoop',
     label: 'While Loop',
     inputs: [{ id: 'stop', name: 'stop', type: 'boolean', direction: 'input' }],
-    outputs: [],
+    outputs: [{ id: 'i', name: 'i', type: 'integer', direction: 'output', isInternal: true }],
     params: [],
     executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   },

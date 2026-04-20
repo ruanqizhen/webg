@@ -106,36 +106,7 @@ export class ExecutionEngine {
     return false;
   }
 
-  // Detect deadlock - when no nodes are ready to execute but execution is not complete
-  public detectDeadlock(executingNodes: string[]): boolean {
-    if (executingNodes.length === 0) return false;
-    
-    // Check if all executing nodes are waiting for inputs that will never arrive
-    for (const nodeId of executingNodes) {
-      const node = this.graph.nodes.find(n => n.id === nodeId);
-      if (!node) continue;
-      
-      const nodeEdges = this.graph.edges.filter(e => e.targetNode === nodeId);
-      let hasUnresolvedInput = false;
-      
-      for (const edge of nodeEdges) {
-        const sourceNode = this.graph.nodes.find(n => n.id === edge.sourceNode);
-        if (sourceNode) {
-          const sourceValue = this.runtime.portValues[`${edge.sourceNode}_${edge.sourcePort}`];
-          if (sourceValue === undefined) {
-            hasUnresolvedInput = true;
-            break;
-          }
-        }
-      }
-      
-      // If this node has no unresolved inputs, it's not deadlocked
-      if (!hasUnresolvedInput) return false;
-    }
-    
-    // All nodes are waiting for inputs - this is a deadlock
-    return true;
-  }
+
 
   private async executeSubgraph(parentId: string | undefined, caseStructureId?: string, activeCase?: string) {
     let nodesInLevel = this.graph.nodes.filter(n => n.parent === parentId);
@@ -229,180 +200,185 @@ export class ExecutionEngine {
         // Execution Logic
         let result: Record<string, any> = {};
 
-        if (node.type === 'structure.forLoop') {
-           // Find all tunnels belonging to this loop
-           const childTunnels = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.tunnel');
+         if (node.type === 'structure.forLoop' || node.type === 'structure.whileLoop') {
+            // Find all tunnels belonging to this loop
+            const childTunnels = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.tunnel');
 
-           // Classify tunnels as input (left border, x ≈ 0) or output (right border)
-           const inputTunnels: typeof childTunnels = [];
-           const outputTunnels: typeof childTunnels = [];
-           for (const t of childTunnels) {
-              const parentW = node.width || 300;
-              if ((t.position?.x ?? 0) < parentW / 2) {
-                 inputTunnels.push(t);
-              } else {
-                 outputTunnels.push(t);
-              }
-           }
+            // Classify tunnels as input (left border, x ≈ 0) or output (right border)
+            const inputTunnels: typeof childTunnels = [];
+            const outputTunnels: typeof childTunnels = [];
+            for (const t of childTunnels) {
+               const parentW = node.width || 300;
+               if ((t.position?.x ?? 0) < parentW / 2) {
+                  inputTunnels.push(t);
+               } else {
+                  outputTunnels.push(t);
+               }
+            }
 
-           // Resolve indexed input arrays and determine auto-N
-           const indexedInputArrays = new Map<string, any[]>(); // tunnelId → array
-           let autoN = -1;
-           for (const tunnel of inputTunnels) {
-              const isIndexing = tunnel.params?.indexing ?? true;
-              if (!isIndexing) continue;
-              const val = this.runtime.portValues[`${tunnel.id}_input`];
-              if (Array.isArray(val)) {
-                 indexedInputArrays.set(tunnel.id, val);
-                 if (autoN < 0 || val.length < autoN) autoN = val.length;
-              }
-           }
+            // Resolve indexed input arrays and determine auto-N
+            const indexedInputArrays = new Map<string, any[]>(); // tunnelId → array
+            let autoN = -1;
+            for (const tunnel of inputTunnels) {
+               const isIndexing = tunnel.params?.indexing ?? true;
+               if (!isIndexing) continue;
+               const val = this.runtime.portValues[`${tunnel.id}_input`];
+               if (Array.isArray(val)) {
+                  indexedInputArrays.set(tunnel.id, val);
+                  if (autoN < 0 || val.length < autoN) autoN = val.length;
+               }
+            }
 
-           // Determine N: explicit connection takes priority, else auto from arrays
-           let N = Math.trunc(Number(inputs.N) || 0);
-           const hasExplicitN = this.graph.edges.some(e => e.targetNode === node.id && e.targetPort === 'N');
-           if (!hasExplicitN && autoN > 0) N = autoN;
+            // Determine N: explicit connection takes priority, else auto from arrays
+            let N = Math.trunc(Number(inputs.N) || 0);
+            const hasExplicitN = this.graph.edges.some(e => e.targetNode === node.id && e.targetPort === 'N');
+            if (!hasExplicitN && autoN > 0) N = autoN;
 
-           // Prepare output tunnel collectors
-           const outputCollectors = new Map<string, any[]>(); // tunnelId → collected values
-           for (const tunnel of outputTunnels) {
-              const isIndexing = tunnel.params?.indexing ?? true;
-              if (isIndexing) {
-                 outputCollectors.set(tunnel.id, []);
-              }
-           }
+            // Prepare output tunnel collectors
+            const outputCollectors = new Map<string, any[]>(); // tunnelId → collected values
+            for (const tunnel of outputTunnels) {
+               const isIndexing = tunnel.params?.indexing ?? true;
+               if (isIndexing) {
+                  outputCollectors.set(tunnel.id, []);
+               }
+            }
 
-           // === Shift Registers ===
-           // Find all shift register pairs
-           const shiftRegs = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.shiftRegister');
-           const srPairs = new Map<string, { left?: typeof shiftRegs[0], right?: typeof shiftRegs[0] }>();
-           for (const sr of shiftRegs) {
-              const pairId = sr.params?.pairId;
-              if (!pairId) continue;
-              if (!srPairs.has(pairId)) srPairs.set(pairId, {});
-              const pair = srPairs.get(pairId)!;
-              if (sr.params?.side === 'left') pair.left = sr;
-              else if (sr.params?.side === 'right') pair.right = sr;
-           }
+            // === Shift Registers ===
+            // Find all shift register pairs
+            const shiftRegs = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.shiftRegister');
+            const srPairs = new Map<string, { left?: typeof shiftRegs[0], right?: typeof shiftRegs[0] }>();
+            for (const sr of shiftRegs) {
+               const pairId = sr.params?.pairId;
+               if (!pairId) continue;
+               if (!srPairs.has(pairId)) srPairs.set(pairId, {});
+               const pair = srPairs.get(pairId)!;
+               if (sr.params?.side === 'left') pair.left = sr;
+               else if (sr.params?.side === 'right') pair.right = sr;
+            }
 
-           // Initialize left registers from external wires (before iteration 0)
-           for (const [, pair] of srPairs) {
-              if (pair.left) {
-                 const initVal = this.runtime.portValues[`${pair.left.id}_input`];
-                 this.setPortValue(`${pair.left.id}_output`, initVal);
-                 // Propagate to connected internal nodes
-                 const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
-                 for (const edge of lEdges) {
-                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, initVal);
-                 }
-              }
-           }
+            // Initialize left registers from external wires (before iteration 0)
+            for (const [, pair] of srPairs) {
+               if (pair.left) {
+                  const initVal = this.runtime.portValues[`${pair.left.id}_input`];
+                  this.setPortValue(`${pair.left.id}_output`, initVal);
+                  // Propagate to connected internal nodes
+                  const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
+                  for (const edge of lEdges) {
+                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, initVal);
+                  }
+               }
+            }
 
-           for (let i = 0; i < N; i++) {
-              if (this.aborted) throw new Error("Execution Aborted");
-              
-              this.setPortValue(`${node.id}_i`, i);
-              // Propagate 'i' to connected target nodes inside the loop
-              const iEdges = this.edgeByNodePort.get(`${node.id}_i`) || [];
-              for (const edge of iEdges) {
-                 if (edge.sourceNode === node.id) {
-                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, i);
-                 }
-              }
+            const runIteration = async (iterationIndex: number) => {
+               if (this.aborted) throw new Error("Execution Aborted");
+               
+               this.setPortValue(`${node.id}_i`, iterationIndex);
+               // Propagate 'i' to connected target nodes inside the loop
+               const iEdges = this.edgeByNodePort.get(`${node.id}_i`) || [];
+               for (const edge of iEdges) {
+                  if (edge.sourceNode === node.id) {
+                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, iterationIndex);
+                  }
+               }
 
-              // Feed input tunnels: array[i] → tunnel output, or constant → tunnel output
-              for (const tunnel of inputTunnels) {
-                 const isIndexing = tunnel.params?.indexing ?? true;
-                 if (isIndexing) {
-                    const arr = indexedInputArrays.get(tunnel.id) || [];
-                    const element = i < arr.length ? arr[i] : undefined;
-                    this.setPortValue(`${tunnel.id}_output`, element);
-                    // Propagate to connected nodes
-                    const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
-                    for (const edge of tEdges) {
-                       this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, element);
-                    }
-                 } else {
-                    const val = this.runtime.portValues[`${tunnel.id}_input`];
-                    this.setPortValue(`${tunnel.id}_output`, val);
-                    const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
-                    for (const edge of tEdges) {
-                       this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, val);
-                    }
-                 }
-              }
-              
-              await this.executeSubgraph(node.id);
+               // Feed input tunnels: array[i] → tunnel output, or constant → tunnel output
+               for (const tunnel of inputTunnels) {
+                  const isIndexing = tunnel.params?.indexing ?? true;
+                  if (isIndexing) {
+                     const arr = indexedInputArrays.get(tunnel.id) || [];
+                     const element = iterationIndex < arr.length ? arr[iterationIndex] : undefined;
+                     this.setPortValue(`${tunnel.id}_output`, element);
+                     // Propagate to connected nodes
+                     const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+                     for (const edge of tEdges) {
+                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, element);
+                     }
+                  } else {
+                     const val = this.runtime.portValues[`${tunnel.id}_input`];
+                     this.setPortValue(`${tunnel.id}_output`, val);
+                     const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+                     for (const edge of tEdges) {
+                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, val);
+                     }
+                  }
+               }
+               
+               await this.executeSubgraph(node.id);
 
-              // Collect output tunnel values for indexing
-              for (const tunnel of outputTunnels) {
-                 const isIndexing = tunnel.params?.indexing ?? true;
-                 if (isIndexing && outputCollectors.has(tunnel.id)) {
-                    const val = this.runtime.portValues[`${tunnel.id}_input`];
-                    outputCollectors.get(tunnel.id)!.push(val);
-                 }
-              }
+               // Collect output tunnel values for indexing
+               for (const tunnel of outputTunnels) {
+                  const isIndexing = tunnel.params?.indexing ?? true;
+                  if (isIndexing && outputCollectors.has(tunnel.id)) {
+                     const val = this.runtime.portValues[`${tunnel.id}_input`];
+                     outputCollectors.get(tunnel.id)!.push(val);
+                  }
+               }
 
-              // Shift registers: copy right → left for next iteration
-              for (const [, pair] of srPairs) {
-                 if (pair.right && pair.left) {
-                    const rightVal = this.runtime.portValues[`${pair.right.id}_input`];
-                    this.setPortValue(`${pair.right.id}_output`, rightVal);
-                    this.setPortValue(`${pair.left.id}_output`, rightVal);
-                    // Propagate left output to connected internal nodes
-                    const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
-                    for (const edge of lEdges) {
-                       this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, rightVal);
-                    }
-                 }
-              }
-           }
+               // Shift registers: copy right → left for next iteration
+               for (const [, pair] of srPairs) {
+                  if (pair.right && pair.left) {
+                     const rightVal = this.runtime.portValues[`${pair.right.id}_input`];
+                     this.setPortValue(`${pair.right.id}_output`, rightVal);
+                     this.setPortValue(`${pair.left.id}_output`, rightVal);
+                     // Propagate left output to connected internal nodes
+                     const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
+                     for (const edge of lEdges) {
+                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, rightVal);
+                     }
+                  }
+               }
+            };
 
-           // After loop: set output tunnel values
-           for (const tunnel of outputTunnels) {
-              const isIndexing = tunnel.params?.indexing ?? true;
-              if (isIndexing && outputCollectors.has(tunnel.id)) {
-                 const arr = outputCollectors.get(tunnel.id)!;
-                 this.setPortValue(`${tunnel.id}_output`, arr);
-                 // Propagate outward
-                 const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
-                 for (const edge of tEdges) {
-                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, arr);
-                 }
-              } else {
-                 // Non-indexed: last value already set by executeSubgraph
-                 const lastVal = this.runtime.portValues[`${tunnel.id}_input`];
-                 this.setPortValue(`${tunnel.id}_output`, lastVal);
-                 const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
-                 for (const edge of tEdges) {
-                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, lastVal);
-                 }
-              }
-           }
+            if (node.type === 'structure.forLoop') {
+               for (let i = 0; i < N; i++) {
+                  await runIteration(i);
+               }
+            } else {
+               let count = 0;
+               while (true) {
+                  await runIteration(count);
+                  const stopCondition = Boolean(this.runtime.portValues[`${node.id}_stop`]);
+                  if (stopCondition) break;
+                  count++;
+                  // 异步防止主线程阻塞
+                  if (count % 1000 === 0) await new Promise(r => setTimeout(r, 0));
+                  if (count >= 100000) throw new Error("While Loop Timeout");
+               }
+            }
 
-           // After loop: propagate right shift register outputs outward
-           for (const [, pair] of srPairs) {
-              if (pair.right) {
-                 const finalVal = this.runtime.portValues[`${pair.right.id}_input`] ?? this.runtime.portValues[`${pair.right.id}_output`];
-                 this.setPortValue(`${pair.right.id}_output`, finalVal);
-                 const rEdges = this.edgeByNodePort.get(`${pair.right.id}_output`) || [];
-                 for (const edge of rEdges) {
-                    this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, finalVal);
-                 }
-              }
-           }
-        } else if (node.type === 'structure.whileLoop') {
-           let count = 0;
-           while (true) {
-              if (this.aborted) throw new Error("Execution Aborted");
-              await this.executeSubgraph(node.id);
-              const stopCondition = Boolean(this.runtime.portValues[`${node.id}_stop`]);
-              if (stopCondition) break;
-              count++;
-              // 异步防止主线程阻塞
-              if (count % 1000 === 0) await new Promise(r => setTimeout(r, 0));
-              if (count >= 100000) throw new Error("While Loop Timeout");
-           }
+            // After loop: set output tunnel values
+            for (const tunnel of outputTunnels) {
+               const isIndexing = tunnel.params?.indexing ?? true;
+               if (isIndexing && outputCollectors.has(tunnel.id)) {
+                  const arr = outputCollectors.get(tunnel.id)!;
+                  this.setPortValue(`${tunnel.id}_output`, arr);
+                  // Propagate outward
+                  const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+                  for (const edge of tEdges) {
+                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, arr);
+                  }
+               } else {
+                  // Non-indexed: last value already set by executeSubgraph
+                  const lastVal = this.runtime.portValues[`${tunnel.id}_input`];
+                  this.setPortValue(`${tunnel.id}_output`, lastVal);
+                  const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+                  for (const edge of tEdges) {
+                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, lastVal);
+                  }
+               }
+            }
+
+            // After loop: propagate right shift register outputs outward
+            for (const [, pair] of srPairs) {
+               if (pair.right) {
+                  const finalVal = this.runtime.portValues[`${pair.right.id}_input`] ?? this.runtime.portValues[`${pair.right.id}_output`];
+                  this.setPortValue(`${pair.right.id}_output`, finalVal);
+                  const rEdges = this.edgeByNodePort.get(`${pair.right.id}_output`) || [];
+                  for (const edge of rEdges) {
+                     this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, finalVal);
+                  }
+               }
+            }
         } else if (node.type === 'structure.case') {
            // Case Structure execution - execute only the selected case based on selector value
            const selectorValue = inputs.selector;
@@ -428,7 +404,7 @@ export class ExecutionEngine {
            let applyStandardExecution = true;
            if (node.type === 'io.tunnel' || node.type === 'io.shiftRegister') {
               const pNode = node.parent ? this.graph.nodes.find(n => n.id === node.parent) : null;
-              if (pNode?.type === 'structure.forLoop') {
+               if (pNode?.type === 'structure.forLoop' || pNode?.type === 'structure.whileLoop') {
                  applyStandardExecution = false;
               }
            }

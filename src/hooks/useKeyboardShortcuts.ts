@@ -66,7 +66,15 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       // Paste (Ctrl+V)
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault();
-        pasteNode({ x: 200, y: 200 });
+        const clipboard = useGraphStore.getState().getClipboard();
+        if (clipboard?.node) {
+          pasteNode({ 
+            x: (clipboard.node.position?.x || 180) + 20, 
+            y: (clipboard.node.position?.y || 180) + 20 
+          });
+        } else {
+          pasteNode({ x: 200, y: 200 });
+        }
       // Zoom Fit (Ctrl+0 or Ctrl+=)
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.key === '=')) {
         e.preventDefault();
