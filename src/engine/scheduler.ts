@@ -249,7 +249,8 @@ export class ExecutionEngine {
            const indexedInputArrays = new Map<string, any[]>(); // tunnelId → array
            let autoN = -1;
            for (const tunnel of inputTunnels) {
-              if (!tunnel.params?.indexing) continue;
+              const isIndexing = tunnel.params?.indexing ?? true;
+              if (!isIndexing) continue;
               const val = this.runtime.portValues[`${tunnel.id}_input`];
               if (Array.isArray(val)) {
                  indexedInputArrays.set(tunnel.id, val);
@@ -265,7 +266,8 @@ export class ExecutionEngine {
            // Prepare output tunnel collectors
            const outputCollectors = new Map<string, any[]>(); // tunnelId → collected values
            for (const tunnel of outputTunnels) {
-              if (tunnel.params?.indexing) {
+              const isIndexing = tunnel.params?.indexing ?? true;
+              if (isIndexing) {
                  outputCollectors.set(tunnel.id, []);
               }
            }
@@ -308,16 +310,24 @@ export class ExecutionEngine {
                  }
               }
 
-              // Feed indexed input tunnels: array[i] → tunnel output
+              // Feed input tunnels: array[i] → tunnel output, or constant → tunnel output
               for (const tunnel of inputTunnels) {
-                 if (tunnel.params?.indexing && indexedInputArrays.has(tunnel.id)) {
-                    const arr = indexedInputArrays.get(tunnel.id)!;
+                 const isIndexing = tunnel.params?.indexing ?? true;
+                 if (isIndexing) {
+                    const arr = indexedInputArrays.get(tunnel.id) || [];
                     const element = i < arr.length ? arr[i] : undefined;
                     this.setPortValue(`${tunnel.id}_output`, element);
                     // Propagate to connected nodes
                     const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
                     for (const edge of tEdges) {
                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, element);
+                    }
+                 } else {
+                    const val = this.runtime.portValues[`${tunnel.id}_input`];
+                    this.setPortValue(`${tunnel.id}_output`, val);
+                    const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+                    for (const edge of tEdges) {
+                       this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, val);
                     }
                  }
               }
@@ -326,7 +336,8 @@ export class ExecutionEngine {
 
               // Collect output tunnel values for indexing
               for (const tunnel of outputTunnels) {
-                 if (tunnel.params?.indexing && outputCollectors.has(tunnel.id)) {
+                 const isIndexing = tunnel.params?.indexing ?? true;
+                 if (isIndexing && outputCollectors.has(tunnel.id)) {
                     const val = this.runtime.portValues[`${tunnel.id}_input`];
                     outputCollectors.get(tunnel.id)!.push(val);
                  }
@@ -349,7 +360,8 @@ export class ExecutionEngine {
 
            // After loop: set output tunnel values
            for (const tunnel of outputTunnels) {
-              if (tunnel.params?.indexing && outputCollectors.has(tunnel.id)) {
+              const isIndexing = tunnel.params?.indexing ?? true;
+              if (isIndexing && outputCollectors.has(tunnel.id)) {
                  const arr = outputCollectors.get(tunnel.id)!;
                  this.setPortValue(`${tunnel.id}_output`, arr);
                  // Propagate outward
@@ -413,8 +425,18 @@ export class ExecutionEngine {
            await this.executeSubgraph(node.id, node.id, caseToExecute);
         } else {
            // Standard Node or Tunnel
-           const nodeTask = await def.executor(ctx);
-           result = nodeTask.outputs;
+           let applyStandardExecution = true;
+           if (node.type === 'io.tunnel' || node.type === 'io.shiftRegister') {
+              const pNode = node.parent ? this.graph.nodes.find(n => n.id === node.parent) : null;
+              if (pNode?.type === 'structure.forLoop') {
+                 applyStandardExecution = false;
+              }
+           }
+
+           if (applyStandardExecution) {
+              const nodeTask = await def.executor(ctx);
+              result = nodeTask.outputs;
+           }
 
            // Apply integer truncation for number constants configured as integer
            if (node.type === 'source.number' && node.params?.numberType === 'integer') {
