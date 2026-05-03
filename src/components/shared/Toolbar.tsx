@@ -99,6 +99,12 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     runtimeStore.resetDebug();
   };
 
+  const handleClear = () => {
+    if (window.confirm('Clear the entire project? This action cannot be undone.')) {
+      clearGraph();
+    }
+  };
+
   const handleReset = () => {
     runtimeStore.resetRuntime();
   };
@@ -265,7 +271,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
              <span className={statusTextColor}>{currentStatus}</span>
           </div>
           <div className="w-px h-6 bg-gray-200"></div>
-          <Button size="sm" variant="ghost" onClick={clearGraph} className="gap-1 text-gray-400 hover:text-red-500">
+          <Button size="sm" variant="ghost" onClick={handleClear} className="gap-1 text-gray-400 hover:text-red-500">
             <Trash2 size={14} /> Clear
           </Button>
           <div className="w-px h-6 bg-gray-200"></div>

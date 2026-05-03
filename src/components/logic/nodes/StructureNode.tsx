@@ -1,9 +1,10 @@
-import { Handle, Position, NodeResizer } from 'reactflow';
+import { Handle, Position, NodeResizer, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
+import type { PortDefinition } from '../../../types/runtime';
 
 // Colors for different cases
 const CASE_COLORS: Record<string, string> = {
@@ -16,7 +17,12 @@ const CASE_COLORS: Record<string, string> = {
   'default': '#6b7280', // gray
 };
 
-export function StructureNode({ id, data, type, selected }: any) {
+interface StructureNodeData {
+  def: typeof NodeRegistry[string];
+  nodeType: string;
+}
+
+export function StructureNode({ id, data, type, selected }: NodeProps<StructureNodeData>) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
@@ -110,7 +116,7 @@ export function StructureNode({ id, data, type, selected }: any) {
 
       {/* Ports for the structure itself */}
       <div className="absolute top-8 left-0 flex flex-col gap-2 pointer-events-auto">
-         {def?.inputs?.map((port: any) => {
+         {def?.inputs?.map((port: PortDefinition) => {
              const isSelector = isCaseStructure && port.name === 'selector';
              return (
                  <div key={port.name} className={`flex items-center gap-1 h-4 relative ${isSelector ? 'mt-4' : ''}`}>
@@ -143,7 +149,7 @@ export function StructureNode({ id, data, type, selected }: any) {
       </div>
 
       <div className="absolute top-8 right-0 flex flex-col gap-2 items-end pointer-events-auto">
-         {def?.outputs?.filter((p: any) => !(type === 'structure.forLoop' && p.name === 'i')).map((port: any) => (
+         {def?.outputs?.filter((p: PortDefinition) => !(type === 'structure.forLoop' && p.name === 'i')).map((port: PortDefinition) => (
              <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
                 <span className="text-gray-800 pr-2 text-[10px] font-bold uppercase pointer-events-none">{port.name}</span>
                 <Handle

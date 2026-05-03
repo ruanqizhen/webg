@@ -103,7 +103,7 @@ function IdeLayoutInner() {
 
               updateNode(an.id, {
                   params: { ...an.params, elementType: nodeType },
-                  outputs: [{ name: 'value', type: `${pType}[]` as any, direction: 'output', id: 'value' }]
+                  outputs: [{ name: 'value', type: `${pType}[]`, direction: 'output', id: 'value' }]
               });
               return;
           }
@@ -207,8 +207,8 @@ function IdeLayoutInner() {
           
           const currentTerminal = useGraphStore.getState().nodes.find(n => n.id === targetArrayControl.bindingNodeId);
           if (currentTerminal) {
-              const newInputs = currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` as any }));
-              const newOutputs = currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` as any }));
+              const newInputs = currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` }));
+              const newOutputs = currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` }));
               updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
           }
           return;

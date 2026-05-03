@@ -1,10 +1,26 @@
 import { useState } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
+import type { NodeInstance } from '../../../types/graph';
+
+interface BaseNodeData {
+  def: typeof NodeRegistry[string];
+  nodeType: string;
+  caseId?: string;
+}
+
+interface HandleRendererProps {
+  nodeId: string;
+  port: { name: string; type: string; id?: string; direction?: string };
+  position: Position;
+  topPct: number;
+  isInput: boolean;
+  colorOverride?: string;
+}
 
 /* ═══════════════════════════════════════════════════════
    LabVIEW-Inspired Icon Definitions
@@ -182,30 +198,37 @@ function stateRingClass(nodeState: string, selected: boolean, isCurrentStep: boo
    Main BaseNode Component
    ═══════════════════════════════════════════════════════ */
 
+const HANDLE_STYLE_BASE = {
+  width: 10,
+  height: 10,
+  border: '2px solid white',
+} as const;
+
 // Helper for handle rendering to keep BaseNode clean
-function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverride }: any) {
+function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverride }: HandleRendererProps) {
   const val = useRuntimeStore(s => s.portValues[`${nodeId}_${port.name}`]);
-  
+  const handleStyle = {
+    ...HANDLE_STYLE_BASE,
+    top: `${topPct}%`,
+    background: colorOverride || getTypeColor(port.type),
+    [isInput ? 'left' : 'right']: -5,
+  };
+  const tooltipSide = isInput ? 'left' : 'right';
+
   return (
     <div className="group">
       <Handle
         type={isInput ? "target" : "source"}
         position={position}
         id={port.name}
-        style={{
-          top: `${topPct}%`,
-          background: colorOverride || getTypeColor(port.type),
-          width: isInput ? 10 : 10, height: 10,
-          border: '2px solid white',
-          [isInput ? 'left' : 'right']: -5,
-        }}
+        style={handleStyle}
       />
       <div
         className="hidden group-hover:block absolute text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none"
-        style={{ 
-          top: `${topPct}%`, 
-          [isInput ? 'left' : 'right']: -8, 
-          transform: isInput ? 'translate(-100%, -50%)' : 'translate(100%, -50%)' 
+        style={{
+          top: `${topPct}%`,
+          [tooltipSide]: -8,
+          transform: isInput ? 'translate(-100%, -50%)' : 'translate(100%, -50%)',
         }}
       >
         {port.name}{val !== undefined ? `: ${String(val)}` : ''}
@@ -214,7 +237,16 @@ function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverrid
   );
 }
 
-function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, selected }: any) {
+interface ArrayConstantProps {
+  id: string;
+  node: NodeInstance | undefined;
+  updateNode: (id: string, updates: Partial<NodeInstance>) => void;
+  nodeState: string;
+  isCurrentStep: boolean;
+  selected: boolean;
+}
+
+function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, selected }: ArrayConstantProps) {
   const [arrayIndex, setArrayIndex] = useState(0);
   const paramValue = Array.isArray(node?.params?.value) ? node.params.value : [];
   const elementType = node?.params?.elementType;
@@ -235,7 +267,7 @@ function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, sel
      
      const newArr = [...paramValue];
      newArr[arrayIndex] = val;
-     updateNode(id, { params: { ...node.params, value: newArr } });
+     updateNode(id, { params: { ...node?.params, value: newArr } });
   };
 
   const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
@@ -263,7 +295,7 @@ function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, sel
   );
 }
 
-export function BaseNode({ id, data, type, selected }: any) {
+export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) {
   const actualType: string = data?.nodeType || type;
   const def = NodeRegistry[actualType] || data?.def;
   

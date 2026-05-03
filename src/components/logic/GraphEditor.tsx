@@ -141,7 +141,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
              const clampedY = Math.max(0, Math.min(pH - 16, c.position.y));
              updateNode(c.id, { position: { x: fixedX, y: clampedY } }, true); // skipHistory during drag
           } else {
-             updateNode(c.id, { position: c.position as any }, true); // skipHistory during drag
+             updateNode(c.id, { position: c.position }, true); // skipHistory during drag
           }
         } else if (c.type === 'dimensions' && c.dimensions) {
           const dims = c.dimensions;

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 60)",
+      "PowerShell(npx tsc -b --noEmit 2>&1)",
+      "PowerShell(npx vite build 2>&1)"
+    ]
+  }
+}

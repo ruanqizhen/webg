@@ -1,26 +1,36 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, type NodeProps } from 'reactflow';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
 
-export function TunnelNode({ id, selected }: any) {
+export function TunnelNode({ id, selected }: NodeProps) {
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
-  const portValues = useRuntimeStore(s => s.portValues);
-  const val = portValues[`${id}_output`];
+  const val = useRuntimeStore(s => s.portValues[`${id}_output`]);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
-  const edges = useGraphStore(s => s.edges);
-  const nodes = useGraphStore(s => s.nodes);
   const { updateNode, addNode, removeNode } = useGraphStore();
 
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
-  const node = nodes.find(n => n.id === id);
-  const parentNode = node?.parent ? nodes.find(n => n.id === node.parent) : null;
+  const node = useGraphStore(s => {
+    for (const n of s.nodes) {
+      if (n.id === id) return n;
+    }
+    return undefined;
+  });
+  const parentNode = useGraphStore(s => {
+    if (!node) return undefined;
+    const parentId = node.parent;
+    if (!parentId) return undefined;
+    for (const n of s.nodes) {
+      if (n.id === parentId) return n;
+    }
+    return undefined;
+  });
   const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
 
   const isShiftRegister = node?.type === 'io.shiftRegister';
@@ -30,38 +40,39 @@ export function TunnelNode({ id, selected }: any) {
 
   let tunnelType = 'any';
   let currId = id;
+  const allNodes = useGraphStore.getState().nodes;
+  const allEdges = useGraphStore.getState().edges;
   for (let i = 0; i < 50; i++) {
-     const inEdge = edges.find(e => e.targetNode === currId);
+     const inEdge = allEdges.find(e => e.targetNode === currId);
      if (!inEdge) break;
-     const srcNode = nodes.find(n => n.id === inEdge.sourceNode);
+     const srcNode = allNodes.find(n => n.id === inEdge.sourceNode);
      if (!srcNode) break;
      if (srcNode.type !== 'io.tunnel' && srcNode.type !== 'io.shiftRegister') {
         const def = NodeRegistry[srcNode.type];
-        const portDef = (srcNode.outputs || def?.outputs || []).find((p: any) => p.name === inEdge.sourcePort);
+        const portDef = (srcNode.outputs || def?.outputs || []).find((p: { name: string; type: string }) => p.name === inEdge.sourcePort);
         tunnelType = portDef?.type || 'any';
-        // Override for integer constants
         if (srcNode.type === 'source.number' && srcNode.params?.numberType === 'integer') tunnelType = 'integer';
         break;
      }
      currId = srcNode.id;
   }
-  
+
   const bgColor = getTypeColor(tunnelType);
 
   let isFullyWired = true;
   if (!isShiftRegister && node && node.parent) {
-     const pNode = nodes.find(n => n.id === node.parent);
+     const pNode = allNodes.find(n => n.id === node.parent);
      if (pNode?.type === 'structure.case') {
-        const tunnelInputEdges = edges.filter(e => e.targetNode === id);
+        const tunnelInputEdges = allEdges.filter(e => e.targetNode === id);
         const isOutputTunnel = tunnelInputEdges.some(e => {
-            const eNode = nodes.find(n => n.id === e.sourceNode);
+            const eNode = allNodes.find(n => n.id === e.sourceNode);
             return eNode?.parent === pNode.id;
         });
         if (isOutputTunnel) {
            const requiredCases = pNode.params?.cases || ['true', 'false'];
            const wiredCases = new Set<string>();
            tunnelInputEdges.forEach(e => {
-              const eNode = nodes.find(n => n.id === e.sourceNode);
+              const eNode = allNodes.find(n => n.id === e.sourceNode);
               if (eNode?.caseId) wiredCases.add(eNode.caseId);
            });
            isFullyWired = requiredCases.every((c: string) => wiredCases.has(c));
@@ -115,9 +126,9 @@ export function TunnelNode({ id, selected }: any) {
     // Find pair and delete it
     const pairId = node?.params?.pairId;
     if (pairId) {
-      const pairNode = nodes.find(n => 
-        n.parent === node?.parent && 
-        n.type === 'io.shiftRegister' && 
+      const pairNode = useGraphStore.getState().nodes.find(n =>
+        n.parent === node?.parent &&
+        n.type === 'io.shiftRegister' &&
         n.params?.pairId === pairId && 
         n.id !== id
       );

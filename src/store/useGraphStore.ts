@@ -97,6 +97,19 @@ export const useGraphStore = create<GraphState>((set, get) => {
         };
         collectDescendants(id);
 
+        // Clean up paired Shift Register if removing one of a pair
+        const node = state.nodes.find(n => n.id === id);
+        if (node?.type === 'io.shiftRegister' && node.params?.pairId) {
+          const pairNode = state.nodes.find(n =>
+            n.id !== id &&
+            n.type === 'io.shiftRegister' &&
+            n.params?.pairId === node.params.pairId
+          );
+          if (pairNode && !idsToRemove.has(pairNode.id)) {
+            collectDescendants(pairNode.id);
+          }
+        }
+
         const nodes = state.nodes.filter(n => !idsToRemove.has(n.id));
         const edges = state.edges.filter(e => !idsToRemove.has(e.sourceNode) && !idsToRemove.has(e.targetNode));
         const uiControls = state.uiControls.filter(c => !idsToRemove.has(c.bindingNodeId));
@@ -315,11 +328,23 @@ export const useGraphStore = create<GraphState>((set, get) => {
     },
 
     loadGraph: (graph: Graph) => {
+      if (!graph || typeof graph !== 'object') {
+        throw new Error('Invalid graph data: expected an object');
+      }
+      if (!Array.isArray(graph.nodes)) {
+        throw new Error('Invalid graph data: nodes must be an array');
+      }
+      if (!Array.isArray(graph.edges)) {
+        throw new Error('Invalid graph data: edges must be an array');
+      }
+      if (!Array.isArray(graph.uiControls)) {
+        throw new Error('Invalid graph data: uiControls must be an array');
+      }
       saveToHistory();
       set({
-        nodes: graph.nodes || [],
-        edges: graph.edges || [],
-        uiControls: graph.uiControls || []
+        nodes: graph.nodes,
+        edges: graph.edges,
+        uiControls: graph.uiControls
       });
     },
 
@@ -449,17 +474,18 @@ export const useGraphStore = create<GraphState>((set, get) => {
       try {
         const data = localStorage.getItem(STORAGE_KEY);
         if (!data) return false;
-        
+
         const parsed = JSON.parse(data);
-        if (parsed.graph) {
-          set({
-            nodes: parsed.graph.nodes || [],
-            edges: parsed.graph.edges || [],
-            uiControls: parsed.graph.uiControls || []
-          });
-          return true;
+        if (!parsed.graph || !Array.isArray(parsed.graph.nodes) || !Array.isArray(parsed.graph.edges) || !Array.isArray(parsed.graph.uiControls)) {
+          console.error('Invalid project data structure');
+          return false;
         }
-        return false;
+        set({
+          nodes: parsed.graph.nodes,
+          edges: parsed.graph.edges,
+          uiControls: parsed.graph.uiControls
+        });
+        return true;
       } catch (err) {
         console.error('Failed to load from storage:', err);
         return false;

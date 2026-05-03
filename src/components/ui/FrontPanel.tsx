@@ -160,7 +160,21 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
   );
 }
 
-function InnerControlRender({ control, displayVal, handleChange, width, height, colorOn, colorOff, min, max, step, isIndicatorDir }: any) {
+interface InnerControlRenderProps {
+  control: UIControl;
+  displayVal: any;
+  handleChange: (e: React.ChangeEvent<HTMLInputElement> | { target: { value: string } }) => void;
+  width: number;
+  height: number;
+  colorOn: string;
+  colorOff: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  isIndicatorDir: boolean;
+}
+
+function InnerControlRender({ control, displayVal, handleChange, width, height, colorOn, colorOff, min, max, step, isIndicatorDir }: InnerControlRenderProps) {
   return (
     <>
       {control.type === 'numberInput' && (
@@ -337,7 +351,7 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
                 color={colorOn}
              />
              {!isIndicatorDir && (
-                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
+                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as unknown as React.CSSProperties} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
              )}
          </div>
       )}
@@ -464,8 +478,8 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
             const currentTerminal = allNodes.find(n => n.id === overlappingArray!.bindingNodeId);
             if (currentTerminal) {
                 const isIndicator = overlappingArray!.direction === 'indicator';
-                const newInputs = isIndicator ? currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` as any })) : currentTerminal.inputs;
-                const newOutputs = !isIndicator ? currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` as any })) : currentTerminal.outputs;
+                const newInputs = isIndicator ? currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` })) : currentTerminal.inputs;
+                const newOutputs = !isIndicator ? currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` })) : currentTerminal.outputs;
                 useGraphStore.getState().updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
             }
 
@@ -712,9 +726,10 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
   return (
     <div 
       ref={(node) => {
-        // Handle both forwarded ref and internal ref
-        (internalRef as any).current = node;
-        if (containerRef) (containerRef as any).current = node;
+        internalRef.current = node;
+        if (containerRef) {
+          (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        }
       }}
       className={`w-full h-full relative overflow-hidden flex-grow select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{

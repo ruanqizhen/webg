@@ -152,7 +152,7 @@ export function Palette() {
     }, terminalDef);
   };
 
-  const categories = Object.values(NodeRegistry).reduce((acc: any, node) => {
+  const categories = Object.values(NodeRegistry).reduce((acc: Record<string, typeof NodeRegistry[string][]>, node) => {
     if (node.type === 'io.terminal' || node.type === 'io.tunnel' || node.type === 'io.shiftRegister') return acc;
     const cat = node.type.split('.')[0];
     if (!acc[cat]) acc[cat] = [];
@@ -161,11 +161,11 @@ export function Palette() {
   }, {});
 
   // Filter nodes and controls based on search query
-  const filteredCategories: Record<string, any[]> = searchQuery
+  const filteredCategories: Record<string, typeof NodeRegistry[string][]> = searchQuery
     ? Object.entries(categories)
-        .map(([cat, nodes]) => [cat, (nodes as any[]).filter((n) => n.label.toLowerCase().includes(searchQuery.toLowerCase()))])
-        .filter(([_, nodes]) => (nodes as any[]).length > 0)
-        .reduce((acc, [cat, nodes]) => ({ ...acc, [cat as string]: nodes }), {})
+        .map(([cat, catNodes]) => [cat, catNodes.filter((n) => n.label.toLowerCase().includes(searchQuery.toLowerCase()))] as const)
+        .filter(([, catNodes]) => catNodes.length > 0)
+        .reduce((acc, [cat, catNodes]) => ({ ...acc, [cat]: catNodes }), {} as Record<string, typeof NodeRegistry[string][]>)
     : categories;
 
   const filteredUIControls = searchQuery
@@ -191,10 +191,10 @@ export function Palette() {
 
       <div className="p-3 flex flex-col gap-4">
         {viewMode === 'logic' ? (
-          Object.entries(filteredCategories).map(([cat, nodes]: any) => (
+          Object.entries(filteredCategories).map(([cat, catNodes]) => (
              <div key={cat} className="flex flex-col gap-2">
                 <div className="text-xs font-semibold text-gray-500 capitalize px-1">{cat}</div>
-                {nodes.map((node: any) => {
+                {catNodes.map((node) => {
                    const Icon = LOGIC_ICONS[node.type] || Box;
                    return (
                      <div 

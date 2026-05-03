@@ -1,4 +1,4 @@
-import type { Graph, Edge } from '../types/graph';
+import type { Graph, Edge, NodeInstance } from '../types/graph';
 import { NodeRegistry } from './registry';
 import type { NodeState, RuntimeMemory } from '../types/runtime';
 
@@ -19,6 +19,7 @@ export class ExecutionEngine {
   private batchMode: boolean;
   private aborted = false;
   private edgeByNodePort = new Map<string, Edge[]>();
+  private nodeMap = new Map<string, NodeInstance>();
 
   constructor(
     graph: Graph,
@@ -38,7 +39,7 @@ export class ExecutionEngine {
     this.updatePortValue = updatePortValue;
     this.debugCallbacks = debugCallbacks;
     this.batchMode = batchMode;
-    this.buildEdgeMap();
+    this.buildMaps();
   }
 
   /** Abort a running execution */
@@ -46,14 +47,25 @@ export class ExecutionEngine {
     this.aborted = true;
   }
 
-  /** Update a port value in both the engine's internal runtime and the external store */
+  /** Update a port value in the engine's internal runtime. In batch mode defers store sync. */
   private setPortValue(portId: string, value: any) {
     this.runtime.portValues[portId] = value;
-    this.updatePortValue(portId, value);
+    if (!this.batchMode) {
+      this.updatePortValue(portId, value);
+    }
   }
 
-  /** Build the edge lookup map once for the entire execution */
-  private buildEdgeMap() {
+  /** Flush all buffered port values to the external store (batch mode only) */
+  private flushPortValues() {
+    if (this.batchMode) {
+      for (const [portId, value] of Object.entries(this.runtime.portValues)) {
+        this.updatePortValue(portId, value);
+      }
+    }
+  }
+
+  /** Build the edge and node lookup maps once for the entire execution */
+  private buildMaps() {
     this.edgeByNodePort.clear();
     for (const edge of this.graph.edges) {
       const edgeKey = `${edge.sourceNode}_${edge.sourcePort}`;
@@ -61,16 +73,20 @@ export class ExecutionEngine {
       arr.push(edge);
       this.edgeByNodePort.set(edgeKey, arr);
     }
+    this.nodeMap.clear();
+    for (const node of this.graph.nodes) {
+      this.nodeMap.set(node.id, node);
+    }
   }
 
   // Find the ancestor of nodeId that sits exactly in the current parentId level
   private getAncestorInLevel(nodeId: string, parentId: string | undefined): string | null {
-    let curr = this.graph.nodes.find(n => n.id === nodeId);
+    let curr = this.nodeMap.get(nodeId);
     while (curr) {
       if (curr.parent === parentId) return curr.id;
       const parentRef = curr.parent;
       if (!parentRef) return null;
-      const nextCurr = this.graph.nodes.find(n => n.id === parentRef);
+      const nextCurr = this.nodeMap.get(parentRef);
       if (!nextCurr) return null;
       curr = nextCurr;
     }
@@ -233,6 +249,10 @@ export class ExecutionEngine {
             let N = Math.trunc(Number(inputs.N) || 0);
             const hasExplicitN = this.graph.edges.some(e => e.targetNode === node.id && e.targetPort === 'N');
             if (!hasExplicitN && autoN > 0) N = autoN;
+            // Warn if connected N exceeds available array data
+            if (hasExplicitN && autoN > 0 && N > autoN) {
+              console.warn(`For Loop "${node.id}": N=${N} but input arrays have length ${autoN}. Elements beyond index ${autoN - 1} will be undefined.`);
+            }
 
             // Prepare output tunnel collectors
             const outputCollectors = new Map<string, any[]>(); // tunnelId → collected values
@@ -287,6 +307,9 @@ export class ExecutionEngine {
                   if (isIndexing) {
                      const arr = indexedInputArrays.get(tunnel.id) || [];
                      const element = iterationIndex < arr.length ? arr[iterationIndex] : undefined;
+                     if (iterationIndex >= arr.length && arr.length > 0) {
+                       console.warn(`For Loop iteration ${iterationIndex}: tunnel "${tunnel.id}" array has length ${arr.length}, index out of bounds.`);
+                     }
                      this.setPortValue(`${tunnel.id}_output`, element);
                      // Propagate to connected nodes
                      const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
@@ -340,9 +363,9 @@ export class ExecutionEngine {
                   const stopCondition = Boolean(this.runtime.portValues[`${node.id}_stop`]);
                   if (stopCondition) break;
                   count++;
-                  // 异步防止主线程阻塞
-                  if (count % 1000 === 0) await new Promise(r => setTimeout(r, 0));
-                  if (count >= 100000) throw new Error("While Loop Timeout");
+                  // Yield to event loop every 50 iterations to avoid blocking the main thread
+                  if (count % 50 === 0) await new Promise<void>(r => queueMicrotask(() => r()));
+                  if (count >= 100000) throw new Error("While Loop Timeout: exceeded 100,000 iterations. Check your stop condition or add a counter check.");
                }
             }
 
@@ -403,7 +426,7 @@ export class ExecutionEngine {
            // Standard Node or Tunnel
            let applyStandardExecution = true;
            if (node.type === 'io.tunnel' || node.type === 'io.shiftRegister') {
-              const pNode = node.parent ? this.graph.nodes.find(n => n.id === node.parent) : null;
+              const pNode = node.parent ? this.nodeMap.get(node.parent) : undefined;
                if (pNode?.type === 'structure.forLoop' || pNode?.type === 'structure.whileLoop') {
                  applyStandardExecution = false;
               }
@@ -494,7 +517,7 @@ export class ExecutionEngine {
 
     // Initialize control terminal port values from UI controls before execution
     for (const control of this.graph.uiControls) {
-      const termNode = this.graph.nodes.find(n => n.id === control.bindingNodeId);
+      const termNode = this.nodeMap.get(control.bindingNodeId);
       if (termNode && termNode.type === 'io.terminal') {
         const value = termNode.params?.value !== undefined ? termNode.params.value : control.defaultValue;
         if (control.direction === 'control') {
@@ -505,5 +528,6 @@ export class ExecutionEngine {
     }
 
     await this.executeSubgraph(undefined);
+    this.flushPortValues();
   }
 }

@@ -30,12 +30,12 @@ export function CustomEdge({
 
   const nodeState = useRuntimeStore((s) => s.nodeState[source]);
   const isRunning = nodeState === 'running' || nodeState === 'done';
-  const nodes = useGraphStore(state => state.nodes);
-  const uiControls = useGraphStore(state => state.uiControls);
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
-  const edges = useGraphStore(state => state.edges);
+  const allNodes = useGraphStore.getState().nodes;
+  const allEdges = useGraphStore.getState().edges;
+  const allUiControls = useGraphStore.getState().uiControls;
   let strokeColor = '#b1b1b7';
   let isArrayBase = false;
   let arrayModifiers = 0;
@@ -43,24 +43,22 @@ export function CustomEdge({
   let currPort = sourceHandleId;
 
   for (let i = 0; i < 50; i++) {
-     const currNode = nodes.find(n => n.id === currId);
+     const currNode = allNodes.find(n => n.id === currId);
      if (!currNode) break;
 
      if (currNode.type === 'io.tunnel' || currNode.type === 'io.shiftRegister') {
-        const parentNode = currNode.parent ? nodes.find(n => n.id === currNode.parent) : null;
+        const parentNode = currNode.parent ? allNodes.find(n => n.id === currNode.parent) : null;
         const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
         const isIndexing = currNode.type === 'io.tunnel' ? (currNode.params?.indexing ?? (isInLoop ? true : false)) : false;
 
         if (isIndexing && parentNode) {
             const pW = parentNode.width || 300;
             const isInputTunnel = (currNode.position?.x ?? 0) < pW / 2;
-            // If tracing backwards across an input tunnel, we are going from inside to outside. The base is an array, but we are inside, so -1.
-            // If tracing backwards across an output tunnel, we are going from outside to inside. The base is a scalar, but we are outside, so +1.
             if (isInputTunnel) arrayModifiers--;
             else arrayModifiers++;
         }
 
-        const inEdge = edges.find(e => e.targetNode === currId);
+        const inEdge = allEdges.find(e => e.targetNode === currId);
         if (!inEdge) break;
         currId = inEdge.sourceNode;
         currPort = inEdge.sourcePort;
@@ -68,18 +66,16 @@ export function CustomEdge({
         const def = NodeRegistry[currNode.type];
         if (def) {
            const nodeOutputs = (currNode.outputs && currNode.outputs.length > 0) ? currNode.outputs : (def.outputs || []);
-           const portDef = nodeOutputs.find((p: any) => p.name === currPort);
+           const portDef = nodeOutputs.find((p: { name: string; type: string }) => p.name === currPort);
            if (portDef) {
                strokeColor = getTypeColor(portDef.type);
                isArrayBase = isTypeArray(portDef.type);
            }
-           // Override for integer number constants
            if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
               strokeColor = '#1565C0';
            }
-           // Override for integer terminal nodes
            if (currNode.type === 'io.terminal') {
-              const ctrl = uiControls.find((c: any) => c.bindingNodeId === currNode.id);
+              const ctrl = allUiControls.find((c) => c.bindingNodeId === currNode.id);
               if (ctrl?.numberType === 'integer') {
                  strokeColor = '#1565C0';
               }
