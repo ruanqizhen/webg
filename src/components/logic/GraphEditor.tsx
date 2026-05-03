@@ -104,7 +104,7 @@ const initialEdgeTypes: any = { custom: CustomEdge };
 // Inner component that uses useReactFlow - rendered INSIDE ReactFlow
 function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
   const reactFlow = useReactFlow();
-  const { setSelectedNodeId, setSelectedEdgeId } = useUIStore();
+  const { setSelectedEdgeId, setSelectedNodeIds } = useUIStore();
   const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
 
 
@@ -291,10 +291,19 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
   }, [pushHistory]);
 
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
+    // Snap to 16px grid
+    const GRID = 16;
+    const snappedX = Math.round(node.position.x / GRID) * GRID;
+    const snappedY = Math.round(node.position.y / GRID) * GRID;
+    const pos = { x: snappedX, y: snappedY };
+    if (snappedX !== node.position.x || snappedY !== node.position.y) {
+      updateNode(node.id, { position: pos }, true);
+    }
+
     if (!node.parentNode) {
        const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
-       const nodeCenterX = node.position.x + (node.width || 120) / 2;
-       const nodeCenterY = node.position.y + (node.height || 60) / 2;
+       const nodeCenterX = pos.x + (node.width || 120) / 2;
+       const nodeCenterY = pos.y + (node.height || 60) / 2;
 
        for (const s of structures) {
           const sX = s.position?.x ?? 0;
@@ -309,7 +318,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
              updateNode(node.id, {
                  parent: s.id,
-                 position: { x: node.position.x - sX, y: node.position.y - sY },
+                 position: { x: pos.x - sX, y: pos.y - sY },
                  caseId: isCaseStructure ? activeCase : undefined
              });
              resolveNodeOverlaps(node.id);
@@ -321,13 +330,13 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
        if (parentNode && node.type !== 'io.tunnel') {
           const pW = parentNode.width || 300;
           const pH = parentNode.height || 200;
-          const nodeCenterX = node.position.x + (node.width || 120) / 2;
-          const nodeCenterY = node.position.y + (node.height || 60) / 2;
+          const nodeCenterX2 = pos.x + (node.width || 120) / 2;
+          const nodeCenterY2 = pos.y + (node.height || 60) / 2;
 
-          if (nodeCenterX < 0 || nodeCenterX > pW || nodeCenterY < 0 || nodeCenterY > pH) {
+          if (nodeCenterX2 < 0 || nodeCenterX2 > pW || nodeCenterY2 < 0 || nodeCenterY2 > pH) {
              updateNode(node.id, {
                  parent: undefined,
-                 position: { x: (parentNode.position?.x ?? 0) + node.position.x, y: (parentNode.position?.y ?? 0) + node.position.y },
+                 position: { x: (parentNode.position?.x ?? 0) + pos.x, y: (parentNode.position?.y ?? 0) + pos.y },
                  caseId: undefined
              });
              resolveNodeOverlaps(node.id);
@@ -376,8 +385,30 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         fitView
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={["Backspace", "Delete"]}
+        onReconnect={(oldEdge, newConnection) => {
+          const state = useGraphStore.getState();
+          state.removeEdge(oldEdge.id);
+          const sourceHandle = newConnection.sourceHandle;
+          const targetHandle = newConnection.targetHandle;
+          if (newConnection.source && newConnection.target && sourceHandle && targetHandle) {
+            state.addEdge({
+              id: `e_${newConnection.source}_${sourceHandle}-${newConnection.target}_${targetHandle}_${Date.now().toString(36)}`,
+              sourceNode: newConnection.source,
+              sourcePort: sourceHandle,
+              targetNode: newConnection.target,
+              targetPort: targetHandle,
+            });
+          }
+        }}
         onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
-        onPaneClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
+        onPaneClick={() => {
+          useUIStore.getState().clearSelection();
+        }}
+        onSelectionChange={({ nodes: selectedNodes }) => {
+          setSelectedNodeIds(selectedNodes.map((n) => n.id));
+        }}
+        multiSelectionKeyCode="Shift"
+        selectionKeyCode="Shift"
       >
         <Background color="#eee" gap={16} />
         <Controls />

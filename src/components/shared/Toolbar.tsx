@@ -1,4 +1,7 @@
-import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle, Sun, Moon, Monitor, Terminal, Lightbulb } from 'lucide-react';
+import { useThemeStore } from '../../store/useThemeStore';
+import { useLogStore } from '../../store/useLogStore';
+import { createExampleProject } from '../../lib/exampleProject';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
@@ -8,6 +11,8 @@ import { useRef } from 'react';
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
+  const { theme, setTheme } = useThemeStore();
+  const consoleVisible = useLogStore((s) => s.isVisible);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<ExecutionEngine | null>(null);
 
@@ -97,6 +102,16 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     engineRef.current = null;
     runtimeStore.setRunning(false);
     runtimeStore.resetDebug();
+  };
+
+  const cycleTheme = () => {
+    const next: Record<string, 'light' | 'dark' | 'system'> = { light: 'dark', dark: 'system', system: 'light' };
+    setTheme(next[theme]);
+  };
+
+  const handleLoadExample = () => {
+    const example = createExampleProject();
+    loadGraph(example);
   };
 
   const handleClear = () => {
@@ -271,14 +286,37 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
              <span className={statusTextColor}>{currentStatus}</span>
           </div>
           <div className="w-px h-6 bg-gray-200"></div>
+          <Button size="sm" variant="ghost" onClick={handleLoadExample} className="gap-1 text-gray-400 hover:text-yellow-500" title="Load example project">
+            <Lightbulb size={14} /> Example
+          </Button>
           <Button size="sm" variant="ghost" onClick={handleClear} className="gap-1 text-gray-400 hover:text-red-500">
             <Trash2 size={14} /> Clear
           </Button>
           <div className="w-px h-6 bg-gray-200"></div>
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            onClick={() => window.open('https://github.com/ruanqizhen/webg/blob/main/README.md', '_blank')} 
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={cycleTheme}
+            className="gap-1 text-gray-400 hover:text-yellow-500"
+            title={`Theme: ${theme}`}
+          >
+            {theme === 'light' && <Sun size={14} />}
+            {theme === 'dark' && <Moon size={14} />}
+            {theme === 'system' && <Monitor size={14} />}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => useLogStore.getState().toggleVisible()}
+            className={`gap-1 ${consoleVisible ? 'text-green-500' : 'text-gray-400 hover:text-green-500'}`}
+            title="Toggle Output Console"
+          >
+            <Terminal size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => window.open('https://github.com/ruanqizhen/webg/blob/main/README.md', '_blank')}
             className="gap-1 text-gray-400 hover:text-blue-500"
           >
             <HelpCircle size={14} /> Help

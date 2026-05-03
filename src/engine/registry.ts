@@ -1,4 +1,12 @@
 import type { NodeDefinition } from '../types/runtime';
+import { runtimeLog } from '../store/useLogStore';
+
+function formatLogValue(value: any): string {
+  if (value === undefined || value === null) return String(value);
+  if (typeof value === 'object') return JSON.stringify(value, null, 2);
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  return String(value);
+}
 
 export const NodeRegistry: Record<string, NodeDefinition> = {
   // Sources
@@ -125,10 +133,9 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     type: 'sink.display',
     label: 'Display',
     inputs: [{ name: 'value', type: 'any' }],
-    outputs: [{ name: 'pass_through', type: 'any' }], // useful if we want to daisy-chain
+    outputs: [{ name: 'pass_through', type: 'any' }],
     executor: (ctx) => {
-      // Logic for indicator UI update is handled by the execution engine tracking 'pass_through' 
-      // or we can emit an event. Returning the value means the node finishes.
+      runtimeLog(formatLogValue(ctx.inputs.value), 'info', ctx.nodeId, 'Display');
       return { outputs: { pass_through: ctx.inputs.value } };
     }
   },
@@ -138,7 +145,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     inputs: [{ name: 'value', type: 'any' }],
     outputs: [],
     executor: (ctx) => {
-      console.log(`[Node Log ${ctx.nodeId}]:`, ctx.inputs.value);
+      runtimeLog(formatLogValue(ctx.inputs.value), 'log', ctx.nodeId, 'Console Log');
       return { outputs: {} };
     }
   },

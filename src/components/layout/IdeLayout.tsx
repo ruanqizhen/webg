@@ -3,9 +3,12 @@ import { MousePointer2, Network } from 'lucide-react';
 import { Toolbar } from '../shared/Toolbar';
 import { Palette } from '../shared/Palette';
 import { PropertiesPanel } from '../shared/PropertiesPanel';
+import { OutputConsole } from '../shared/OutputConsole';
+import { NodeSearch } from '../shared/NodeSearch';
+import { ShortcutCheatsheet } from '../shared/ShortcutCheatsheet';
 import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor, resolveNodeOverlaps } from '../logic/GraphEditor';
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -26,14 +29,48 @@ function IdeLayoutInner() {
   const reactFlow = useReactFlow();
   const frontPanelRef = useRef<{ screenToPanelPosition: (x: number, y: number) => { x: number, y: number } }>(null);
   const frontPanelDivRef = useRef<HTMLDivElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
 
   const handleZoomFit = useCallback(() => {
     zoomFitRef.current?.();
   }, []);
 
+  const handleFocusNode = useCallback((nodeId: string) => {
+    const node = useGraphStore.getState().nodes.find((n) => n.id === nodeId);
+    if (node) {
+      const cx = (node.position?.x ?? 0) + (node.width ?? 120) / 2;
+      const cy = (node.position?.y ?? 0) + (node.height ?? 60) / 2;
+      reactFlow.setCenter(cx, cy, { zoom: 1.5, duration: 500 });
+      useUIStore.getState().setSelectedNodeId(nodeId);
+    }
+  }, [reactFlow]);
+
   useKeyboardShortcuts({
-    onZoomFit: handleZoomFit
+    onZoomFit: handleZoomFit,
   });
+
+  // Ctrl+F / Ctrl+P to open search, ? for cheatsheet
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'p')) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setSearchOpen(true);
+        }
+      }
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setCheatsheetOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Load from storage on mount and start auto-save
   useEffect(() => {
@@ -248,9 +285,9 @@ function IdeLayoutInner() {
       <div className="flex flex-1 overflow-hidden relative">
          <Palette />
          
-         <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-gray-200">
+         <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-gray-200 dark:border-gray-700">
             {/* Tabs Header */}
-            <div className="flex bg-gray-50 border-b shrink-0 px-2 pt-2 gap-1 select-none">
+            <div className="flex bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700 shrink-0 px-2 pt-2 gap-1 select-none">
                <button 
                   className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'ui' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
                   onClick={() => setViewMode('ui')}
@@ -274,10 +311,13 @@ function IdeLayoutInner() {
                {viewMode === 'ui' && <FrontPanel ref={frontPanelRef} containerRef={frontPanelDivRef} />}
                {viewMode === 'logic' && <GraphEditor onZoomFitRef={zoomFitRef} />}
             </div>
+           <OutputConsole />
          </div>
 
          <PropertiesPanel />
       </div>
+      <NodeSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} onFocusNode={handleFocusNode} />
+      <ShortcutCheatsheet isOpen={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
     </div>
   );
 }

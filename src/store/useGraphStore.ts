@@ -30,6 +30,8 @@ interface GraphState extends Graph {
   // Copy/Paste
   copyNode: (nodeId: string) => void;
   pasteNode: (position: { x: number; y: number }) => { nodeId: string | null; controlId: string | null };
+  copyNodes: (nodeIds: string[]) => void;
+  pasteNodes: (position: { x: number; y: number }) => { nodeIds: string[]; controlIds: string[] };
   getClipboard: () => { node: NodeInstance | null; control: UIControl | null } | null;
 
   // History for Undo/Redo
@@ -46,6 +48,8 @@ const MAX_HISTORY = 50;
 export const useGraphStore = create<GraphState>((set, get) => {
   // Clipboard for copy/paste
   let clipboard: { node: NodeInstance | null; control: UIControl | null } | null = null;
+  // Multi-node clipboard for subgraph copy
+  let multiClipboard: { nodes: NodeInstance[]; edges: Edge[]; uiControls: UIControl[] } | null = null;
 
   // History stacks for undo/redo
   let historyStack: Graph[] = [];
@@ -401,6 +405,83 @@ export const useGraphStore = create<GraphState>((set, get) => {
     },
 
     getClipboard: () => clipboard,
+
+    copyNodes: (nodeIds: string[]) => {
+      const state = get();
+      const selectedIds = new Set(nodeIds);
+      const subNodes = state.nodes.filter(n => selectedIds.has(n.id));
+      const subEdges = state.edges.filter(e => selectedIds.has(e.sourceNode) && selectedIds.has(e.targetNode));
+      const subControls = state.uiControls.filter(c => selectedIds.has(c.bindingNodeId));
+
+      if (subNodes.length > 0) {
+        // Clone with zeroed positions and IDs for re-paste
+        multiClipboard = {
+          nodes: subNodes.map(n => ({ ...n, id: '', position: { x: n.position?.x ?? 0, y: n.position?.y ?? 0 } })),
+          edges: subEdges.map(e => ({ ...e, id: '', sourceNode: '', targetNode: '' })),
+          uiControls: subControls.map(c => ({ ...c, id: '', bindingNodeId: '' })),
+        };
+      }
+    },
+
+    pasteNodes: (position) => {
+      if (multiClipboard && multiClipboard.nodes.length > 0) {
+        const idMap = new Map<string, string>();
+        const newNodes: NodeInstance[] = [];
+        const newControls: UIControl[] = [];
+        // Compute offset from top-left of clipboard group to center of paste position
+        const minX = Math.min(...multiClipboard.nodes.map(n => n.position?.x ?? 0));
+        const minY = Math.min(...multiClipboard.nodes.map(n => n.position?.y ?? 0));
+        const offsetX = position.x - minX;
+        const offsetY = position.y - minY;
+
+        saveToHistory();
+
+        for (const n of multiClipboard.nodes) {
+          const newId = generateId();
+          idMap.set(n.id || '', newId);
+          newNodes.push({
+            ...n,
+            id: newId,
+            position: {
+              x: (n.position?.x ?? 0) + offsetX,
+              y: (n.position?.y ?? 0) + offsetY,
+            },
+          });
+        }
+
+        for (const c of multiClipboard.uiControls) {
+          const newCtrlId = generateId();
+          const newNodeId = idMap.get(c.bindingNodeId || '') || generateId();
+          newControls.push({ ...c, id: newCtrlId, bindingNodeId: newNodeId });
+        }
+
+        const newEdges: Edge[] = multiClipboard.edges.map(e => ({
+          ...e,
+          id: generateId(),
+          sourceNode: idMap.get(e.sourceNode || '') || e.sourceNode,
+          targetNode: idMap.get(e.targetNode || '') || e.targetNode,
+        }));
+
+        // Also place single-node clipboard items
+        set(state => ({
+          nodes: [...state.nodes, ...newNodes],
+          edges: [...state.edges, ...newEdges],
+          uiControls: [...state.uiControls, ...newControls],
+        }));
+
+        return { nodeIds: newNodes.map(n => n.id), controlIds: newControls.map(c => c.id) };
+      }
+
+      if (clipboard?.node) {
+        const result = get().pasteNode(position);
+        return {
+          nodeIds: result.nodeId ? [result.nodeId] : [],
+          controlIds: result.controlId ? [result.controlId] : [],
+        };
+      }
+
+      return { nodeIds: [], controlIds: [] };
+    },
 
     pushHistory: () => saveToHistory(),
 
