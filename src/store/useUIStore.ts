@@ -28,11 +28,17 @@ export const useUIStore = create<UIState>((set) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
 
   setSelectedNodeId: (id) =>
-    set({
-      selectedNodeId: id,
-      selectedNodeIds: id ? [id] : [],
-      selectedControlId: null,
-      selectedEdgeId: null,
+    set((state) => {
+      if (state.selectedNodeId === id && state.selectedNodeIds.length === (id ? 1 : 0)) {
+        return state;
+      }
+      return {
+        ...state,
+        selectedNodeId: id,
+        selectedNodeIds: id ? [id] : [],
+        selectedControlId: null,
+        selectedEdgeId: null,
+      };
     }),
 
   addSelectedNodeId: (id) =>

@@ -383,6 +383,9 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         nodeTypes={initialNodeTypes}
         edgeTypes={initialEdgeTypes}
         fitView
+        nodesFocusable={true}
+        nodesDraggable={true}
+        elementsSelectable={true}
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={["Backspace", "Delete"]}
         onReconnect={(oldEdge, newConnection) => {
