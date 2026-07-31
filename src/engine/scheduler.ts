@@ -94,30 +94,67 @@ export class ExecutionEngine {
   }
 
   public detectCycles(): boolean {
-    // DFS on the entire graph resolved cleanly
-    const deps = new Map<string, string[]>();
-    for (const n of this.graph.nodes) deps.set(n.id, []);
-    for (const e of this.graph.edges) {
-       deps.get(e.sourceNode)?.push(e.targetNode);
-    }
-    const visited = new Set<string>();
-    const recStack = new Set<string>();
+    // Group nodes by parent (+ caseId for Case structures) and ignore cross-group edges.
+    // Tunnel / ShiftRegister nodes are intentionally ignored because they break cycles by design
+    // (feedback via SR is handled explicitly by the scheduler, not as a graph edge cycle).
+    const nodeMap = new Map<string, NodeInstance>();
+    for (const n of this.graph.nodes) nodeMap.set(n.id, n);
 
-    const dfs = (nodeId: string): boolean => {
-      if (recStack.has(nodeId)) return true;
-      if (visited.has(nodeId)) return false;
-      visited.add(nodeId);
-      recStack.add(nodeId);
-      const children = deps.get(nodeId) || [];
-      for (const c of children) {
-         if (dfs(c)) return true;
+    const excludedTypes = new Set(['io.tunnel', 'io.shiftRegister']);
+
+    // Build groups: key = parentId + caseId (caseId only matters inside Case structures)
+    const groupKey = (n: NodeInstance): string => {
+      const parent = n.parent ?? '__root__';
+      const pNode = parent !== '__root__' ? nodeMap.get(parent) : undefined;
+      if (pNode?.type === 'structure.case') {
+        return `${parent}::${n.caseId ?? '__noCase'}`;
       }
-      recStack.delete(nodeId);
-      return false;
+      return parent;
+    };
+
+    const groups = new Map<string, NodeInstance[]>();
+    for (const n of this.graph.nodes) {
+      if (excludedTypes.has(n.type)) continue;
+      const key = groupKey(n);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(n);
     }
 
-    for (const n of this.graph.nodes) {
-      if (dfs(n.id)) return true;
+    for (const [, groupNodes] of groups) {
+      if (groupNodes.length <= 1) continue;
+      const idSet = new Set(groupNodes.map(n => n.id));
+      const deps = new Map<string, string[]>();
+      for (const n of groupNodes) deps.set(n.id, []);
+
+      for (const e of this.graph.edges) {
+        if (!idSet.has(e.sourceNode) || !idSet.has(e.targetNode)) continue;
+        // Skip if either endpoint is tunnel/SR (already filtered nodes, but edge could point to excluded? already not in idSet)
+        const srcNode = nodeMap.get(e.sourceNode);
+        const tgtNode = nodeMap.get(e.targetNode);
+        if (!srcNode || !tgtNode) continue;
+        if (excludedTypes.has(srcNode.type) || excludedTypes.has(tgtNode.type)) continue;
+        deps.get(e.sourceNode)?.push(e.targetNode);
+      }
+
+      const visited = new Set<string>();
+      const recStack = new Set<string>();
+
+      const dfs = (nodeId: string): boolean => {
+        if (recStack.has(nodeId)) return true;
+        if (visited.has(nodeId)) return false;
+        visited.add(nodeId);
+        recStack.add(nodeId);
+        const children = deps.get(nodeId) || [];
+        for (const c of children) {
+          if (dfs(c)) return true;
+        }
+        recStack.delete(nodeId);
+        return false;
+      };
+
+      for (const n of groupNodes) {
+        if (dfs(n.id)) return true;
+      }
     }
     return false;
   }
@@ -220,15 +257,43 @@ export class ExecutionEngine {
             // Find all tunnels belonging to this loop
             const childTunnels = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.tunnel');
 
-            // Classify tunnels as input (left border, x ≈ 0) or output (right border)
+            // Robust classification: input tunnel = incoming edge from outside loop, output = from inside
+            const isDescendantOf = (candidateId: string, ancestorId: string): boolean => {
+              let cur = this.nodeMap.get(candidateId);
+              while (cur) {
+                if (cur.parent === ancestorId) return true;
+                if (!cur.parent) return false;
+                cur = this.nodeMap.get(cur.parent);
+                if (!cur) return false;
+                if (cur.id === ancestorId) return true;
+              }
+              return false;
+            };
+
             const inputTunnels: typeof childTunnels = [];
             const outputTunnels: typeof childTunnels = [];
             for (const t of childTunnels) {
-               const parentW = node.width || 300;
-               if ((t.position?.x ?? 0) < parentW / 2) {
-                  inputTunnels.push(t);
+               const incoming = this.graph.edges.filter(e => e.targetNode === t.id);
+               if (incoming.length === 0) {
+                 // Fallback: use position heuristic and explicit side param if present
+                 const parentW = node.width || 300;
+                 const explicitSide = (t.params as any)?.side;
+                 if (explicitSide) {
+                   if (explicitSide === 'left') inputTunnels.push(t);
+                   else outputTunnels.push(t);
+                 } else if ((t.position?.x ?? 0) < parentW / 2) {
+                   inputTunnels.push(t);
+                 } else {
+                   outputTunnels.push(t);
+                 }
+                 continue;
+               }
+               const srcId = incoming[0].sourceNode;
+               // If source is inside this loop => output tunnel, else input
+               if (isDescendantOf(srcId, node.id)) {
+                 outputTunnels.push(t);
                } else {
-                  outputTunnels.push(t);
+                 inputTunnels.push(t);
                }
             }
 
@@ -245,10 +310,19 @@ export class ExecutionEngine {
                }
             }
 
-            // Determine N: explicit connection takes priority, else auto from arrays
-            let N = Math.trunc(Number(inputs.N) || 0);
-            const hasExplicitN = this.graph.edges.some(e => e.targetNode === node.id && e.targetPort === 'N');
-            if (!hasExplicitN && autoN > 0) N = autoN;
+            // Determine N: explicit value takes priority, else auto from shortest indexed array
+            const rawN = inputs.N;
+            const parsedN = rawN !== undefined ? Number(rawN) : NaN;
+            const explicitN = isFinite(parsedN) ? Math.trunc(parsedN) : undefined;
+            let N: number;
+            if (explicitN !== undefined) {
+              N = Math.max(0, explicitN);
+            } else if (autoN > 0) {
+              N = autoN;
+            } else {
+              N = 0;
+            }
+            const hasExplicitN = explicitN !== undefined;
             // Warn if connected N exceeds available array data
             if (hasExplicitN && autoN > 0 && N > autoN) {
               console.warn(`For Loop "${node.id}": N=${N} but input arrays have length ${autoN}. Elements beyond index ${autoN - 1} will be undefined.`);
@@ -364,7 +438,7 @@ export class ExecutionEngine {
                   if (stopCondition) break;
                   count++;
                   // Yield to event loop every 50 iterations to avoid blocking the main thread
-                  if (count % 50 === 0) await new Promise<void>(r => queueMicrotask(() => r()));
+                  if (count % 50 === 0) await new Promise<void>(r => setTimeout(r, 0));
                   if (count >= 100000) throw new Error("While Loop Timeout: exceeded 100,000 iterations. Check your stop condition or add a counter check.");
                }
             }
@@ -492,9 +566,11 @@ export class ExecutionEngine {
       // Decrement children in-degree
       const children = deps.get(node.id) || [];
       for (const childId of children) {
-         let count = inDegree.get(childId)! - 1;
-         inDegree.set(childId, count);
-         if (count === 0) queue.push(childId);
+         const prev = inDegree.get(childId);
+         if (prev === undefined) continue;
+         const next = prev - 1;
+         inDegree.set(childId, next);
+         if (next === 0) queue.push(childId);
       }
       
     }

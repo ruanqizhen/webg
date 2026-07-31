@@ -6,6 +6,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
+import { generateId } from '../../../lib/utils';
 
 export function TunnelNode({ id, selected }: NodeProps) {
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
@@ -40,12 +41,12 @@ export function TunnelNode({ id, selected }: NodeProps) {
 
   let tunnelType = 'any';
   let currId = id;
-  const allNodes = useGraphStore.getState().nodes;
-  const allEdges = useGraphStore.getState().edges;
+  const allNodesSub = useGraphStore(s => s.nodes);
+  const allEdgesSub = useGraphStore(s => s.edges);
   for (let i = 0; i < 50; i++) {
-     const inEdge = allEdges.find(e => e.targetNode === currId);
+     const inEdge = allEdgesSub.find(e => e.targetNode === currId);
      if (!inEdge) break;
-     const srcNode = allNodes.find(n => n.id === inEdge.sourceNode);
+     const srcNode = allNodesSub.find(n => n.id === inEdge.sourceNode);
      if (!srcNode) break;
      if (srcNode.type !== 'io.tunnel' && srcNode.type !== 'io.shiftRegister') {
         const def = NodeRegistry[srcNode.type];
@@ -61,18 +62,18 @@ export function TunnelNode({ id, selected }: NodeProps) {
 
   let isFullyWired = true;
   if (!isShiftRegister && node && node.parent) {
-     const pNode = allNodes.find(n => n.id === node.parent);
+     const pNode = allNodesSub.find(n => n.id === node.parent);
      if (pNode?.type === 'structure.case') {
-        const tunnelInputEdges = allEdges.filter(e => e.targetNode === id);
+        const tunnelInputEdges = allEdgesSub.filter(e => e.targetNode === id);
         const isOutputTunnel = tunnelInputEdges.some(e => {
-            const eNode = allNodes.find(n => n.id === e.sourceNode);
+            const eNode = allNodesSub.find(n => n.id === e.sourceNode);
             return eNode?.parent === pNode.id;
         });
         if (isOutputTunnel) {
            const requiredCases = pNode.params?.cases || ['true', 'false'];
            const wiredCases = new Set<string>();
            tunnelInputEdges.forEach(e => {
-              const eNode = allNodes.find(n => n.id === e.sourceNode);
+              const eNode = allNodesSub.find(n => n.id === e.sourceNode);
               if (eNode?.caseId) wiredCases.add(eNode.caseId);
            });
            isFullyWired = requiredCases.every((c: string) => wiredCases.has(c));
@@ -96,21 +97,19 @@ export function TunnelNode({ id, selected }: NodeProps) {
   const replaceWithShiftRegister = () => {
     setShowMenu(false);
     if (!parentNode) return;
-    
-    // Determine which side we are on
+
     const pW = parentNode.width || 300;
     const isLeftEdge = (node?.position?.x ?? 0) < pW / 2;
-    const pairId = `sr_${Date.now().toString(36)}`;
-    
-    // Convert current to shift register
+    const pairId = generateId();
+
     updateNode(id, {
       type: 'io.shiftRegister',
       params: { pairId, side: isLeftEdge ? 'left' : 'right' }
     });
 
-    // Spawn partner
+    // Spawn partner with unique id
     addNode({
-      id: `${pairId}_sibling`,
+      id: generateId(),
       type: 'io.shiftRegister',
       position: { x: isLeftEdge ? pW - 20 : 0, y: node?.position?.y || 0 },
       parent: node?.parent,

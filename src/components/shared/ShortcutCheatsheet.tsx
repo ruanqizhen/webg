@@ -36,6 +36,7 @@ const SHORTCUTS = [
 
 export function ShortcutCheatsheet({ isOpen, onClose }: ShortcutCheatsheetProps) {
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   return createPortal(
     <>

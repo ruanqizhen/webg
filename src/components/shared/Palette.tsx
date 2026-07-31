@@ -4,6 +4,7 @@ import { NodeRegistry } from '../../engine/registry';
 import { getNodeColor } from '../../lib/colors';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
+import { controlDefaults } from '../../lib/controlDefaults';
 import { 
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
@@ -95,10 +96,15 @@ export function Palette() {
     const direction: 'control' | 'indicator' = controlDef.direction || 'control';
     const isIndicator = direction === 'indicator';
 
+    // Deterministic placement to avoid pure-render impurity and overlapping
+    const existingCount = useGraphStore.getState().nodes.length;
+    const offsetX = (existingCount % 6) * 40;
+    const offsetY = Math.floor(existingCount / 6) * 50;
+
     const terminalDef: any = {
       id: termId,
       type: 'io.terminal',
-      position: { x: Math.random() * 200 + 50, y: Math.random() * 200 + 50 },
+      position: { x: 80 + offsetX, y: 80 + offsetY },
       inputs: [],
       outputs: [],
       params: { value: controlDef.type === 'button' ? false : 0 }
@@ -116,19 +122,6 @@ export function Palette() {
     } else {
        terminalDef.outputs = [{ name: 'output', type: portType, direction: 'output', id: 'output' }];
     }
-
-    // Default properties for different control types
-    const controlDefaults: Record<string, any> = {
-      numberInput: { min: 0, max: 100, step: 1, defaultValue: 0 },
-      button: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
-      numberIndicator: { defaultValue: 0 },
-      textLabel: { defaultValue: '' },
-      gauge: { min: 0, max: 100, colorOn: '#4CAF50', defaultValue: 0 },
-      indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
-      slider: { min: 0, max: 100, step: 1, defaultValue: 0, width: 160, height: 40 },
-      knob: { min: 0, max: 100, step: 1, defaultValue: 0, width: 80, height: 80 },
-      tank: { min: 0, max: 100, colorOn: '#3B82F6', defaultValue: 0, width: 60, height: 160 },
-    };
 
     const existingLabels = uiControls.map(c => c.label);
     const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);

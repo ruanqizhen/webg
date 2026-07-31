@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -27,10 +27,10 @@ export const resolveNodeOverlaps = (draggedNodeId: string) => {
         const currentNodes = useGraphStore.getState().nodes;
         const targetNode = currentNodes.find(n => n.id === draggedNodeId);
         if (!targetNode || targetNode.type === 'io.tunnel' || targetNode.type === 'io.shiftRegister') return;
-        
+
         const targetParent = targetNode.parent;
         const targetCase = targetNode.caseId;
-        
+
         const rects = currentNodes
             .filter(n => n.parent === targetParent && n.caseId === targetCase && n.type !== 'io.tunnel' && n.type !== 'io.shiftRegister')
             .map(n => ({
@@ -40,40 +40,40 @@ export const resolveNodeOverlaps = (draggedNodeId: string) => {
                 w: n.width || 120,
                 h: n.height || 60
             }));
-        
+
         const rectMap = new Map(rects.map(r => [r.id, r]));
-        
+
         const pushOverlaps = (id: string, visited: Set<string>) => {
             visited.add(id);
             const rect = rectMap.get(id);
             if (!rect) return;
-            
+
             for (const [otherId, other] of rectMap.entries()) {
                 if (visited.has(otherId)) continue;
-                
-                const isOverlap = 
+
+                const isOverlap =
                     rect.x < other.x + other.w &&
                     rect.x + rect.w > other.x &&
                     rect.y < other.y + other.h &&
                     rect.y + rect.h > other.y;
-                    
+
                 if (isOverlap) {
                     const pushRight = (rect.x + rect.w) - other.x + 10;
                     const pushDown = (rect.y + rect.h) - other.y + 10;
-                    
+
                     if (pushRight < pushDown) {
                         other.x += pushRight;
                     } else {
                         other.y += pushDown;
                     }
-                    
+
                     pushOverlaps(otherId, visited);
                 }
             }
         };
-        
+
         pushOverlaps(draggedNodeId, new Set());
-        
+
         for (const r of rects) {
             const original = currentNodes.find(n => n.id === r.id);
             if (original && (original.position?.x !== r.x || original.position?.y !== r.y)) {
@@ -92,7 +92,6 @@ const initialNodeTypes: any = {
   'io.shiftRegister': TunnelNode
 };
 
-// Register all primitive and basic logic/math nodes to BaseNode custom renderer
 Object.keys(NodeRegistry).forEach(key => {
   if (!initialNodeTypes[key]) {
     initialNodeTypes[key] = BaseNode;
@@ -101,12 +100,40 @@ Object.keys(NodeRegistry).forEach(key => {
 
 const initialEdgeTypes: any = { custom: CustomEdge };
 
+function validateConnection(
+  sourceNodeType: string,
+  targetNodeType: string,
+  sourceHandle: string,
+  targetHandle: string
+): string | null {
+  const sourceDef = NodeRegistry[sourceNodeType];
+  const targetDef = NodeRegistry[targetNodeType];
+  const sourcePort = sourceDef?.outputs.find(p => p.name === sourceHandle);
+  const targetPort = targetDef?.inputs.find(p => p.name === targetHandle);
+  if (sourcePort && targetPort && sourcePort.type !== 'any' && targetPort.type !== 'any' && sourcePort.type !== targetPort.type) {
+    return `Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`;
+  }
+  return null;
+}
+
 // Inner component that uses useReactFlow - rendered INSIDE ReactFlow
 function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
   const reactFlow = useReactFlow();
   const { setSelectedEdgeId, setSelectedNodeIds } = useUIStore();
   const [typeMismatch, setTypeMismatch] = useState<string | null>(null);
+  const typeMismatchTimerRef = useRef<number | null>(null);
 
+  const showTypeMismatch = useCallback((msg: string) => {
+    setTypeMismatch(msg);
+    if (typeMismatchTimerRef.current) window.clearTimeout(typeMismatchTimerRef.current);
+    typeMismatchTimerRef.current = window.setTimeout(() => setTypeMismatch(null), 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (typeMismatchTimerRef.current) window.clearTimeout(typeMismatchTimerRef.current);
+    };
+  }, []);
 
   // Register zoom fit function with parent ref
   useEffect(() => {
@@ -117,37 +144,34 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     }
   }, [reactFlow, onZoomFitRef]);
 
-  const { nodes, edges, updateNode, addEdge: addGraphEdge, removeEdge, removeNode, pushHistory } = useGraphStore();
+  const { nodes, edges, updateNode, pushHistory } = useGraphStore();
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       changes.forEach(c => {
         if (c.type === 'position' && c.position) {
-          // Read fresh state to avoid stale closure issues with batched changes
           const currentNodes = useGraphStore.getState().nodes;
           const node = currentNodes.find(n => n.id === c.id);
           if ((node?.type === 'io.tunnel' || node?.type === 'io.shiftRegister') && node.parent) {
              const p = currentNodes.find(p => p.id === node.parent);
              const pW = p?.width || 300;
              const pH = p?.height || 200;
-             // Determine if it's on the left or right border based on its current dragged position or side config
              let isRight = false;
              if (node.type === 'io.shiftRegister') {
                  isRight = node.params?.side === 'right';
              } else {
                  isRight = (c.position.x ?? 0) > pW / 2;
              }
-             const fixedX = isRight ? pW - 16 : 0; // 16px is approx tunnel width
+             const fixedX = isRight ? pW - 16 : 0;
              const clampedY = Math.max(0, Math.min(pH - 16, c.position.y));
-             updateNode(c.id, { position: { x: fixedX, y: clampedY } }, true); // skipHistory during drag
+             updateNode(c.id, { position: { x: fixedX, y: clampedY } }, true);
           } else {
-             updateNode(c.id, { position: c.position }, true); // skipHistory during drag
+             updateNode(c.id, { position: c.position }, true);
           }
         } else if (c.type === 'dimensions' && c.dimensions) {
           const dims = c.dimensions;
           updateNode(c.id, { width: dims.width, height: dims.height });
-          
-          // Also reposition right-side tunnels when parent resizes
+
           const currentNodes = useGraphStore.getState().nodes;
           const parentNode = currentNodes.find(n => n.id === c.id);
           if (parentNode && String(parentNode.type).startsWith('structure')) {
@@ -160,57 +184,59 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
                 } else {
                     isRight = (child.position?.x ?? 0) > oldPW / 2;
                 }
-                
+
                 let newX = child.position?.x ?? 0;
                 let newY = child.position?.y ?? 0;
-                
+
                 if (isRight) newX = dims.width - 16;
                 newY = Math.max(0, Math.min(dims.height - 16, newY));
-                
+
                 if (newX !== (child.position?.x ?? 0) || newY !== (child.position?.y ?? 0)) {
                     updateNode(child.id, { position: { x: newX, y: newY } }, true);
                 }
              });
           }
-        } else if (c.type === 'remove') {
-          removeNode(c.id);
         }
+        // NOTE: remove type intentionally ignored here to avoid double-delete
+        // with useKeyboardShortcuts — deletion is handled centrally there.
       });
     },
-    [updateNode, removeNode]
+    [updateNode]
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      // Only handle selection changes — delete is handled by keyboard hook to avoid double history
       changes.forEach(c => {
         if (c.type === 'remove') {
-          removeEdge(c.id);
+          // Skip: handled by useKeyboardShortcuts to prevent double history push
         }
       });
     },
-    [removeEdge]
+    []
   );
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const sourceNode = nodes.find(n => n.id === connection.source);
-      const targetNode = nodes.find(n => n.id === connection.target);
+      // Read fresh state to avoid stale closure
+      const currentNodes = useGraphStore.getState().nodes;
+      const sourceNode = currentNodes.find(n => n.id === connection.source);
+      const targetNode = currentNodes.find(n => n.id === connection.target);
 
       if (!sourceNode || !targetNode || !connection.sourceHandle || !connection.targetHandle) return;
 
-      const sourceDef = NodeRegistry[sourceNode.type];
-      const targetDef = NodeRegistry[targetNode.type];
-
-      const sourcePort = sourceDef?.outputs.find(p => p.name === connection.sourceHandle);
-      const targetPort = targetDef?.inputs.find(p => p.name === connection.targetHandle);
-
-      if (sourcePort && targetPort && sourcePort.type !== 'any' && targetPort.type !== 'any' && sourcePort.type !== targetPort.type) {
-        setTypeMismatch(`Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`);
-        setTimeout(() => setTypeMismatch(null), 3000);
+      const mismatch = validateConnection(
+        sourceNode.type,
+        targetNode.type,
+        connection.sourceHandle,
+        connection.targetHandle
+      );
+      if (mismatch) {
+        showTypeMismatch(mismatch);
         return;
       }
 
-      addGraphEdge({
+      useGraphStore.getState().addEdge({
         id: `e_${connection.source}_${connection.sourceHandle}-${connection.target}_${connection.targetHandle}_${Date.now().toString(36)}`,
         sourceNode: connection.source!,
         sourcePort: connection.sourceHandle!,
@@ -218,30 +244,44 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         targetPort: connection.targetHandle!
       });
     },
-    [nodes, addGraphEdge]
+    [showTypeMismatch]
   );
-
-  const getFlowNodeType = (nodeType: string): string => {
-    if (nodeType.startsWith('structure.')) return nodeType;
-    if (nodeType === 'io.tunnel' || nodeType === 'io.shiftRegister') return nodeType;
-    return 'custom';
-  };
 
   const flowNodes: FlowNode[] = useMemo(() => {
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
     return nodes.map(n => {
       let hidden = false;
-      if (n.parent) {
-         const parentNode = nodeMap.get(n.parent);
-         if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
-            if (n.caseId && n.caseId !== parentNode.params.activeCase) {
-               hidden = true;
+      let curr: typeof n | undefined = n;
+      // Walk ancestor chain for case hidden logic
+      while (curr?.parent) {
+        const parentNode = nodeMap.get(curr.parent);
+        if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
+          const isChildOfThisParent = n.parent === parentNode.id || curr.parent === parentNode.id;
+          const checkNode = n.parent === parentNode.id ? n : curr;
+          if (checkNode.caseId && checkNode.caseId !== parentNode.params?.activeCase) {
+            if (isChildOfThisParent || n.caseId) {
+              hidden = true;
+              break;
             }
-         }
+          }
+        }
+        curr = parentNode ? { ...parentNode, id: parentNode.id } as any : undefined;
+        if (curr && curr.parent) {
+          const gp = nodeMap.get(curr.parent);
+          if (gp?.type === 'structure.case' && gp.params?.activeCase) {
+            if (n.caseId && n.caseId !== gp.params?.activeCase) {
+              hidden = true;
+              break;
+            }
+          }
+          curr = gp as any;
+        } else {
+          break;
+        }
       }
       return {
         id: n.id,
-        type: getFlowNodeType(n.type),
+        type: n.type.startsWith('structure.') ? n.type : (n.type === 'io.tunnel' || n.type === 'io.shiftRegister' ? n.type : 'custom'),
         position: n.position,
         data: { def: NodeRegistry[n.type], nodeType: n.type, caseId: n.caseId },
         parentNode: n.parent,
@@ -249,31 +289,36 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         ...(n.width ? { width: n.width } : {}),
         ...(n.height ? { height: n.height } : {}),
         className: n.type.startsWith('structure.') ? 'pointer-events-none' : '',
-        zIndex: n.type.startsWith('structure.') ? -1 : 1,
+        zIndex: n.type.startsWith('structure.') ? 0 : 1,
       };
     });
   }, [nodes]);
-  
+
   const flowEdges: FlowEdge[] = useMemo(() => {
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
     return edges.map(e => {
        let hidden = false;
        const sourceNode = nodeMap.get(e.sourceNode);
        const targetNode = nodeMap.get(e.targetNode);
-       
-       const checkHidden = (n: any) => {
-          if (!n || !n.parent) return false;
-          const parentNode = nodeMap.get(n.parent);
-          if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
-             if (n.caseId && n.caseId !== parentNode.params.activeCase) return true;
-          }
-          return false;
+
+       const checkHidden = (node: (typeof nodeMap extends Map<any, infer V> ? V : never) | undefined) => {
+         if (!node) return false;
+         let curr: any = node;
+         while (curr?.parent) {
+           const parentNode = nodeMap.get(curr.parent);
+           if (parentNode?.type === 'structure.case' && parentNode.params?.activeCase) {
+             const checkId = curr === node ? (node as any).caseId : curr.caseId;
+             if (checkId && checkId !== parentNode.params.activeCase) return true;
+           }
+           curr = parentNode;
+         }
+         return false;
        };
-  
-       if (checkHidden(sourceNode) || checkHidden(targetNode)) {
+
+       if (checkHidden(sourceNode as any) || checkHidden(targetNode as any)) {
            hidden = true;
        }
-  
+
        return {
          id: e.id,
          source: e.sourceNode,
@@ -291,7 +336,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
   }, [pushHistory]);
 
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
-    // Snap to 16px grid
     const GRID = 16;
     const snappedX = Math.round(node.position.x / GRID) * GRID;
     const snappedY = Math.round(node.position.y / GRID) * GRID;
@@ -306,19 +350,27 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
        const nodeCenterY = pos.y + (node.height || 60) / 2;
 
        for (const s of structures) {
-          const sX = s.position?.x ?? 0;
-          const sY = s.position?.y ?? 0;
+          let absX = s.position?.x ?? 0;
+          let absY = s.position?.y ?? 0;
+          let curParentId: string | undefined = nodes.find(n => n.id === s.id)?.parent;
+          while (curParentId) {
+            const p = nodes.find(n => n.id === curParentId);
+            if (!p) break;
+            absX += p.position?.x ?? 0;
+            absY += p.position?.y ?? 0;
+            curParentId = p.parent;
+          }
           const sW = s.width || 300;
           const sH = s.height || 200;
-          if (nodeCenterX > sX && nodeCenterX < sX + sW &&
-              nodeCenterY > sY && nodeCenterY < sY + sH) {
+          if (nodeCenterX > absX && nodeCenterX < absX + sW &&
+              nodeCenterY > absY && nodeCenterY < absY + sH) {
              const isCaseStructure = s.type === 'structure.case';
              const caseStructureNode = nodes.find(n => n.id === s.id);
              const activeCase = caseStructureNode?.params?.activeCase;
 
              updateNode(node.id, {
                  parent: s.id,
-                 position: { x: pos.x - sX, y: pos.y - sY },
+                 position: { x: pos.x - absX, y: pos.y - absY },
                  caseId: isCaseStructure ? activeCase : undefined
              });
              resolveNodeOverlaps(node.id);
@@ -334,9 +386,19 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           const nodeCenterY2 = pos.y + (node.height || 60) / 2;
 
           if (nodeCenterX2 < 0 || nodeCenterX2 > pW || nodeCenterY2 < 0 || nodeCenterY2 > pH) {
+             let gx = (parentNode.position?.x ?? 0) + pos.x;
+             let gy = (parentNode.position?.y ?? 0) + pos.y;
+             let curPid: string | undefined = nodes.find(n => n.id === parentNode.id)?.parent;
+             while (curPid) {
+               const pp = nodes.find(n => n.id === curPid);
+               if (!pp) break;
+               gx += pp.position?.x ?? 0;
+               gy += pp.position?.y ?? 0;
+               curPid = pp.parent;
+             }
              updateNode(node.id, {
                  parent: undefined,
-                 position: { x: (parentNode.position?.x ?? 0) + pos.x, y: (parentNode.position?.y ?? 0) + pos.y },
+                 position: { x: gx, y: gy },
                  caseId: undefined
              });
              resolveNodeOverlaps(node.id);
@@ -387,8 +449,23 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         nodesDraggable={true}
         elementsSelectable={true}
         proOptions={{ hideAttribution: true }}
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={null}
         onReconnect={(oldEdge, newConnection) => {
+          const currentNodes = useGraphStore.getState().nodes;
+          const srcNode = currentNodes.find(n => n.id === newConnection.source);
+          const tgtNode = currentNodes.find(n => n.id === newConnection.target);
+          if (srcNode && tgtNode && newConnection.sourceHandle && newConnection.targetHandle) {
+            const mismatch = validateConnection(
+              srcNode.type,
+              tgtNode.type,
+              newConnection.sourceHandle,
+              newConnection.targetHandle
+            );
+            if (mismatch) {
+              showTypeMismatch(mismatch);
+              return;
+            }
+          }
           const state = useGraphStore.getState();
           state.removeEdge(oldEdge.id);
           const sourceHandle = newConnection.sourceHandle;
@@ -421,7 +498,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
   );
 }
 
-// Wrapper component that provides ReactFlow context
 function GraphEditorWithProvider({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(() => void) | null> }) {
   return (
     <FlowContent onZoomFitRef={onZoomFitRef} />

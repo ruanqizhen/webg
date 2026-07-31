@@ -56,21 +56,21 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     label: 'Add',
     inputs: [{ name: 'A', type: 'number' }, { name: 'B', type: 'number' }],
     outputs: [{ name: 'result', type: 'number' }],
-    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A || 0) + Number(ctx.inputs.B || 0) } })
+    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A ?? 0) + Number(ctx.inputs.B ?? 0) } })
   },
   'math.subtract': {
     type: 'math.subtract',
     label: 'Subtract',
     inputs: [{ name: 'A', type: 'number' }, { name: 'B', type: 'number' }],
     outputs: [{ name: 'result', type: 'number' }],
-    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A || 0) - Number(ctx.inputs.B || 0) } })
+    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A ?? 0) - Number(ctx.inputs.B ?? 0) } })
   },
   'math.multiply': {
     type: 'math.multiply',
     label: 'Multiply',
     inputs: [{ name: 'A', type: 'number' }, { name: 'B', type: 'number' }],
     outputs: [{ name: 'result', type: 'number' }],
-    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A || 0) * Number(ctx.inputs.B || 1) } })
+    executor: (ctx) => ({ outputs: { result: Number(ctx.inputs.A ?? 0) * Number(ctx.inputs.B ?? 1) } })
   },
   'math.divide': {
     type: 'math.divide',
@@ -79,8 +79,10 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     outputs: [{ name: 'result', type: 'number' }],
     executor: (ctx) => {
       const b = Number(ctx.inputs.B);
-      if (b === 0) throw new Error("Division by zero");
-      return { outputs: { result: Number(ctx.inputs.A) / b } };
+      if (!isFinite(b) || b === 0) throw new Error("Division by zero");
+      const a = Number(ctx.inputs.A);
+      if (!isFinite(a)) throw new Error("Invalid dividend: not a finite number");
+      return { outputs: { result: a / b } };
     }
   },
 

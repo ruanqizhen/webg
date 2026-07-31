@@ -10,6 +10,7 @@ interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
   updateNode: (id: string, updates: Partial<NodeInstance>, skipHistory?: boolean) => void;
   removeNode: (id: string) => void;
+  removeNodes: (ids: string[]) => void;
 
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
@@ -89,7 +90,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
     removeNode: (id) => {
       saveToHistory();
       set((state) => {
-        // Recursively collect all descendant node IDs
         const idsToRemove = new Set<string>();
         const collectDescendants = (parentId: string) => {
           idsToRemove.add(parentId);
@@ -101,7 +101,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
         };
         collectDescendants(id);
 
-        // Clean up paired Shift Register if removing one of a pair
         const node = state.nodes.find(n => n.id === id);
         if (node?.type === 'io.shiftRegister' && node.params?.pairId) {
           const pairNode = state.nodes.find(n =>
@@ -114,6 +113,44 @@ export const useGraphStore = create<GraphState>((set, get) => {
           }
         }
 
+        const nodes = state.nodes.filter(n => !idsToRemove.has(n.id));
+        const edges = state.edges.filter(e => !idsToRemove.has(e.sourceNode) && !idsToRemove.has(e.targetNode));
+        const uiControls = state.uiControls.filter(c => !idsToRemove.has(c.bindingNodeId));
+        return { nodes, edges, uiControls };
+      });
+    },
+
+    // Batch remove — single history entry (fixes B19/B23 multi-history)
+    removeNodes: (ids: string[]) => {
+      if (ids.length === 0) return;
+      saveToHistory();
+      set((state) => {
+        const idsToRemove = new Set<string>();
+        const collectDescendants = (parentId: string) => {
+          idsToRemove.add(parentId);
+          for (const n of state.nodes) {
+            if (n.parent === parentId && !idsToRemove.has(n.id)) {
+              collectDescendants(n.id);
+            }
+          }
+        };
+        for (const id of ids) {
+          if (!idsToRemove.has(id)) collectDescendants(id);
+        }
+        // Include paired SRs for any SR in the set
+        for (const id of [...idsToRemove]) {
+          const node = state.nodes.find(n => n.id === id);
+          if (node?.type === 'io.shiftRegister' && node.params?.pairId) {
+            const pairNode = state.nodes.find(n =>
+              n.id !== id &&
+              n.type === 'io.shiftRegister' &&
+              n.params?.pairId === node.params.pairId
+            );
+            if (pairNode && !idsToRemove.has(pairNode.id)) {
+              collectDescendants(pairNode.id);
+            }
+          }
+        }
         const nodes = state.nodes.filter(n => !idsToRemove.has(n.id));
         const edges = state.edges.filter(e => !idsToRemove.has(e.sourceNode) && !idsToRemove.has(e.targetNode));
         const uiControls = state.uiControls.filter(c => !idsToRemove.has(c.bindingNodeId));
@@ -414,11 +451,11 @@ export const useGraphStore = create<GraphState>((set, get) => {
       const subControls = state.uiControls.filter(c => selectedIds.has(c.bindingNodeId));
 
       if (subNodes.length > 0) {
-        // Clone with zeroed positions and IDs for re-paste
+        // Preserve original IDs — pasteNodes will remap them to new IDs
         multiClipboard = {
-          nodes: subNodes.map(n => ({ ...n, id: '', position: { x: n.position?.x ?? 0, y: n.position?.y ?? 0 } })),
-          edges: subEdges.map(e => ({ ...e, id: '', sourceNode: '', targetNode: '' })),
-          uiControls: subControls.map(c => ({ ...c, id: '', bindingNodeId: '' })),
+          nodes: subNodes.map(n => deepClone(n)),
+          edges: subEdges.map(e => deepClone(e)),
+          uiControls: subControls.map(c => deepClone(c)),
         };
       }
     },
@@ -428,7 +465,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
         const idMap = new Map<string, string>();
         const newNodes: NodeInstance[] = [];
         const newControls: UIControl[] = [];
-        // Compute offset from top-left of clipboard group to center of paste position
         const minX = Math.min(...multiClipboard.nodes.map(n => n.position?.x ?? 0));
         const minY = Math.min(...multiClipboard.nodes.map(n => n.position?.y ?? 0));
         const offsetX = position.x - minX;
@@ -437,8 +473,9 @@ export const useGraphStore = create<GraphState>((set, get) => {
         saveToHistory();
 
         for (const n of multiClipboard.nodes) {
+          const origId = n.id;
           const newId = generateId();
-          idMap.set(n.id || '', newId);
+          idMap.set(origId, newId);
           newNodes.push({
             ...n,
             id: newId,
@@ -450,19 +487,26 @@ export const useGraphStore = create<GraphState>((set, get) => {
         }
 
         for (const c of multiClipboard.uiControls) {
-          const newCtrlId = generateId();
-          const newNodeId = idMap.get(c.bindingNodeId || '') || generateId();
-          newControls.push({ ...c, id: newCtrlId, bindingNodeId: newNodeId });
+          const mappedBindingId = idMap.get(c.bindingNodeId);
+          // Only create control if its terminal node was also in the clipboard
+          if (!mappedBindingId) continue;
+          newControls.push({ ...c, id: generateId(), bindingNodeId: mappedBindingId });
         }
 
-        const newEdges: Edge[] = multiClipboard.edges.map(e => ({
-          ...e,
-          id: generateId(),
-          sourceNode: idMap.get(e.sourceNode || '') || e.sourceNode,
-          targetNode: idMap.get(e.targetNode || '') || e.targetNode,
-        }));
+        // Only rebuild edges whose both endpoints were in the clipboard
+        const newEdges: Edge[] = [];
+        for (const e of multiClipboard.edges) {
+          const srcId = idMap.get(e.sourceNode);
+          const tgtId = idMap.get(e.targetNode);
+          if (!srcId || !tgtId) continue;
+          newEdges.push({
+            ...e,
+            id: generateId(),
+            sourceNode: srcId,
+            targetNode: tgtId,
+          });
+        }
 
-        // Also place single-node clipboard items
         set(state => ({
           nodes: [...state.nodes, ...newNodes],
           edges: [...state.edges, ...newEdges],
@@ -489,11 +533,11 @@ export const useGraphStore = create<GraphState>((set, get) => {
       if (historyStack.length === 0) return;
 
       const state = get();
-      const currentState: Graph = {
-        nodes: [...state.nodes],
-        edges: [...state.edges],
-        uiControls: [...state.uiControls]
-      };
+      const currentState: Graph = deepClone({
+        nodes: state.nodes,
+        edges: state.edges,
+        uiControls: state.uiControls
+      });
       redoStack.push(currentState);
 
       const previousState = historyStack.pop();
@@ -510,11 +554,11 @@ export const useGraphStore = create<GraphState>((set, get) => {
       if (redoStack.length === 0) return;
 
       const state = get();
-      const currentState: Graph = {
-        nodes: [...state.nodes],
-        edges: [...state.edges],
-        uiControls: [...state.uiControls]
-      };
+      const currentState: Graph = deepClone({
+        nodes: state.nodes,
+        edges: state.edges,
+        uiControls: state.uiControls
+      });
       historyStack.push(currentState);
 
       const nextState = redoStack.pop();
@@ -578,11 +622,14 @@ export const useGraphStore = create<GraphState>((set, get) => {
       const intervalId = setInterval(() => {
         get().saveToStorage();
       }, AUTO_SAVE_INTERVAL);
-      
+
       // Initial save after 2 seconds
-      setTimeout(() => get().saveToStorage(), 2000);
-      
-      return () => clearInterval(intervalId);
+      const timeoutId = setTimeout(() => get().saveToStorage(), 2000);
+
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+      };
     }
   };
 });

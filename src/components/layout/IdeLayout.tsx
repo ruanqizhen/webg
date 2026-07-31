@@ -13,6 +13,8 @@ import { useGraphStore } from '../../store/useGraphStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { ReactFlowProvider, useReactFlow } from 'reactflow';
+import { NodeRegistry } from '../../engine/registry';
+import { controlDefaults } from '../../lib/controlDefaults';
 
 export function IdeLayout() {
   return (
@@ -24,7 +26,6 @@ export function IdeLayout() {
 
 function IdeLayoutInner() {
   const { viewMode, setViewMode } = useUIStore();
-  const { addNode, addUIControl, updateNode, updateUIControl, uiControls, loadFromStorage, startAutoSave } = useGraphStore();
   const zoomFitRef = useRef<(() => void) | null>(null);
   const reactFlow = useReactFlow();
   const frontPanelRef = useRef<{ screenToPanelPosition: (x: number, y: number) => { x: number, y: number } }>(null);
@@ -74,14 +75,16 @@ function IdeLayoutInner() {
 
   // Load from storage on mount and start auto-save
   useEffect(() => {
-    loadFromStorage();
-    const cleanup = startAutoSave();
+    const graphStore = useGraphStore.getState();
+    graphStore.loadFromStorage();
+    const cleanup = graphStore.startAutoSave();
     return cleanup;
-  }, [loadFromStorage, startAutoSave]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    
+
     // 1. Logic Node Drop
     const nodeType = e.dataTransfer.getData('application/node-type');
     if (nodeType && viewMode === 'logic') {
@@ -89,31 +92,40 @@ function IdeLayoutInner() {
         x: e.clientX,
         y: e.clientY,
       });
-      
+
       const id = generateId();
-      
+
       const currentNodes = useGraphStore.getState().nodes;
       const structures = currentNodes.filter(n => String(n.type).startsWith('structure'));
-      
+
       let parent: string | undefined = undefined;
       let caseId: string | undefined = undefined;
       let localX = position.x;
       let localY = position.y;
-      
+
       const nodeCenterX = position.x + 60;
       const nodeCenterY = position.y + 30;
-      
+
       for (const s of structures) {
-          const sX = s.position?.x ?? 0;
-          const sY = s.position?.y ?? 0;
+          // Compute global position accumulating all ancestors
+          let gX = s.position?.x ?? 0;
+          let gY = s.position?.y ?? 0;
+          let curParent: string | undefined = s.parent;
+          while (curParent) {
+            const p = currentNodes.find(n => n.id === curParent);
+            if (!p) break;
+            gX += p.position?.x ?? 0;
+            gY += p.position?.y ?? 0;
+            curParent = p.parent;
+          }
           const sW = s.width || 300;
           const sH = s.height || 200;
-          if (nodeCenterX > sX && nodeCenterX < sX + sW &&
-              nodeCenterY > sY && nodeCenterY < sY + sH) {
+          if (nodeCenterX > gX && nodeCenterX < gX + sW &&
+              nodeCenterY > gY && nodeCenterY < gY + sH) {
              const isCaseStructure = s.type === 'structure.case';
              parent = s.id;
-             localX = position.x - sX;
-             localY = position.y - sY;
+             localX = position.x - gX;
+             localY = position.y - gY;
              caseId = isCaseStructure ? s.params?.activeCase : undefined;
              break;
           }
@@ -122,23 +134,31 @@ function IdeLayoutInner() {
       // Check for Array Constant intersection
       const arrayNodes = currentNodes.filter(n => n.type === 'source.array');
       for (const an of arrayNodes) {
-          const sX = an.position?.x ?? 0;
-          const sY = an.position?.y ?? 0;
+          let anGX = an.position?.x ?? 0;
+          let anGY = an.position?.y ?? 0;
+          let anP: string | undefined = an.parent;
+          while (anP) {
+            const p = currentNodes.find(n => n.id === anP);
+            if (!p) break;
+            anGX += p.position?.x ?? 0;
+            anGY += p.position?.y ?? 0;
+            anP = p.parent;
+          }
           const sW = an.width || 120;
           const sH = an.height || 60;
-          
-          if (nodeCenterX > sX && nodeCenterX < sX + sW &&
-              nodeCenterY > sY && nodeCenterY < sY + sH) {
-              
-              if (nodeType === 'source.array') return; // no 2D array yet
-              if (!nodeType.startsWith('source.')) return; // Only allow constants
+
+          if (nodeCenterX > anGX && nodeCenterX < anGX + sW &&
+              nodeCenterY > anGY && nodeCenterY < anGY + sH) {
+
+              if (nodeType === 'source.array') return;
+              if (!nodeType.startsWith('source.')) return;
 
               let pType = 'any';
               if (nodeType === 'source.number') pType = 'number';
               if (nodeType === 'source.boolean') pType = 'boolean';
               if (nodeType === 'source.string') pType = 'string';
 
-              updateNode(an.id, {
+              useGraphStore.getState().updateNode(an.id, {
                   params: { ...an.params, elementType: nodeType },
                   outputs: [{ name: 'value', type: `${pType}[]`, direction: 'output', id: 'value' }]
               });
@@ -146,7 +166,16 @@ function IdeLayoutInner() {
           }
       }
 
-      addNode({
+      // Build default params from registry so e.g. Number Constant gets value=0 not undefined
+      const nodeDef = NodeRegistry[nodeType];
+      const defaultParams: Record<string, any> = {};
+      if (nodeDef?.params) {
+        for (const p of nodeDef.params) {
+          defaultParams[p.name] = p.defaultValue;
+        }
+      }
+
+      useGraphStore.getState().addNode({
         id,
         type: nodeType,
         position: { x: localX, y: localY },
@@ -154,9 +183,9 @@ function IdeLayoutInner() {
         caseId,
         inputs: [],
         outputs: [],
-        params: {}
+        params: defaultParams
       });
-      
+
       resolveNodeOverlaps(id);
       return;
     }
@@ -164,7 +193,12 @@ function IdeLayoutInner() {
     // 2. UI Control Drop
     const controlDataRaw = e.dataTransfer.getData('application/ui-control');
     if (controlDataRaw && viewMode === 'ui') {
-      const controlDef = JSON.parse(controlDataRaw);
+      let controlDef: any;
+      try {
+        controlDef = JSON.parse(controlDataRaw);
+      } catch {
+        return;
+      }
       const pos = frontPanelRef.current?.screenToPanelPosition(e.clientX, e.clientY);
       if (!pos) return;
 
@@ -178,7 +212,7 @@ function IdeLayoutInner() {
       const terminalDef: any = {
         id: termId,
         type: 'io.terminal',
-        position: { x: Math.random() * 200 + 50, y: Math.random() * 200 + 50 },
+        position: { x: 100, y: 100 },
         inputs: [],
         outputs: [],
         params: { value: controlDef.type === 'button' ? false : 0 }
@@ -197,24 +231,10 @@ function IdeLayoutInner() {
         terminalDef.outputs = [{ name: 'output', type: portType, direction: 'output', id: 'output' }];
       }
 
-      // Default properties for different control types
-      const controlDefaults: Record<string, any> = {
-        numberInput: { min: 0, max: 100, step: 1, defaultValue: 0 },
-        button: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
-        numberIndicator: { defaultValue: 0 },
-        textLabel: { defaultValue: '' },
-        gauge: { min: 0, max: 100, colorOn: '#4CAF50', defaultValue: 0 },
-        indicatorLight: { colorOn: '#4CAF50', colorOff: '#cccccc', defaultValue: false },
-        slider: { min: 0, max: 100, step: 1, defaultValue: 0, width: 160, height: 40 },
-        knob: { min: 0, max: 100, step: 1, defaultValue: 0, width: 80, height: 80 },
-        tank: { min: 0, max: 100, colorOn: '#3B82F6', defaultValue: 0, width: 60, height: 160 },
-        array: { defaultValue: [], width: 120, height: 60 }
-      };
-
       // Check if we are dropping ON an existing Array UI Control
-      const targetArrayControl = uiControls.find(c => {
+      const currentControls = useGraphStore.getState().uiControls;
+      const targetArrayControl = currentControls.find(c => {
           if (c.type !== 'array') return false;
-          // Only allow dropping indicator into array indicator, or control into array control
           if (c.direction !== direction) return false;
           const cx = c.x ?? 50;
           const cy = c.y ?? 50;
@@ -224,9 +244,9 @@ function IdeLayoutInner() {
       });
 
       if (targetArrayControl) {
-          if (controlDef.type === 'array') return; // no 2D array yet
-          
-          updateUIControl(targetArrayControl.id, { 
+          if (controlDef.type === 'array') return;
+
+          useGraphStore.getState().updateUIControl(targetArrayControl.id, {
               elementDef: {
                  ...controlDef,
                  defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
@@ -241,20 +261,20 @@ function IdeLayoutInner() {
               width: Math.max(targetArrayControl.width || 120, 46 + (controlDefaults[controlDef.type]?.width || (controlDef.type === 'button' ? 80 : 140))),
               height: Math.max(targetArrayControl.height || 60, controlDefaults[controlDef.type]?.height || 60)
           });
-          
+
           const currentTerminal = useGraphStore.getState().nodes.find(n => n.id === targetArrayControl.bindingNodeId);
           if (currentTerminal) {
               const newInputs = currentTerminal.inputs.map(p => ({ ...p, type: `${portType}[]` }));
               const newOutputs = currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` }));
-              updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
+              useGraphStore.getState().updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
           }
           return;
       }
 
-      const existingLabels = uiControls.map(c => c.label);
+      const existingLabels = currentControls.map(c => c.label);
       const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);
 
-      addUIControl({
+      useGraphStore.getState().addUIControl({
         id: ctrlId,
         type: controlDef.type,
         direction,
@@ -272,7 +292,7 @@ function IdeLayoutInner() {
         colorOff: controlDefaults[controlDef.type]?.colorOff,
       }, terminalDef);
     }
-  }, [addNode, addUIControl, viewMode, reactFlow]);
+  }, [viewMode, reactFlow]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

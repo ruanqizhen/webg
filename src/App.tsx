@@ -1,3 +1,4 @@
+import './App.css';
 import { IdeLayout } from './components/layout/IdeLayout';
 
 function App() {

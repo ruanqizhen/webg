@@ -129,34 +129,49 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   };
 
   const handleSave = () => {
-    const graph = exportGraph();
-    const fileData = {
-      version: "1.1",
-      graph: graph,
-      ui: {
-        panelLayout: {},
-        viewport: {}
-      }
-    };
-    const blob = new Blob([JSON.stringify(fileData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'project.webg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const graph = exportGraph();
+      const fileData = {
+        version: "1.1",
+        graph: graph,
+        ui: {
+          panelLayout: {},
+          viewport: {}
+        }
+      };
+      const json = JSON.stringify(fileData, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `project_${new Date().toISOString().slice(0,10)}.webg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Delay revoke to avoid interrupting download in some browsers
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err: any) {
+      console.error('Failed to save project:', err);
+      alert('Failed to save project: ' + (err?.message || 'Unknown error'));
+    }
   };
 
   const handleLoad = () => {
     fileInputRef.current?.click();
   };
 
+  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`File too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_FILE_SIZE/1024/1024}MB.`);
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {

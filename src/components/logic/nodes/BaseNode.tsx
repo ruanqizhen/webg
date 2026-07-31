@@ -282,8 +282,8 @@ function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, sel
        <div className="flex-1 flex items-center justify-center p-1 relative overflow-hidden bg-[#fff]">
           {elementType ? (
              <div className="w-full h-full relative" onContextMenu={e => e.stopPropagation()}>
-               {elementType === 'source.number' && <input type="number" value={innerVal || ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full text-center bg-[#FFECB3] border border-[#FFCA28] text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 nodrag" />}
-               {elementType === 'source.string' && <input type="text" value={innerVal || ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full px-1 text-left bg-[#FCE4EC] border border-[#F48FB1] text-xs font-mono focus:outline-none focus:ring-1 focus:ring-pink-500 nodrag" />}
+               {elementType === 'source.number' && <input type="number" value={innerVal ?? ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full text-center bg-[#FFECB3] border border-[#FFCA28] text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 nodrag" />}
+               {elementType === 'source.string' && <input type="text" value={innerVal ?? ''} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="w-full h-full px-1 text-left bg-[#FCE4EC] border border-[#F48FB1] text-xs font-mono focus:outline-none focus:ring-1 focus:ring-pink-500 nodrag" />}
                {elementType === 'source.boolean' && <label className="w-full h-full flex items-center justify-center bg-[#E8F5E9] border border-[#A5D6A7] cursor-pointer nodrag"><input type="checkbox" checked={!!innerVal} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="mr-1" /><span className="text-[10px] font-bold text-green-800">{innerVal ? 'T' : 'F'}</span></label>}
              </div>
           ) : (

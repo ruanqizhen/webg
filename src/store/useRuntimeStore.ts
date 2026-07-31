@@ -66,16 +66,18 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
     // Wait for user to continue (for step mode or breakpoint)
     waitForStep: () => {
       return new Promise<void>((resolve, reject) => {
-        // Clean up any existing resolver first (race condition fix)
-        if (stepResolver) {
-          stepResolver();
+        // Reject any existing waiter — do not silently continue past a breakpoint
+        if (stepResolver && stepRejecter) {
+          try { stepRejecter(new Error('superseded')); } catch { /* ignore */ }
+          stepResolver = null;
+          stepRejecter = null;
         }
         stepResolver = resolve;
         stepRejecter = reject;
         set({ isPaused: true });
       });
     },
-    
+
     // Continue execution (called from toolbar)
     continueExecution: () => {
       if (stepResolver) {
@@ -87,14 +89,14 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => {
       }
       set({ isPaused: false, currentStepNode: null });
     },
-    
+
     resetDebug: () => {
-      if (stepResolver) {
-        stepResolver();
-        stepResolver = null;
-      }
       if (stepRejecter) {
+        try { stepRejecter(new Error('reset')); } catch { /* ignore */ }
         stepRejecter = null;
+      }
+      if (stepResolver) {
+        stepResolver = null;
       }
       set({ isStepMode: false, isPaused: false, currentStepNode: null });
     },

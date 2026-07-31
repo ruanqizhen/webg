@@ -57,6 +57,7 @@ export function NodeSearch({ isOpen, onClose, onFocusNode }: NodeSearchProps) {
   );
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   return createPortal(
     <>

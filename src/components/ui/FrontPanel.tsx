@@ -5,7 +5,9 @@ import { useRuntimeStore } from '../../store/useRuntimeStore';
 import type { UIControl } from '../../types/graph';
 
 function Gauge({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
-  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  const rawRange = max - min;
+  const range = rawRange === 0 ? 1 : rawRange;
+  const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
   const rotation = percentage * 1.8 - 90; // -90 to 90 degrees
 
   return (
@@ -94,7 +96,9 @@ function Gauge({ value, min, max, color }: { value: number; min: number; max: nu
 }
 
 function Knob({ value, min, max, onChange, disabled }: { value: number; min: number; max: number; onChange?: (v: number) => void; disabled?: boolean }) {
-  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  const rawRange = max - min;
+  const range = rawRange === 0 ? 1 : rawRange;
+  const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
   const rotation = percentage * 2.7 - 135; // mapping 0-100% to -135deg to +135deg
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -140,7 +144,9 @@ function Knob({ value, min, max, onChange, disabled }: { value: number; min: num
 }
 
 function Tank({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
-  const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  const rawRange = max - min;
+  const range = rawRange === 0 ? 1 : rawRange;
+  const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
   
   return (
     <div className="relative w-full max-w-[60%] h-full min-h-[50px] bg-gray-200 rounded-md border-[3px] border-[#9ca3af] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-end mx-auto">
@@ -228,7 +234,7 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
          <div className="bg-[#111] px-3 py-2 text-xl rounded shadow-[inset_0_4px_10px_rgba(0,0,0,1)] border-b border-r border-gray-500 border-t-2 border-l-2 border-t-black border-l-black text-right font-mono flex-1 flex items-center justify-end overflow-hidden relative">
            <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
            <span className="text-[#39ff14] drop-shadow-[0_0_8px_rgba(57,255,20,0.9)] z-10 select-all">
-             {Number(displayVal || 0).toFixed(2)}
+             {Number(displayVal ?? 0).toFixed(2)}
            </span>
          </div>
       )}
@@ -239,7 +245,7 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
            <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-12"></div></div>
            <div className="absolute left-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-45"></div></div>
            <div className="absolute right-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 rotate-12"></div></div>
-           <span className="relative z-10 pointer-events-none drop-shadow-sm select-all">{String(displayVal || '')}</span>
+           <span className="relative z-10 pointer-events-none drop-shadow-sm select-all">{String(displayVal ?? '')}</span>
          </div>
       )}
 
@@ -322,7 +328,7 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
              </div>
              <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0" style={{ fontSize: `${Math.max(9, height * 0.15)}px` }}>
                  <span className="text-gray-400">{min ?? 0}</span>
-                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal || 0).toFixed(1)}</span>
+                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal ?? 0).toFixed(1)}</span>
                  <span className="text-gray-400">{max ?? 100}</span>
              </div>
          </div>
@@ -362,82 +368,100 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
 function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
   const { updateUIControl, updateNode, pushHistory } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
-  
+
   const terminalId = control.bindingNodeId;
   const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
   const [isDragging, setIsDragging] = useState(false);
   const [resizeMode, setResizeMode] = useState<string | null>(null);
-  const dragRef = useRef<{ pointerId: number | null; element: EventTarget | null }>({ pointerId: null, element: null });
+  const dragMetaRef = useRef<{
+    pointerId: number | null;
+    element: EventTarget | null;
+    clientX: number;
+    clientY: number;
+    origX: number;
+    origY: number;
+    origW: number;
+    origH: number;
+  }>({ pointerId: null, element: null, clientX: 0, clientY: 0, origX: 0, origY: 0, origW: 0, origH: 0 });
   const originalPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
     setSelectedControlId(control.id);
-    pushHistory(); // Save state before starting drag
+    pushHistory();
     setIsDragging(true);
     setResizeMode(null);
-    dragRef.current.pointerId = e.pointerId;
-    dragRef.current.element = e.currentTarget;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    
-    // Save original position for bounce back
+    dragMetaRef.current.pointerId = e.pointerId;
+    dragMetaRef.current.element = e.currentTarget;
+    dragMetaRef.current.clientX = e.clientX;
+    dragMetaRef.current.clientY = e.clientY;
+    dragMetaRef.current.origX = control.x ?? 50;
+    dragMetaRef.current.origY = control.y ?? 50;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
     originalPosRef.current = { x: control.x ?? 50, y: control.y ?? 50 };
   };
 
   const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
     e.stopPropagation();
     setSelectedControlId(control.id);
-    pushHistory(); // Save state before starting resize
+    pushHistory();
     setIsDragging(true);
     setResizeMode(mode);
-    dragRef.current.pointerId = e.pointerId;
-    dragRef.current.element = e.currentTarget;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    dragMetaRef.current.pointerId = e.pointerId;
+    dragMetaRef.current.element = e.currentTarget;
+    dragMetaRef.current.clientX = e.clientX;
+    dragMetaRef.current.clientY = e.clientY;
+    dragMetaRef.current.origW = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
+    dragMetaRef.current.origH = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (isDragging) {
-      if (!resizeMode) {
-        updateUIControl(control.id, {
-          x: (control.x || 0) + e.movementX / transform.scale,
-          y: (control.y || 0) + e.movementY / transform.scale,
-        }, true); // skipHistory during drag
-      } else {
-        const currentWidth = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
-        const currentHeight = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
-        
-        let newWidth = currentWidth;
-        let newHeight = currentHeight;
-        
-        if (resizeMode.includes('e')) newWidth = Math.max(30, currentWidth + e.movementX / transform.scale);
-        if (resizeMode.includes('s')) newHeight = Math.max(30, currentHeight + e.movementY / transform.scale);
-        
-        updateUIControl(control.id, {
-          width: newWidth,
-          height: newHeight,
-        }, true); // skipHistory during resize
-      }
+    if (!isDragging) return;
+    const dx = e.clientX - dragMetaRef.current.clientX;
+    const dy = e.clientY - dragMetaRef.current.clientY;
+    if (!resizeMode) {
+      // Use accumulated delta from drag start for stability with pointer capture
+      const totalDx = e.clientX - dragMetaRef.current.clientX;
+      const totalDy = e.clientY - dragMetaRef.current.clientY;
+      updateUIControl(control.id, {
+        x: dragMetaRef.current.origX + totalDx / transform.scale,
+        y: dragMetaRef.current.origY + totalDy / transform.scale,
+      }, true);
+    } else {
+      let newWidth = dragMetaRef.current.origW;
+      let newHeight = dragMetaRef.current.origH;
+
+      if (resizeMode.includes('e')) newWidth = Math.max(30, dragMetaRef.current.origW + dx / transform.scale);
+      if (resizeMode.includes('s')) newHeight = Math.max(30, dragMetaRef.current.origH + dy / transform.scale);
+
+      updateUIControl(control.id, {
+        width: newWidth,
+        height: newHeight,
+      }, true);
     }
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
     setIsDragging(false);
     setResizeMode(null);
-    dragRef.current.pointerId = null;
-    dragRef.current.element = null;
+    const meta = dragMetaRef.current;
+    meta.pointerId = null;
+    meta.element = null;
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (err) {}
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
 
-    // Overlap resolution and Array absorption logic
-    if (isDragging && !resizeMode && originalPosRef.current) {
+    if (!resizeMode && originalPosRef.current) {
         const myX = control.x ?? 50;
         const myY = control.y ?? 50;
         const myW = width;
         const myH = height;
-        
+
         const allControls = useGraphStore.getState().uiControls;
         const allNodes = useGraphStore.getState().nodes;
-        
+
         let overlappingArray: UIControl | null = null;
         let hasOverlap = false;
 
@@ -447,7 +471,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
             const oY = other.y ?? 50;
             const oW = other.width || (other.type === 'gauge' ? 120 : other.type === 'indicatorLight' || other.type === 'button' ? 80 : 140);
             const oH = other.height || (other.type === 'gauge' ? 100 : other.type === 'indicatorLight' || other.type === 'button' ? 60 : 60);
-            
+
             if (myX < oX + oW && myX + myW > oX && myY < oY + oH && myY + myH > oY) {
                 hasOverlap = true;
                 if (other.type === 'array' && other.direction === control.direction && control.type !== 'array') {
@@ -458,23 +482,22 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
         }
 
         if (overlappingArray) {
-            // Absorb into array!
             const getPortType = (type: string) => {
                 if (type === 'button' || type === 'indicatorLight') return 'boolean';
                 if (type === 'textLabel') return 'string';
                 return 'number';
             };
             const portType = getPortType(control.type);
-            
+
             updateUIControl(overlappingArray.id, {
                 elementDef: {
                     ...control,
-                    id: undefined // Let it be a template
+                    id: undefined
                 },
                 width: Math.max(overlappingArray.width || 120, 46 + myW),
                 height: Math.max(overlappingArray.height || 60, myH)
             });
-            
+
             const currentTerminal = allNodes.find(n => n.id === overlappingArray!.bindingNodeId);
             if (currentTerminal) {
                 const isIndicator = overlappingArray!.direction === 'indicator';
@@ -483,22 +506,25 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
                 useGraphStore.getState().updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
             }
 
-            // Remove the dragged control from the graph entirely
+            // Remove dragged control and its terminal — also cleans its edges via removeNode
             useGraphStore.getState().removeNode(control.bindingNodeId);
         } else if (hasOverlap) {
-            // Bounce! Revert to original position
-            updateUIControl(control.id, { x: originalPosRef.current.x, y: originalPosRef.current.y }, true);
+            updateUIControl(control.id, { x: originalPosRef.current!.x, y: originalPosRef.current!.y }, true);
         }
     }
   };
 
-  // Cleanup on unmount
+  // Cleanup on unmount — snapshot element ref to avoid stale closure warning
+  const cleanupElementRef = useRef<EventTarget | null>(null);
   useEffect(() => {
+    cleanupElementRef.current = dragMetaRef.current.element;
     return () => {
-      if (dragRef.current.element && dragRef.current.pointerId !== null) {
+      const el = dragMetaRef.current.element;
+      const pid = dragMetaRef.current.pointerId;
+      if (el && pid !== null) {
         try {
-          (dragRef.current.element as HTMLElement).releasePointerCapture(dragRef.current.pointerId);
-        } catch (err) {
+          (el as HTMLElement).releasePointerCapture(pid);
+        } catch {
           // Ignore
         }
       }
@@ -655,14 +681,16 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isPanning, setIsPanning] = useState(false);
   const internalRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ clientX: number; clientY: number; tx: number; ty: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
     screenToPanelPosition: (screenX: number, screenY: number) => {
       const rect = internalRef.current?.getBoundingClientRect();
       if (!rect) return { x: screenX, y: screenY };
+      const safeScale = transform.scale === 0 ? 1 : transform.scale;
       return {
-        x: (screenX - rect.left - transform.x) / transform.scale,
-        y: (screenY - rect.top - transform.y) / transform.scale
+        x: (screenX - rect.left - transform.x) / safeScale,
+        y: (screenY - rect.top - transform.y) / safeScale
       };
     }
   }));
@@ -679,13 +707,12 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
       const zoomFactor = Math.pow(0.999, e.deltaY);
       const newScale = Math.max(0.1, Math.min(5, transform.scale * zoomFactor));
 
-      // Adjust x and y to zoom at mouse position
-      const newX = mouseX - (mouseX - transform.x) * (newScale / transform.scale);
-      const newY = mouseY - (mouseY - transform.y) * (newScale / transform.scale);
+      const safeScale = transform.scale === 0 ? 1 : transform.scale;
+      const newX = mouseX - (mouseX - transform.x) * (newScale / safeScale);
+      const newY = mouseY - (mouseY - transform.y) * (newScale / safeScale);
 
       setTransform({ x: newX, y: newY, scale: newScale });
     } else {
-      // Normal scroll translates
       setTransform(t => ({
         ...t,
         x: t.x - e.deltaX,
@@ -697,40 +724,48 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.target === e.currentTarget) {
       setSelectedControlId(null);
-      if (e.button === 0 || e.button === 1) { // Left or middle click on background
+      if (e.button === 0 || e.button === 1) {
           setIsPanning(true);
+          panRef.current = { clientX: e.clientX, clientY: e.clientY, tx: transform.x, ty: transform.y };
           e.currentTarget.setPointerCapture(e.pointerId);
       }
     }
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (isPanning) {
-      setTransform(t => ({
-        ...t,
-        x: t.x + e.movementX,
-        y: t.y + e.movementY
-      }));
+    if (isPanning && panRef.current) {
+      const dx = e.clientX - panRef.current.clientX;
+      const dy = e.clientY - panRef.current.clientY;
+      setTransform({
+        x: panRef.current.tx + dx,
+        y: panRef.current.ty + dy,
+        scale: transform.scale
+      });
     }
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
     if (isPanning) {
       setIsPanning(false);
+      panRef.current = null;
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch (err) { /* Ignore */ }
+      } catch { /* Ignore */ }
+    }
+  };
+
+  const panelCallbackRef = (node: HTMLDivElement | null) => {
+    internalRef.current = node;
+    // containerRef is a mutable ref object passed from parent — sync its .current
+    if (containerRef) {
+      // eslint-disable-next-line react-hooks/immutability
+      (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
     }
   };
 
   return (
-    <div 
-      ref={(node) => {
-        internalRef.current = node;
-        if (containerRef) {
-          (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-        }
-      }}
+    <div
+      ref={panelCallbackRef}
       className={`w-full h-full relative overflow-hidden flex-grow select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         backgroundColor: '#f8fafc',

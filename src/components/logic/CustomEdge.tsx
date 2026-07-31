@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { BaseEdge, getBezierPath } from 'reactflow';
 import type { EdgeProps } from 'reactflow';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -5,6 +6,67 @@ import { getTypeColor, isTypeArray } from '../../lib/colors';
 import { NodeRegistry } from '../../engine/registry';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
+import type { NodeInstance, Edge, UIControl } from '../../types/graph';
+
+function resolveEdgeVisuals(
+  source: string,
+  sourceHandleId: string | null | undefined,
+  allNodes: NodeInstance[],
+  allEdges: Edge[],
+  allUiControls: UIControl[]
+) {
+  let strokeColor = '#b1b1b7';
+  let isArrayBase = false;
+  let arrayModifiers = 0;
+  let currId = source;
+  let currPort: string | null | undefined = sourceHandleId ?? null;
+
+  for (let i = 0; i < 50; i++) {
+    const currNode = allNodes.find(n => n.id === currId);
+    if (!currNode) break;
+
+    if (currNode.type === 'io.tunnel' || currNode.type === 'io.shiftRegister') {
+      const parentNode = currNode.parent ? allNodes.find(n => n.id === currNode.parent) : null;
+      const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
+      const isIndexing =
+        currNode.type === 'io.tunnel' ? (currNode.params?.indexing ?? (isInLoop ? true : false)) : false;
+
+      if (isIndexing && parentNode) {
+        const pW = parentNode.width || 300;
+        const isInputTunnel = (currNode.position?.x ?? 0) < pW / 2;
+        if (isInputTunnel) arrayModifiers--;
+        else arrayModifiers++;
+      }
+
+      const inEdge = allEdges.find(e => e.targetNode === currId);
+      if (!inEdge) break;
+      currId = inEdge.sourceNode;
+      currPort = inEdge.sourcePort;
+    } else {
+      const def = NodeRegistry[currNode.type];
+      if (def) {
+        const nodeOutputs =
+          currNode.outputs && currNode.outputs.length > 0 ? currNode.outputs : (def.outputs || []);
+        const portDef = nodeOutputs.find((p: { name: string; type: string }) => p.name === currPort);
+        if (portDef) {
+          strokeColor = getTypeColor(portDef.type);
+          isArrayBase = isTypeArray(portDef.type);
+        }
+        if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
+          strokeColor = '#1565C0';
+        }
+        if (currNode.type === 'io.terminal') {
+          const ctrl = allUiControls.find(c => c.bindingNodeId === currNode.id);
+          if (ctrl?.numberType === 'integer') {
+            strokeColor = '#1565C0';
+          }
+        }
+      }
+      break;
+    }
+  }
+  return { strokeColor, isArrayBase, arrayModifiers };
+}
 
 export function CustomEdge({
   source,
@@ -33,57 +95,15 @@ export function CustomEdge({
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
-  const allNodes = useGraphStore.getState().nodes;
-  const allEdges = useGraphStore.getState().edges;
-  const allUiControls = useGraphStore.getState().uiControls;
-  let strokeColor = '#b1b1b7';
-  let isArrayBase = false;
-  let arrayModifiers = 0;
-  let currId = source;
-  let currPort = sourceHandleId;
+  // Subscribe so color updates reactively when node types change
+  const allNodes = useGraphStore((s) => s.nodes);
+  const allEdges = useGraphStore((s) => s.edges);
+  const allUiControls = useGraphStore((s) => s.uiControls);
 
-  for (let i = 0; i < 50; i++) {
-     const currNode = allNodes.find(n => n.id === currId);
-     if (!currNode) break;
-
-     if (currNode.type === 'io.tunnel' || currNode.type === 'io.shiftRegister') {
-        const parentNode = currNode.parent ? allNodes.find(n => n.id === currNode.parent) : null;
-        const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
-        const isIndexing = currNode.type === 'io.tunnel' ? (currNode.params?.indexing ?? (isInLoop ? true : false)) : false;
-
-        if (isIndexing && parentNode) {
-            const pW = parentNode.width || 300;
-            const isInputTunnel = (currNode.position?.x ?? 0) < pW / 2;
-            if (isInputTunnel) arrayModifiers--;
-            else arrayModifiers++;
-        }
-
-        const inEdge = allEdges.find(e => e.targetNode === currId);
-        if (!inEdge) break;
-        currId = inEdge.sourceNode;
-        currPort = inEdge.sourcePort;
-     } else {
-        const def = NodeRegistry[currNode.type];
-        if (def) {
-           const nodeOutputs = (currNode.outputs && currNode.outputs.length > 0) ? currNode.outputs : (def.outputs || []);
-           const portDef = nodeOutputs.find((p: { name: string; type: string }) => p.name === currPort);
-           if (portDef) {
-               strokeColor = getTypeColor(portDef.type);
-               isArrayBase = isTypeArray(portDef.type);
-           }
-           if (currNode.type === 'source.number' && currNode.params?.numberType === 'integer') {
-              strokeColor = '#1565C0';
-           }
-           if (currNode.type === 'io.terminal') {
-              const ctrl = allUiControls.find((c) => c.bindingNodeId === currNode.id);
-              if (ctrl?.numberType === 'integer') {
-                 strokeColor = '#1565C0';
-              }
-           }
-        }
-        break;
-     }
-  }
+  const { strokeColor, isArrayBase, arrayModifiers } = useMemo(
+    () => resolveEdgeVisuals(source, sourceHandleId, allNodes, allEdges, allUiControls),
+    [source, sourceHandleId, allNodes, allEdges, allUiControls]
+  );
 
   const isSelected = selectedEdgeId === id;
   const isArray = (isArrayBase ? 1 : 0) + arrayModifiers > 0;

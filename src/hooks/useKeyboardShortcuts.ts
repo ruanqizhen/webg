@@ -91,7 +91,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
             if (structureNodes.length > 0) {
               if (!window.confirm(`Delete ${structureNodes.length} structure node(s)? All internal nodes and connections will be permanently removed.`)) return;
             }
-            selectedNodeIds.forEach((id) => store.removeNode(id));
+            store.removeNodes(selectedNodeIds);
             useUIStore.getState().clearSelection();
           } else if (selectedNodeId) {
             e.preventDefault();

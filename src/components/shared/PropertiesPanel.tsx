@@ -4,7 +4,7 @@ import { NodeRegistry } from '../../engine/registry';
 
 export function PropertiesPanel() {
   const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
-  const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge, removeNode } = useGraphStore();
+  const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge } = useGraphStore();
 
   const activeNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
   const activeControl = selectedControlId ? uiControls.find(c => c.id === selectedControlId) : null;
@@ -81,7 +81,7 @@ export function PropertiesPanel() {
                           } 
                         });
 
-                        // Clean up orphaned nodes whose caseId is no longer valid
+                        // Clean up orphaned nodes whose caseId is no longer valid — batch as single history entry
                         const removedCases = new Set(
                           (activeNode.params.cases || []).filter((c: string) => !finalCases.includes(c))
                         );
@@ -89,7 +89,9 @@ export function PropertiesPanel() {
                           const orphans = nodes.filter(
                             n => n.parent === activeNode.id && n.caseId && removedCases.has(n.caseId)
                           );
-                          orphans.forEach(n => removeNode(n.id));
+                          if (orphans.length > 0) {
+                            useGraphStore.getState().removeNodes(orphans.map(n => n.id));
+                          }
                         }
                       }}
                       placeholder="true, false"
