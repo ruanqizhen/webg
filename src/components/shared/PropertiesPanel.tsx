@@ -40,6 +40,50 @@ export function PropertiesPanel() {
                  <div className="font-mono text-[10px] text-muted-foreground break-all">{activeNode.id}</div>
               </FieldGroup>
 
+              {/* For Loop specific */}
+              {activeNode.type === 'structure.forLoop' && (
+                <>
+                  <FieldGroup>
+                    <FieldLabel className="flex items-center gap-2">For Loop Options</FieldLabel>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input type="checkbox" checked={!!activeNode.params.hasConditional} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, hasConditional: e.target.checked } })} className="w-4 h-4 rounded border-input" />
+                      Enable Conditional Terminal
+                    </label>
+                  </FieldGroup>
+                  {activeNode.params.hasConditional && (
+                    <FieldGroup>
+                      <FieldLabel>Conditional Mode</FieldLabel>
+                      <FieldSelect value={activeNode.params.conditionalMode || 'stopIfTrue'} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, conditionalMode: e.target.value } })}>
+                        <option value="stopIfTrue">Stop if True (break when true)</option>
+                        <option value="continueIfTrue">Continue if True (break when false)</option>
+                      </FieldSelect>
+                    </FieldGroup>
+                  )}
+                  <FieldGroup>
+                    <FieldLabel>Max Iterations (0 = unlimited)</FieldLabel>
+                    <FieldInput type="number" value={activeNode.params.maxIterations ?? ''} placeholder="0 = no limit" onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: e.target.value ? Number(e.target.value) : 0 } })} />
+                  </FieldGroup>
+                </>
+              )}
+
+              {/* While Loop specific */}
+              {activeNode.type === 'structure.whileLoop' && (
+                <>
+                  <FieldGroup>
+                    <FieldLabel>Condition Mode</FieldLabel>
+                    <FieldSelect value={activeNode.params.conditionMode || 'stopIfTrue'} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, conditionMode: e.target.value } })}>
+                      <option value="stopIfTrue">Stop if True (default)</option>
+                      <option value="continueIfTrue">Continue if True</option>
+                    </FieldSelect>
+                    <span className="text-[11px] text-muted-foreground">Stop if True = loop stops when condition is true. Continue if True = loop stops when false.</span>
+                  </FieldGroup>
+                  <FieldGroup>
+                    <FieldLabel>Max Iterations (safety)</FieldLabel>
+                    <FieldInput type="number" value={activeNode.params.maxIterations ?? 100000} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: e.target.value ? Number(e.target.value) : 100000 } })} />
+                  </FieldGroup>
+                </>
+              )}
+
               {isCaseStructure && (
                 <>
                   <FieldGroup>

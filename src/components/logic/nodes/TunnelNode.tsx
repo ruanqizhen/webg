@@ -33,9 +33,12 @@ export function TunnelNode({ id, selected }: NodeProps) {
     return undefined;
   });
   const isInLoop = parentNode?.type === 'structure.forLoop' || parentNode?.type === 'structure.whileLoop';
+  const isForLoop = parentNode?.type === 'structure.forLoop';
 
   const isShiftRegister = node?.type === 'io.shiftRegister';
-  const isIndexing = isShiftRegister ? false : (node?.params?.indexing ?? (isInLoop ? true : false));
+  // LabVIEW: For Loop tunnels default indexing=true, While Loop default false
+  const defaultIndexing = isInLoop ? (isForLoop ? true : false) : false;
+  const isIndexing = isShiftRegister ? false : (node?.params?.indexing ?? defaultIndexing);
   const side = isShiftRegister ? (node?.params?.side || 'left') : 'left';
   const isLeft = side === 'left';
 
@@ -184,12 +187,22 @@ export function TunnelNode({ id, selected }: NodeProps) {
                 <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={replaceWithShiftRegister}>
                   <span className="text-sm font-medium w-4 text-center">↻</span>Replace with Shift Register
                 </button>
+                <div className="h-px bg-border my-1 mx-2" />
+                <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={() => { setShowMenu(false); removeNode(id); }}>
+                  <span className="w-4 text-center">🗑</span>Delete Tunnel
+                </button>
               </>
             )}
             {isShiftRegister && (
-              <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={revertToTunnel}>
-                <span className="text-sm font-medium text-primary w-4 text-center">■</span>Revert to Tunnel
-              </button>
+              <>
+                <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={revertToTunnel}>
+                  <span className="text-sm font-medium text-primary w-4 text-center">■</span>Revert to Tunnel
+                </button>
+                <div className="h-px bg-border my-1 mx-2" />
+                <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={() => { setShowMenu(false); removeNode(id); }}>
+                  <span className="w-4 text-center">🗑</span>Delete Shift Register
+                </button>
+              </>
             )}
           </div>
         </>,

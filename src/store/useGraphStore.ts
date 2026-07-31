@@ -14,6 +14,7 @@ interface GraphState extends Graph {
 
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
+  removeEdges: (ids: string[]) => void;
 
   addUIControl: (control: UIControl, terminalNode: NodeInstance) => void;
   updateUIControl: (id: string, updates: Partial<UIControl>, skipHistory?: boolean) => void;
@@ -243,8 +244,10 @@ export const useGraphStore = create<GraphState>((set, get) => {
               spawnX = isInput ? 0 : (pStruct.width || 300) - 16;
               spawnY = Math.max(0, Math.min((pStruct.height || 200) - 16, localSpawnY));
             }
-            // Auto-enable indexing on loop structure tunnels
-            const isLoopStructure = pStruct?.type === 'structure.forLoop' || pStruct?.type === 'structure.whileLoop';
+            // Auto-enable indexing: For Loop defaults to true (LabVIEW), While Loop defaults to false
+            const isForLoop = pStruct?.type === 'structure.forLoop';
+            const isWhileLoop = pStruct?.type === 'structure.whileLoop';
+            const indexingDefault = isForLoop ? true : isWhileLoop ? false : undefined;
             const tunnelId = generateId();
             const tunnelNode: NodeInstance = {
               id: tunnelId,
@@ -253,7 +256,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
               parent: parentId,
               inputs: [],
               outputs: [],
-              params: isLoopStructure ? { indexing: true } : {}
+              params: indexingDefault !== undefined ? { indexing: indexingDefault } : {}
             };
             return { tunnelId, tunnelNode };
           };
@@ -321,6 +324,14 @@ export const useGraphStore = create<GraphState>((set, get) => {
       saveToHistory();
       set((state) => ({
         edges: state.edges.filter(e => e.id !== id)
+      }));
+    },
+
+    removeEdges: (ids: string[]) => {
+      if (ids.length === 0) return;
+      saveToHistory();
+      set((state) => ({
+        edges: state.edges.filter(e => !ids.includes(e.id))
       }));
     },
 

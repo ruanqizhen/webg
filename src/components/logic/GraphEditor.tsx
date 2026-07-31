@@ -148,6 +148,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      const removeIds: string[] = [];
       changes.forEach(c => {
         if (c.type === 'position' && c.position) {
           const currentNodes = useGraphStore.getState().nodes;
@@ -196,22 +197,39 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
                 }
              });
           }
+        } else if (c.type === 'remove') {
+          removeIds.push(c.id);
         }
-        // NOTE: remove type intentionally ignored here to avoid double-delete
-        // with useKeyboardShortcuts — deletion is handled centrally there.
       });
+      if (removeIds.length > 0) {
+        // Check for structure nodes with children — confirm
+        const store = useGraphStore.getState();
+        const structWithChildren = removeIds.filter(id => {
+          const n = store.nodes.find(nd => nd.id === id);
+          return n && String(n.type).startsWith('structure.') && store.nodes.some(child => child.parent === id);
+        });
+        if (structWithChildren.length > 0) {
+          if (!window.confirm(`Delete ${structWithChildren.length} structure node(s)? All internal nodes and connections will be permanently removed.`)) return;
+        }
+        store.removeNodes(removeIds);
+        useUIStore.getState().clearSelection();
+      }
     },
     [updateNode]
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      // Only handle selection changes — delete is handled by keyboard hook to avoid double history
+      const removeIds: string[] = [];
       changes.forEach(c => {
         if (c.type === 'remove') {
-          // Skip: handled by useKeyboardShortcuts to prevent double history push
+          removeIds.push(c.id);
         }
       });
+      if (removeIds.length > 0) {
+        useGraphStore.getState().removeEdges(removeIds);
+        useUIStore.getState().setSelectedEdgeId(null);
+      }
     },
     []
   );
@@ -449,7 +467,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         nodesDraggable={true}
         elementsSelectable={true}
         proOptions={{ hideAttribution: true }}
-        deleteKeyCode={null}
+        deleteKeyCode={["Backspace", "Delete"]}
         onReconnect={(oldEdge, newConnection) => {
           const currentNodes = useGraphStore.getState().nodes;
           const srcNode = currentNodes.find(n => n.id === newConnection.source);

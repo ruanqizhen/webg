@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { getTypeColor } from '../../../lib/colors';
@@ -311,6 +312,25 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
   const boundControlLabel = boundControl?.label;
   const updateNode = useGraphStore(s => s.updateNode);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
+  const removeNode = useGraphStore(s => s.removeNode);
+  const clearSelection = useUIStore(s => s.clearSelection);
+
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedNodeId(id);
+    setMenuPos({ x: e.clientX, y: e.clientY });
+    setShowMenu(true);
+  };
+
+  const handleDelete = () => {
+    setShowMenu(false);
+    removeNode(id);
+    clearSelection();
+  };
 
   const hasBreakpoint = node?.breakpoint || false;
   const isCurrentStep = currentStepNode === id;
@@ -422,6 +442,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
         className={`relative cursor-pointer transition-all rounded-lg ${ringCls}`}
         style={{ width: w, height: h }}
         onClick={() => setSelectedNodeId(id)}
+        onContextMenu={handleContextMenu}
         title={def.label}
       >
         {/* SVG Shape */}
@@ -473,16 +494,33 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
 
         {/* Output handles */}
         {nodeOutputs.map((port: any, i: number) => (
-          <OptimizedHandle 
-            key={port.name} 
-            nodeId={id} 
-            port={port} 
-            position={Position.Right} 
-            isInput={false} 
+          <OptimizedHandle
+            key={port.name}
+            nodeId={id}
+            port={port}
+            position={Position.Right}
+            isInput={false}
             topPct={outputPositions[i]}
             colorOverride={getEffectiveColor(port)}
           />
         ))}
+
+        {/* Context menu */}
+        {showMenu && typeof document !== 'undefined' && createPortal(
+          <>
+            <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} onContextMenu={(e) => { e.preventDefault(); setShowMenu(false); }} />
+            <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[160px] text-xs animate-in fade-in zoom-in-95" style={{ left: menuPos.x, top: menuPos.y }}>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onClick={() => { setShowMenu(false); setSelectedNodeId(id); }}>
+                <span className="w-4 text-center">⚙</span>Properties
+              </button>
+              <div className="h-px bg-border my-1 mx-2" />
+              <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={handleDelete}>
+                <span className="w-4 text-center">🗑</span>Delete Node
+              </button>
+            </div>
+          </>,
+          document.body
+        )}
       </div>
     );
   }
@@ -503,6 +541,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
     <div
       className={`flex flex-col rounded-md shadow-sm bg-card border border-border overflow-hidden min-w-[120px] transition-colors ${stateBorder}`}
       onClick={() => setSelectedNodeId(id)}
+      onContextMenu={handleContextMenu}
     >
       <div className="px-2.5 py-1 text-white text-xs font-medium flex justify-between items-center"
            style={{ backgroundColor: headerColor }}>
@@ -522,7 +561,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
                 style={{ background: getTypeColor(port.type), width: 12, height: 12, left: -14 }}
                 title={`${port.name} (${port.type})`} />
               <PortValueTooltip nodeId={id} portName={port.name} isOutput={false} />
-              <span className="text-gray-600 pl-1">{port.name}</span>
+              <span className="text-muted-foreground pl-1">{port.name}</span>
             </div>
           ))}
         </div>
@@ -530,7 +569,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
           {def.outputs.map((port: any) => (
             <div key={port.name} className="flex items-center justify-end gap-1 h-4 relative group">
               <PortValueTooltip nodeId={id} portName={port.name} isOutput={true} />
-              <span className="text-gray-600 pr-1">{port.name}</span>
+              <span className="text-muted-foreground pr-1">{port.name}</span>
               <Handle type="source" position={Position.Right} id={port.name}
                 style={{ background: getTypeColor(port.type), width: 12, height: 12, right: -14 }}
                 title={`${port.name} (${port.type})`} />
@@ -538,6 +577,15 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
           ))}
         </div>
       </div>
+      {showMenu && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} onContextMenu={(e) => { e.preventDefault(); setShowMenu(false); }} />
+          <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[160px] text-xs animate-in fade-in zoom-in-95" style={{ left: menuPos.x, top: menuPos.y }}>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={handleDelete}>🗑 Delete Node</button>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

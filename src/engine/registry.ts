@@ -189,9 +189,16 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
   'structure.forLoop': {
     type: 'structure.forLoop',
     label: 'For Loop',
-    inputs: [{ id: 'N', name: 'N', type: 'integer', direction: 'input' }],
+    inputs: [
+      { id: 'N', name: 'N', type: 'integer', direction: 'input' },
+      { id: 'conditional', name: 'conditional', type: 'boolean', direction: 'input' }
+    ],
     outputs: [{ id: 'i', name: 'i', type: 'integer', direction: 'output', isInternal: true }],
-    params: [],
+    params: [
+      { name: 'hasConditional', type: 'boolean', defaultValue: false },
+      { name: 'conditionalMode', type: 'string', defaultValue: 'stopIfTrue' },
+      { name: 'maxIterations', type: 'number', defaultValue: 0 }
+    ],
     executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   },
   'structure.whileLoop': {
@@ -199,7 +206,10 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     label: 'While Loop',
     inputs: [{ id: 'stop', name: 'stop', type: 'boolean', direction: 'input' }],
     outputs: [{ id: 'i', name: 'i', type: 'integer', direction: 'output', isInternal: true }],
-    params: [],
+    params: [
+      { name: 'conditionMode', type: 'string', defaultValue: 'stopIfTrue' },
+      { name: 'maxIterations', type: 'number', defaultValue: 100000 }
+    ],
     executor: async (_ctx) => { return { outputs: {} }; } // Driven by scheduler
   },
   'structure.case': {

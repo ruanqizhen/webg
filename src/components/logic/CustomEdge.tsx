@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BaseEdge, getBezierPath } from 'reactflow';
 import type { EdgeProps } from 'reactflow';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -95,6 +96,17 @@ export function CustomEdge({
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedEdgeId(id);
+    setMenuPos({ x: e.clientX, y: e.clientY });
+    setShowMenu(true);
+  };
+
   // Subscribe so color updates reactively when node types change
   const allNodes = useGraphStore((s) => s.nodes);
   const allEdges = useGraphStore((s) => s.edges);
@@ -110,7 +122,7 @@ export function CustomEdge({
 
   return (
     <>
-      <g onClick={() => setSelectedEdgeId(id)} style={{ cursor: 'pointer' }}>
+      <g onClick={() => setSelectedEdgeId(id)} onContextMenu={handleContextMenu} style={{ cursor: 'pointer' }}>
         {isArray && !isSelected && (
            <>
               <BaseEdge
@@ -167,7 +179,7 @@ export function CustomEdge({
             style={{ overflow: 'visible' }}
           >
             <div
-              className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center cursor-pointer border-2 border-white transition-colors"
+              className="w-8 h-8 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-full shadow-lg flex items-center justify-center cursor-pointer border-2 border-card transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 removeEdge(id);
@@ -182,6 +194,17 @@ export function CustomEdge({
             </div>
           </foreignObject>
         </g>
+      )}
+      {showMenu && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} onContextMenu={(e) => { e.preventDefault(); setShowMenu(false); }} />
+          <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[160px] text-xs animate-in fade-in zoom-in-95" style={{ left: menuPos.x, top: menuPos.y }}>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={() => { setShowMenu(false); removeEdge(id); setSelectedEdgeId(null); }}>
+              <span className="w-4 text-center">🗑</span>Delete Connection
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </>
   );

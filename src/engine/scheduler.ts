@@ -297,48 +297,63 @@ export class ExecutionEngine {
                }
             }
 
-            // Resolve indexed input arrays and determine auto-N
-            const indexedInputArrays = new Map<string, any[]>(); // tunnelId → array
+            // Resolve indexed input arrays and determine auto-N (For Loop only — While does not auto from array length)
+            const indexedInputArrays = new Map<string, any[]>();
             let autoN = -1;
-            for (const tunnel of inputTunnels) {
-               const isIndexing = tunnel.params?.indexing ?? true;
-               if (!isIndexing) continue;
-               const val = this.runtime.portValues[`${tunnel.id}_input`];
-               if (Array.isArray(val)) {
-                  indexedInputArrays.set(tunnel.id, val);
-                  if (autoN < 0 || val.length < autoN) autoN = val.length;
-               }
+            if (node.type === 'structure.forLoop') {
+              for (const tunnel of inputTunnels) {
+                 const isIndexing = tunnel.params?.indexing ?? true;
+                 if (!isIndexing) continue;
+                 const val = this.runtime.portValues[`${tunnel.id}_input`];
+                 if (Array.isArray(val)) {
+                    indexedInputArrays.set(tunnel.id, val);
+                    if (autoN < 0 || val.length < autoN) autoN = val.length;
+                 }
+              }
             }
 
-            // Determine N: explicit value takes priority, else auto from shortest indexed array
+            // Determine N: explicit value takes priority, else auto from shortest indexed array (For only)
             const rawN = inputs.N;
             const parsedN = rawN !== undefined ? Number(rawN) : NaN;
             const explicitN = isFinite(parsedN) ? Math.trunc(parsedN) : undefined;
             let N: number;
             if (explicitN !== undefined) {
               N = Math.max(0, explicitN);
-            } else if (autoN > 0) {
+            } else if (node.type === 'structure.forLoop' && autoN >= 0) {
               N = autoN;
             } else {
               N = 0;
             }
             const hasExplicitN = explicitN !== undefined;
-            // Warn if connected N exceeds available array data
-            if (hasExplicitN && autoN > 0 && N > autoN) {
-              console.warn(`For Loop "${node.id}": N=${N} but input arrays have length ${autoN}. Elements beyond index ${autoN - 1} will be undefined.`);
+
+            // Helper to provide LabVIEW-like default values instead of undefined
+            const defaultForAny = (sample: any): any => {
+              if (Array.isArray(sample)) return sample.length > 0 ? defaultForAny(sample[0]) : 0;
+              if (typeof sample === 'boolean') return false;
+              if (typeof sample === 'string') return '';
+              if (typeof sample === 'number') return 0;
+              return 0;
+            };
+
+            const defaultForTunnelType = (_tunnelId: string): any => {
+              // If no info, return 0 — LabVIEW default for untyped
+              return 0;
+            };
+
+            if (hasExplicitN && autoN >= 0 && N > autoN) {
+              console.warn(`For Loop "${node.id}": N=${N} but input arrays have length ${autoN}. Out-of-range iterations will use default values.`);
             }
 
             // Prepare output tunnel collectors
-            const outputCollectors = new Map<string, any[]>(); // tunnelId → collected values
+            const outputCollectors = new Map<string, any[]>();
             for (const tunnel of outputTunnels) {
-               const isIndexing = tunnel.params?.indexing ?? true;
+               const isIndexing = tunnel.params?.indexing ?? (node.type === 'structure.forLoop' ? true : false);
                if (isIndexing) {
                   outputCollectors.set(tunnel.id, []);
                }
             }
 
             // === Shift Registers ===
-            // Find all shift register pairs
             const shiftRegs = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.shiftRegister');
             const srPairs = new Map<string, { left?: typeof shiftRegs[0], right?: typeof shiftRegs[0] }>();
             for (const sr of shiftRegs) {
@@ -350,12 +365,15 @@ export class ExecutionEngine {
                else if (sr.params?.side === 'right') pair.right = sr;
             }
 
-            // Initialize left registers from external wires (before iteration 0)
+            // Initialize left registers from external wires (before iteration 0) — with safe defaults
             for (const [, pair] of srPairs) {
                if (pair.left) {
-                  const initVal = this.runtime.portValues[`${pair.left.id}_input`];
+                  let initVal = this.runtime.portValues[`${pair.left.id}_input`];
+                  if (initVal === undefined) {
+                    // LabVIEW default: 0/false/"" depending on connected type — fall back to 0
+                    initVal = defaultForTunnelType(pair.left.id);
+                  }
                   this.setPortValue(`${pair.left.id}_output`, initVal);
-                  // Propagate to connected internal nodes
                   const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
                   for (const edge of lEdges) {
                      this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, initVal);
@@ -363,11 +381,17 @@ export class ExecutionEngine {
                }
             }
 
+            // Read loop params for conditional / conditionMode
+            const forHasConditional = node.type === 'structure.forLoop' ? Boolean(node.params?.hasConditional) : false;
+            const forCondMode = node.params?.conditionalMode || 'stopIfTrue';
+            const whileCondMode = node.params?.conditionMode || 'stopIfTrue';
+            const whileMaxIter = Number(node.params?.maxIterations) || (node.type === 'structure.whileLoop' ? 100000 : 0);
+            const forMaxIter = Number(node.params?.maxIterations) || 0; // 0 = no limit for For
+
             const runIteration = async (iterationIndex: number) => {
                if (this.aborted) throw new Error("Execution Aborted");
-               
+
                this.setPortValue(`${node.id}_i`, iterationIndex);
-               // Propagate 'i' to connected target nodes inside the loop
                const iEdges = this.edgeByNodePort.get(`${node.id}_i`) || [];
                for (const edge of iEdges) {
                   if (edge.sourceNode === node.id) {
@@ -377,15 +401,21 @@ export class ExecutionEngine {
 
                // Feed input tunnels: array[i] → tunnel output, or constant → tunnel output
                for (const tunnel of inputTunnels) {
-                  const isIndexing = tunnel.params?.indexing ?? true;
+                  const isIndexing = tunnel.params?.indexing ?? (node.type === 'structure.forLoop' ? true : false);
                   if (isIndexing) {
                      const arr = indexedInputArrays.get(tunnel.id) || [];
-                     const element = iterationIndex < arr.length ? arr[iterationIndex] : undefined;
-                     if (iterationIndex >= arr.length && arr.length > 0) {
-                       console.warn(`For Loop iteration ${iterationIndex}: tunnel "${tunnel.id}" array has length ${arr.length}, index out of bounds.`);
+                     let element: any;
+                     if (iterationIndex < arr.length) {
+                       element = arr[iterationIndex];
+                     } else {
+                       // Out of bounds → LabVIEW returns default(T) rather than undefined
+                       const sample = arr.length > 0 ? arr[0] : undefined;
+                       element = sample !== undefined ? defaultForAny(sample) : defaultForTunnelType(tunnel.id);
+                       if (arr.length > 0) {
+                         console.warn(`Loop iteration ${iterationIndex}: tunnel "${tunnel.id}" array length ${arr.length} out of bounds, using default.`);
+                       }
                      }
                      this.setPortValue(`${tunnel.id}_output`, element);
-                     // Propagate to connected nodes
                      const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
                      for (const edge of tEdges) {
                         this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, element);
@@ -399,12 +429,12 @@ export class ExecutionEngine {
                      }
                   }
                }
-               
+
                await this.executeSubgraph(node.id);
 
                // Collect output tunnel values for indexing
                for (const tunnel of outputTunnels) {
-                  const isIndexing = tunnel.params?.indexing ?? true;
+                  const isIndexing = tunnel.params?.indexing ?? (node.type === 'structure.forLoop' ? true : false);
                   if (isIndexing && outputCollectors.has(tunnel.id)) {
                      const val = this.runtime.portValues[`${tunnel.id}_input`];
                      outputCollectors.get(tunnel.id)!.push(val);
@@ -415,48 +445,69 @@ export class ExecutionEngine {
                for (const [, pair] of srPairs) {
                   if (pair.right && pair.left) {
                      const rightVal = this.runtime.portValues[`${pair.right.id}_input`];
-                     this.setPortValue(`${pair.right.id}_output`, rightVal);
-                     this.setPortValue(`${pair.left.id}_output`, rightVal);
-                     // Propagate left output to connected internal nodes
+                     // If right not wired inside, keep left value to avoid NaN
+                     const safeRight = rightVal !== undefined ? rightVal : this.runtime.portValues[`${pair.left.id}_output`];
+                     this.setPortValue(`${pair.right.id}_output`, safeRight);
+                     this.setPortValue(`${pair.left.id}_output`, safeRight);
                      const lEdges = this.edgeByNodePort.get(`${pair.left.id}_output`) || [];
                      for (const edge of lEdges) {
-                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, rightVal);
+                        this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, safeRight);
                      }
                   }
                }
             };
 
             if (node.type === 'structure.forLoop') {
-               for (let i = 0; i < N; i++) {
+               const limit = forMaxIter > 0 ? Math.min(N, forMaxIter) : N;
+               if (forMaxIter > 0 && N > forMaxIter) {
+                 console.warn(`For Loop "${node.id}": N=${N} exceeds maxIterations ${forMaxIter}, clamped.`);
+               }
+               for (let i = 0; i < limit; i++) {
                   await runIteration(i);
+                  // Check conditional terminal (optional break)
+                  if (forHasConditional) {
+                    const condRaw = this.runtime.portValues[`${node.id}_conditional`];
+                    if (condRaw !== undefined) {
+                      const cond = Boolean(condRaw);
+                      const shouldBreak = forCondMode === 'stopIfTrue' ? cond : !cond;
+                      if (shouldBreak) break;
+                    }
+                  }
                }
             } else {
                let count = 0;
+               const maxIter = whileMaxIter > 0 ? whileMaxIter : 100000;
                while (true) {
                   await runIteration(count);
-                  const stopCondition = Boolean(this.runtime.portValues[`${node.id}_stop`]);
-                  if (stopCondition) break;
+                  const stopRaw = this.runtime.portValues[`${node.id}_stop`];
+                  const stopCondition = Boolean(stopRaw);
+                  const shouldStop = whileCondMode === 'stopIfTrue' ? stopCondition : !stopCondition;
+                  if (shouldStop) break;
                   count++;
-                  // Yield to event loop every 50 iterations to avoid blocking the main thread
                   if (count % 50 === 0) await new Promise<void>(r => setTimeout(r, 0));
-                  if (count >= 100000) throw new Error("While Loop Timeout: exceeded 100,000 iterations. Check your stop condition or add a counter check.");
+                  if (count >= maxIter) {
+                    if (whileMaxIter > 0) throw new Error(`While Loop "${node.id}" exceeded maxIterations ${maxIter}. Check stop condition.`);
+                    else throw new Error("While Loop Timeout: exceeded 100,000 iterations. Check your stop condition or add a counter check.");
+                  }
                }
             }
 
             // After loop: set output tunnel values
             for (const tunnel of outputTunnels) {
-               const isIndexing = tunnel.params?.indexing ?? true;
+               const isIndexing = tunnel.params?.indexing ?? (node.type === 'structure.forLoop' ? true : false);
                if (isIndexing && outputCollectors.has(tunnel.id)) {
                   const arr = outputCollectors.get(tunnel.id)!;
                   this.setPortValue(`${tunnel.id}_output`, arr);
-                  // Propagate outward
                   const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
                   for (const edge of tEdges) {
                      this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, arr);
                   }
                } else {
-                  // Non-indexed: last value already set by executeSubgraph
-                  const lastVal = this.runtime.portValues[`${tunnel.id}_input`];
+                  // Non-indexed: last value, or default if 0 iterations (LabVIEW behavior)
+                  let lastVal = this.runtime.portValues[`${tunnel.id}_input`];
+                  if (lastVal === undefined) {
+                    lastVal = defaultForTunnelType(tunnel.id);
+                  }
                   this.setPortValue(`${tunnel.id}_output`, lastVal);
                   const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
                   for (const edge of tEdges) {
@@ -468,7 +519,7 @@ export class ExecutionEngine {
             // After loop: propagate right shift register outputs outward
             for (const [, pair] of srPairs) {
                if (pair.right) {
-                  const finalVal = this.runtime.portValues[`${pair.right.id}_input`] ?? this.runtime.portValues[`${pair.right.id}_output`];
+                  const finalVal = this.runtime.portValues[`${pair.right.id}_input`] ?? this.runtime.portValues[`${pair.right.id}_output`] ?? defaultForTunnelType(pair.right.id);
                   this.setPortValue(`${pair.right.id}_output`, finalVal);
                   const rEdges = this.edgeByNodePort.get(`${pair.right.id}_output`) || [];
                   for (const edge of rEdges) {

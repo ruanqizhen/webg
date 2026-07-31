@@ -1,8 +1,10 @@
 import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import type { UIControl } from '../../types/graph';
+import { generateId } from '../../lib/utils';
 
 // Professional flat controls — tokenized, minimal, elegant
 
@@ -187,10 +189,43 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
   const [isDragging, setIsDragging] = useState(false);
   const [resizeMode, setResizeMode] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const dragMetaRef = useRef<{ pointerId: number | null; element: EventTarget | null; clientX: number; clientY: number; origX: number; origY: number; origW: number; origH: number; }>({ pointerId: null, element: null, clientX: 0, clientY: 0, origX: 0, origY: 0, origW: 0, origH: 0 });
   const originalPosRef = useRef<{ x: number; y: number } | null>(null);
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Keep native menu on inputs
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, select')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedControlId(control.id);
+    setMenuPos({ x: e.clientX, y: e.clientY });
+    setShowMenu(true);
+  };
+
+  const handleDelete = () => {
+    setShowMenu(false);
+    useGraphStore.getState().removeUIControl(control.id);
+    useUIStore.getState().setSelectedControlId(null);
+  };
+
+  const handleDuplicate = () => {
+    setShowMenu(false);
+    const newTermId = generateId();
+    const newCtrlId = generateId();
+    const store = useGraphStore.getState();
+    const termNode = store.nodes.find(n => n.id === control.bindingNodeId);
+    if (!termNode) return;
+    const newTerm = { ...termNode, id: newTermId, position: { x: (termNode.position?.x ?? 0) + 20, y: (termNode.position?.y ?? 0) + 20 } };
+    const newCtrl = { ...control, id: newCtrlId, bindingNodeId: newTermId, x: (control.x ?? 50) + 20, y: (control.y ?? 50) + 20 };
+    store.addUIControl(newCtrl, newTerm as any);
+    useUIStore.getState().setSelectedControlId(newCtrlId);
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 2) return; // right-click should not start drag
     setSelectedControlId(control.id);
     pushHistory();
     setIsDragging(true);
@@ -206,6 +241,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   };
 
   const onResizePointerDown = (mode: string) => (e: React.PointerEvent) => {
+    if ((e as any).button === 2) return;
     e.stopPropagation();
     setSelectedControlId(control.id);
     pushHistory();
@@ -312,7 +348,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   const isSelected = selectedControlId === control.id;
 
   return (
-    <div className={`absolute flex flex-col rounded-md transition-colors ${isSelected ? 'bg-accent/40 outline outline-1 outline-ring z-10' : 'hover:outline hover:outline-1 hover:outline-border'} select-none`} style={{ left: control.x ?? 50, top: control.y ?? 50, width, height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+    <div className={`absolute flex flex-col rounded-md transition-colors ${isSelected ? 'bg-accent/40 outline outline-1 outline-ring z-10' : 'hover:outline hover:outline-1 hover:outline-border'} select-none`} style={{ left: control.x ?? 50, top: control.y ?? 50, width, height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onContextMenu={handleContextMenu}>
       <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-grab z-20">
         <label className="text-[11px] font-medium text-muted-foreground tracking-wide select-none">{control.label}</label>
       </div>
@@ -320,9 +356,9 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
       {control.type === 'array' ? (
         <div className="flex-1 flex flex-row overflow-hidden border border-border bg-card rounded-md shadow-sm">
            <div className="w-9 flex flex-col border-r border-border bg-muted/50 shrink-0">
-               <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.min(99, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-b border-border">▲</button>
+               <button onPointerDown={(e) => { if ((e as any).button !== 0) return; e.stopPropagation(); setArrayIndex(a => Math.min(99, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-b border-border">▲</button>
                <div className="flex-1 flex items-center justify-center font-mono text-[11px] font-medium">{arrayIndex}</div>
-               <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-t border-border">▼</button>
+               <button onPointerDown={(e) => { if ((e as any).button !== 0) return; e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-t border-border">▼</button>
            </div>
            <div className="flex-1 overflow-hidden relative">
                {control.elementDef ? (
@@ -344,6 +380,27 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
            <div className="absolute bottom-[-4px] left-0 right-0 h-2 cursor-s-resize z-10 hover:bg-ring/20" onPointerDown={onResizePointerDown('s')} />
            <div className="absolute bottom-[-5px] right-[-5px] w-2.5 h-2.5 bg-card border border-ring rounded-full shadow-sm cursor-se-resize z-10 hover:scale-110 transition-transform" onPointerDown={onResizePointerDown('se')} />
          </>
+      )}
+
+      {showMenu && typeof document !== 'undefined' && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} onContextMenu={(e) => { e.preventDefault(); setShowMenu(false); }} />
+          <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[160px] text-xs animate-in fade-in zoom-in-95" style={{ left: menuPos.x, top: menuPos.y }}>
+            <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground truncate">{control.label}</div>
+            <div className="h-px bg-border my-1 mx-2" />
+            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onClick={() => { setShowMenu(false); setSelectedControlId(control.id); }}>
+              <span className="w-4 text-center">⚙</span>Properties
+            </button>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onClick={handleDuplicate}>
+              <span className="w-4 text-center">⎘</span>Duplicate
+            </button>
+            <div className="h-px bg-border my-1 mx-2" />
+            <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={handleDelete}>
+              <span className="w-4 text-center">🗑</span>Delete Control
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );

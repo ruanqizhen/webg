@@ -78,37 +78,20 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.key === '=')) {
         e.preventDefault();
         onZoomFit?.();
-      // Delete (Delete or Backspace) - supports multi-select
+      // Delete (Delete or Backspace) — canvas nodes/edges are handled by GraphEditor's onNodesChange/onEdgesChange (single history)
+      // Here we only handle UI controls (FrontPanel) to avoid double-delete
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (!isInput) {
-          if (selectedNodeIds.length > 1) {
-            e.preventDefault();
-            const store = useGraphStore.getState();
-            const structureNodes = selectedNodeIds.filter((id) => {
-              const n = store.nodes.find((nd) => nd.id === id);
-              return n && String(n.type).startsWith('structure.');
-            });
-            if (structureNodes.length > 0) {
-              if (!window.confirm(`Delete ${structureNodes.length} structure node(s)? All internal nodes and connections will be permanently removed.`)) return;
-            }
-            store.removeNodes(selectedNodeIds);
-            useUIStore.getState().clearSelection();
-          } else if (selectedNodeId) {
-            e.preventDefault();
-            const store = useGraphStore.getState();
-            const node = store.nodes.find((n) => n.id === selectedNodeId);
-            const isStructure = node && String(node.type).startsWith('structure.');
-            const hasChildren = node && store.nodes.some((n) => n.parent === node.id);
-            if (isStructure && hasChildren) {
-              if (!window.confirm(`Delete "${node.type.split('.')[1]}" structure? All internal nodes and connections will be permanently removed.`)) return;
-            }
-            removeNode(selectedNodeId);
-            useUIStore.getState().clearSelection();
-          } else if (selectedEdgeId) {
-            e.preventDefault();
-            removeEdge(selectedEdgeId);
-            useUIStore.getState().setSelectedEdgeId(null);
-          } else if (selectedControlId) {
+          // If focus is inside ReactFlow canvas, let GraphEditor handle deletion
+          const targetEl = e.target as HTMLElement;
+          if (targetEl.closest && targetEl.closest('.react-flow')) {
+            return;
+          }
+          // Also check active element inside flow
+          if (typeof document !== 'undefined' && document.activeElement && (document.activeElement as HTMLElement).closest?.('.react-flow')) {
+            return;
+          }
+          if (selectedControlId) {
             e.preventDefault();
             removeUIControl(selectedControlId);
             useUIStore.getState().setSelectedControlId(null);

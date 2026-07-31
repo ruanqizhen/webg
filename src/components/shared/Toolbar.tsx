@@ -1,7 +1,8 @@
-import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle, Sun, Moon, Monitor, Terminal, Lightbulb } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle, Sun, Moon, Monitor, Terminal, Lightbulb, Repeat } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLogStore } from '../../store/useLogStore';
 import { createExampleProject } from '../../lib/exampleProject';
+import { createLoopExampleProject } from '../../lib/loopExampleProject';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
@@ -101,6 +102,10 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleLoadExample = () => {
     loadGraph(createExampleProject());
+  };
+
+  const handleLoadLoopExample = () => {
+    loadGraph(createLoopExampleProject());
   };
 
   const handleClear = () => {
@@ -211,6 +216,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
           <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
 
           <Button size="sm" variant="ghost" onClick={handleLoadExample} className="h-7 w-7 p-0 text-muted-foreground" title="Example"><Lightbulb size={14} /></Button>
+          <Button size="sm" variant="ghost" onClick={handleLoadLoopExample} className="h-7 w-7 p-0 text-muted-foreground" title="Loop Demo (For/While)"><Repeat size={14} /></Button>
           <Button size="sm" variant="ghost" onClick={handleClear} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Clear"><Trash2 size={14} /></Button>
 
           <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
