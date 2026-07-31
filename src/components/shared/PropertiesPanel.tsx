@@ -198,7 +198,7 @@ export function PropertiesPanel() {
            <>
               <FieldGroup>
                  <FieldLabel>Control Type</FieldLabel>
-                 <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeControl.type}</div>
+                 <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeControl.type === 'button' ? 'Switch (button)' : activeControl.type === 'switch' ? 'Switch' : activeControl.type}</div>
               </FieldGroup>
 
               <FieldGroup>
@@ -270,7 +270,7 @@ export function PropertiesPanel() {
                 </>
               )}
 
-              {['button', 'indicatorLight', 'gauge', 'tank'].includes(activeControl.type) && (
+              {['button', 'switch', 'indicatorLight', 'gauge', 'tank'].includes(activeControl.type) && (
                 <>
                   <FieldGroup>
                     <FieldLabel>Color (On/Active)</FieldLabel>
@@ -283,10 +283,10 @@ export function PropertiesPanel() {
                 </>
               )}
 
-              {['numberInput', 'button'].includes(activeControl.type) && (
+              {['numberInput', 'button', 'switch'].includes(activeControl.type) && (
                  <FieldGroup>
                    <FieldLabel>Default Value</FieldLabel>
-                   {activeControl.type === 'button' ? (
+                   {activeControl.type === 'button' || activeControl.type === 'switch' ? (
                        <input type="checkbox" checked={!!activeControl.defaultValue} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: e.target.checked })} className="w-4 h-4 rounded border-input" />
                    ) : (
                        <FieldInput type="number" value={activeControl.defaultValue ?? ''} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: Number(e.target.value) })} />

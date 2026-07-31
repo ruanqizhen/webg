@@ -408,7 +408,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
     
     let color = '#D97706'; // Default Amber (Numeric/DBL) - matching Constant
     let symbol = 'DBL';
-    if (ctrlType === 'button' || ctrlType === 'indicatorLight') {
+    if (ctrlType === 'button' || ctrlType === 'switch' || ctrlType === 'indicatorLight') {
       color = '#059669'; // Green (Boolean)
       symbol = 'TF';
     } else if (ctrlType === 'textLabel') {

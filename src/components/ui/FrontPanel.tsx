@@ -117,12 +117,12 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
          </div>
       )}
 
-      {control.type === 'button' && (
+      {(control.type === 'button' || control.type === 'switch') && (
           <div className="w-full h-full flex items-center justify-center">
             <label className="relative inline-flex items-center cursor-pointer select-none" onPointerDown={e => e.stopPropagation()}>
-              <input type="checkbox" checked={!!displayVal} onChange={handleChange} disabled={isIndicatorDir} className="sr-only peer" />
-              <div className="w-12 h-6 rounded-full bg-input border border-border shadow-inner transition-colors peer-checked:bg-primary relative">
-                 <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card border border-border shadow-sm transition-transform peer-checked:translate-x-6" />
+              <input type="checkbox" checked={!!displayVal} onChange={handleChange} disabled={isIndicatorDir} className="sr-only" />
+              <div className={`w-12 h-6 rounded-full border shadow-inner transition-colors relative ${displayVal ? 'bg-primary border-primary' : 'bg-input border-border'}`}>
+                 <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card border border-border shadow-sm transition-transform duration-200 ${displayVal ? 'translate-x-6' : 'translate-x-0'}`} />
               </div>
             </label>
           </div>
@@ -305,7 +305,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
             }
         }
         if (overlappingArray) {
-            const getPortType = (type: string) => { if (type === 'button' || type === 'indicatorLight') return 'boolean'; if (type === 'textLabel') return 'string'; return 'number'; };
+            const getPortType = (type: string) => { if (type === 'button' || type === 'switch' || type === 'indicatorLight') return 'boolean'; if (type === 'textLabel') return 'string'; return 'number'; };
             const portType = getPortType(control.type);
             updateUIControl(overlappingArray.id, { elementDef: { ...control, id: undefined }, width: Math.max(overlappingArray.width || 120, 46 + myW), height: Math.max(overlappingArray.height || 60, myH) });
             const currentTerminal = allNodes.find(n => n.id === overlappingArray!.bindingNodeId);
@@ -337,7 +337,7 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     let newVal = e.target.value;
     const targetType = isArray ? control.elementDef?.type : control.type;
     if (['numberInput', 'slider', 'knob', 'gauge', 'tank'].includes(targetType)) newVal = Number(newVal);
-    if (['button', 'indicatorLight'].includes(targetType)) newVal = e.target.checked;
+    if (['button', 'switch', 'indicatorLight'].includes(targetType)) newVal = e.target.checked;
     if (isArray) {
        const arr = Array.isArray(control.defaultValue) ? [...control.defaultValue] : [];
        arr[arrayIndex] = newVal;

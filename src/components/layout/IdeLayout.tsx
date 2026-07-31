@@ -215,11 +215,11 @@ function IdeLayoutInner() {
         position: { x: 100, y: 100 },
         inputs: [],
         outputs: [],
-        params: { value: controlDef.type === 'button' ? false : 0 }
+        params: { value: controlDef.type === 'button' || controlDef.type === 'switch' ? false : 0 }
       };
 
       const getPortType = (type: string) => {
-        if (type === 'button' || type === 'indicatorLight') return 'boolean';
+        if (type === 'button' || type === 'switch' || type === 'indicatorLight') return 'boolean';
         if (type === 'textLabel') return 'string';
         return 'number';
       };
@@ -258,7 +258,7 @@ function IdeLayoutInner() {
                  colorOn: controlDefaults[controlDef.type]?.colorOn,
                  colorOff: controlDefaults[controlDef.type]?.colorOff
               },
-              width: Math.max(targetArrayControl.width || 120, 46 + (controlDefaults[controlDef.type]?.width || (controlDef.type === 'button' ? 80 : 140))),
+              width: Math.max(targetArrayControl.width || 120, 46 + (controlDefaults[controlDef.type]?.width || (controlDef.type === 'button' || controlDef.type === 'switch' ? 80 : 140))),
               height: Math.max(targetArrayControl.height || 60, controlDefaults[controlDef.type]?.height || 60)
           });
 

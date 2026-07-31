@@ -10,7 +10,7 @@ import { FieldInput } from '../ui/field';
 import { findNonOverlappingPosition, nodesToRects, controlsToRects } from '../../lib/layout';
 import { resolveNodeOverlaps } from '../logic/GraphEditor';
 import {
-  Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
+  Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
   EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box,
   SlidersHorizontal, CircleDot, Database, List
@@ -18,7 +18,8 @@ import {
 
 const UI_ICONS: Record<string, any> = {
   numberInput: Hash,
-  button: Pointer,
+  button: ToggleLeft,
+  switch: ToggleLeft,
   numberIndicator: SquareAsterisk,
   textLabel: Type,
   gauge: Gauge,
@@ -54,7 +55,7 @@ const LOGIC_ICONS: Record<string, any> = {
 
 const UI_CONTROLS = [
   { type: 'numberInput', label: 'Number Input', direction: 'control' as const },
-  { type: 'button', label: 'Button', direction: 'control' as const },
+  { type: 'button', label: 'Switch', direction: 'control' as const },
   { type: 'slider', label: 'Slider', direction: 'control' as const },
   { type: 'knob', label: 'Knob', direction: 'control' as const },
   { type: 'array', label: 'Array Control', direction: 'control' as const },
@@ -126,10 +127,10 @@ export function Palette() {
       position: termPos,
       inputs: [],
       outputs: [],
-      params: { value: controlDef.type === 'button' ? false : 0 }
+      params: { value: controlDef.type === 'button' || controlDef.type === 'switch' ? false : 0 }
     };
     const getPortType = (type: string) => {
-      if (type === 'button' || type === 'indicatorLight') return 'boolean';
+      if (type === 'button' || type === 'switch' || type === 'indicatorLight') return 'boolean';
       if (type === 'textLabel') return 'string';
       return 'number';
     };
