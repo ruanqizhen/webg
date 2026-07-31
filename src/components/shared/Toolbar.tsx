@@ -5,14 +5,18 @@ import { createExampleProject } from '../../lib/exampleProject';
 import { createLoopExampleProject } from '../../lib/loopExampleProject';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
+import { useTypeErrorStore } from '../../store/useTypeErrorStore';
+import { useUIStore } from '../../store/useUIStore';
 import { ExecutionEngine } from '../../engine/scheduler';
 import { Button } from '../ui/button';
 import { BadgeDot } from '../ui/badge-dot';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
   const runtimeStore = useRuntimeStore();
+  const typeErrors = useTypeErrorStore(s => s.errors);
+  const [showTypeErrors, setShowTypeErrors] = useState(false);
   const { theme, setTheme } = useThemeStore();
   const consoleVisible = useLogStore((s) => s.isVisible);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -236,6 +240,32 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
           <BadgeDot status="error" />
           <span className="text-destructive font-medium flex-1 truncate text-xs">{runtimeStore.errorMessage}</span>
           <Button size="sm" variant="ghost" onClick={() => runtimeStore.setError(null)} className="h-6 w-6 p-0 text-destructive/60 hover:text-destructive"><X size={14} /></Button>
+        </div>
+      )}
+
+      {typeErrors.length > 0 && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-3 py-2 flex flex-col gap-1.5 text-sm">
+          <div className="flex items-center gap-2.5">
+            <BadgeDot status="warning" />
+            <span className="text-amber-700 dark:text-amber-400 font-medium flex-1 text-xs">{typeErrors.length} type error{typeErrors.length>1?'s':''} — Broken Arrow</span>
+            <Button size="sm" variant="ghost" onClick={() => setShowTypeErrors(!showTypeErrors)} className="h-6 px-2 text-[11px] text-amber-700 dark:text-amber-400">{showTypeErrors ? 'Hide' : 'View'}</Button>
+            <Button size="sm" variant="ghost" onClick={() => useTypeErrorStore.getState().clear()} className="h-6 w-6 p-0 text-amber-700/60 hover:text-amber-700"><X size={14} /></Button>
+          </div>
+          {showTypeErrors && (
+            <div className="flex flex-col gap-1 mt-1 max-h-[120px] overflow-y-auto">
+              {typeErrors.map(err => (
+                <div key={err.id} className="flex items-center gap-2 text-[11px] font-mono bg-card border border-border rounded px-2 py-1">
+                  <span className="text-muted-foreground truncate">{err.sourceNode.slice(0,6)}.{err.sourcePort} ({err.sourceType})</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-foreground truncate">{err.targetNode.slice(0,6)}.{err.targetPort} ({err.targetType})</span>
+                  <span className="ml-auto text-destructive truncate max-w-[200px]">{err.message}</span>
+                  <Button size="sm" variant="ghost" className="h-5 w-5 p-0 ml-1" onClick={() => {
+                    useUIStore.getState().setSelectedNodeId(err.targetNode);
+                  }} title="Focus"><span className="text-[10px]">◉</span></Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </>

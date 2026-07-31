@@ -1,6 +1,9 @@
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
+import { useRuntimeStore } from '../../store/useRuntimeStore';
+import { useTypeErrorStore } from '../../store/useTypeErrorStore';
 import { NodeRegistry } from '../../engine/registry';
+import { getTypeColor } from '../../lib/colors';
 import { Panel, PanelHeader } from '../ui/panel';
 import { FieldGroup, FieldLabel, FieldInput, FieldSelect, FieldTextarea } from '../ui/field';
 import { Button } from '../ui/button';
@@ -8,6 +11,8 @@ import { Button } from '../ui/button';
 export function PropertiesPanel() {
   const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
   const { nodes, uiControls, updateNode, updateUIControl, edges, removeEdge } = useGraphStore();
+  const portValues = useRuntimeStore(s => s.portValues);
+  const typeErrors = useTypeErrorStore(s => s.errors);
 
   const activeNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
   const activeControl = selectedControlId ? uiControls.find(c => c.id === selectedControlId) : null;
@@ -159,6 +164,33 @@ export function PropertiesPanel() {
                    )}
                  </FieldGroup>
               ))}
+
+              {/* Ports table with type + value + error highlighting */}
+              <FieldGroup>
+                <FieldLabel>Ports</FieldLabel>
+                <div className="flex flex-col gap-1 rounded-md border border-border bg-card overflow-hidden">
+                  <div className="grid grid-cols-[70px_60px_1fr] gap-1 px-2 py-1 bg-muted text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <span>Port</span><span>Type</span><span>Value / Connected</span>
+                  </div>
+                  <div className="max-h-[180px] overflow-y-auto flex flex-col">
+                    {[...(activeNode.inputs || []), ...(activeNode.outputs || [])].map((p: any) => {
+                      const key = `${activeNode.id}_${p.name}`;
+                      const v = portValues[key];
+                      const displayV = v !== undefined ? (typeof v === 'object' ? JSON.stringify(v).slice(0, 20) : String(v)) : '—';
+                      const connEdge = edges.find((e: any) => (e.targetNode === activeNode.id && e.targetPort === p.name) || (e.sourceNode === activeNode.id && e.sourcePort === p.name));
+                      const connText = connEdge ? (connEdge.targetNode === activeNode.id ? `← ${connEdge.sourceNode.slice(0,4)}.${connEdge.sourcePort}` : `→ ${connEdge.targetNode.slice(0,4)}.${connEdge.targetPort}`) : 'Not connected';
+                      const hasErr = typeErrors.some((er: any) => er.targetNode === activeNode.id && er.targetPort === p.name);
+                      return (
+                        <div key={p.name} className={`grid grid-cols-[70px_60px_1fr] gap-1 px-2 py-1 text-xs items-center ${hasErr ? 'bg-destructive/10 border-l-2 border-l-destructive' : 'hover:bg-accent/50'}`}>
+                          <span className="flex items-center gap-1 truncate"><span className="w-2 h-2 rounded-full shrink-0" style={{ background: getTypeColor(p.type) }} />{p.name}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground truncate">{p.type}</span>
+                          <span className="flex items-center gap-1 truncate"><span className="tabular-nums truncate">{displayV}</span><span className="text-[10px] text-muted-foreground/60 truncate">{connText}</span>{hasErr && <span className="w-2 h-2 rounded-full bg-destructive animate-pulse ml-1" />}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </FieldGroup>
            </>
         )}
 

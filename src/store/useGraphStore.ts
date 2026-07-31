@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Edge, Graph, NodeInstance, UIControl } from '../types/graph';
 import { NodeRegistry } from '../engine/registry';
 import { generateId, deepClone } from '../lib/utils';
+import { useTypeErrorStore } from './useTypeErrorStore';
 
 const STORAGE_KEY = 'webg-project';
 const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
@@ -90,6 +91,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     removeNode: (id) => {
       saveToHistory();
+      // Clear type errors involving this node
+      try { useTypeErrorStore.getState().removeByNode(id); } catch {}
       set((state) => {
         const idsToRemove = new Set<string>();
         const collectDescendants = (parentId: string) => {
@@ -119,12 +122,28 @@ export const useGraphStore = create<GraphState>((set, get) => {
         const uiControls = state.uiControls.filter(c => !idsToRemove.has(c.bindingNodeId));
         return { nodes, edges, uiControls };
       });
+      // Also clear errors for descendant nodes (best effort)
+      try {
+        const st = useGraphStore.getState();
+        // After removal, clear any remaining errors that reference now-missing nodes
+        const errStore = useTypeErrorStore.getState();
+        // We already cleared for root id, now also clear for any that may still reference it (already done via removeByNode for root, but descendants may still have errors)
+        // To be safe, we clear all errors where source or target no longer exists
+        const existingNodeIds = new Set(st.nodes.map(n => n.id));
+        errStore.errors.slice().forEach(e => {
+          if (!existingNodeIds.has(e.sourceNode) || !existingNodeIds.has(e.targetNode)) {
+            errStore.removeByNode(e.sourceNode);
+            errStore.removeByNode(e.targetNode);
+          }
+        });
+      } catch {}
     },
 
     // Batch remove — single history entry (fixes B19/B23 multi-history)
     removeNodes: (ids: string[]) => {
       if (ids.length === 0) return;
       saveToHistory();
+      ids.forEach(id => { try { useTypeErrorStore.getState().removeByNode(id); } catch {} });
       set((state) => {
         const idsToRemove = new Set<string>();
         const collectDescendants = (parentId: string) => {
@@ -322,17 +341,23 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     removeEdge: (id) => {
       saveToHistory();
-      set((state) => ({
-        edges: state.edges.filter(e => e.id !== id)
-      }));
+      set((state) => {
+        const edge = state.edges.find(e => e.id === id);
+        if (edge) {
+          try { useTypeErrorStore.getState().removeError(edge.targetNode, edge.targetPort); } catch {}
+        }
+        return { edges: state.edges.filter(e => e.id !== id) };
+      });
     },
 
     removeEdges: (ids: string[]) => {
       if (ids.length === 0) return;
       saveToHistory();
-      set((state) => ({
-        edges: state.edges.filter(e => !ids.includes(e.id))
-      }));
+      set((state) => {
+        const toRemove = state.edges.filter(e => ids.includes(e.id));
+        toRemove.forEach(e => { try { useTypeErrorStore.getState().removeError(e.targetNode, e.targetPort); } catch {} });
+        return { edges: state.edges.filter(e => !ids.includes(e.id)) };
+      });
     },
 
     addUIControl: (control, terminalNode) => {
@@ -367,6 +392,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     clearGraph: () => {
       saveToHistory();
+      try { useTypeErrorStore.getState().clear(); } catch {}
       set({ nodes: [], edges: [], uiControls: [] });
     },
 
@@ -393,6 +419,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         throw new Error('Invalid graph data: uiControls must be an array');
       }
       saveToHistory();
+      try { useTypeErrorStore.getState().clear(); } catch {}
       set({
         nodes: graph.nodes,
         edges: graph.edges,

@@ -54,3 +54,16 @@ export const STATUS_COLORS = {
   paused: 'var(--status-paused)',
   error: 'var(--status-error)',
 };
+
+export const getTypeAbbrev = (type: string): string => {
+  const base = type.toLowerCase().replace('[]', '');
+  switch (base) {
+    case 'number': return 'DBL';
+    case 'integer': return 'I32';
+    case 'boolean': return 'BOOL';
+    case 'string': return 'STR';
+    case 'array': return 'ARR';
+    case 'any': return 'ANY';
+    default: return base.slice(0, 3).toUpperCase();
+  }
+};

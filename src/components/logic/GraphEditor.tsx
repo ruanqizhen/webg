@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css';
 
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
+import { useTypeErrorStore } from '../../store/useTypeErrorStore';
 import { BaseNode } from './nodes/BaseNode';
 import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
@@ -105,13 +106,20 @@ function validateConnection(
   targetNodeType: string,
   sourceHandle: string,
   targetHandle: string
-): string | null {
+): { message: string; sourceType: string; targetType: string } | null {
   const sourceDef = NodeRegistry[sourceNodeType];
   const targetDef = NodeRegistry[targetNodeType];
   const sourcePort = sourceDef?.outputs.find(p => p.name === sourceHandle);
   const targetPort = targetDef?.inputs.find(p => p.name === targetHandle);
   if (sourcePort && targetPort && sourcePort.type !== 'any' && targetPort.type !== 'any' && sourcePort.type !== targetPort.type) {
-    return `Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`;
+    // Allow number <-> integer compatibility (LabVIEW style coercion)
+    const compatible = (a: string, b: string) => {
+      const la = a.toLowerCase(); const lb = b.toLowerCase();
+      if ((la === 'number' && lb === 'integer') || (la === 'integer' && lb === 'number')) return true;
+      return false;
+    };
+    if (compatible(sourcePort.type, targetPort.type)) return null;
+    return { message: `Type mismatch: Cannot connect ${sourcePort.type} to ${targetPort.type}`, sourceType: sourcePort.type, targetType: targetPort.type };
   }
   return null;
 }
@@ -236,7 +244,6 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      // Read fresh state to avoid stale closure
       const currentNodes = useGraphStore.getState().nodes;
       const sourceNode = currentNodes.find(n => n.id === connection.source);
       const targetNode = currentNodes.find(n => n.id === connection.target);
@@ -250,9 +257,20 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         connection.targetHandle
       );
       if (mismatch) {
-        showTypeMismatch(mismatch);
+        showTypeMismatch(mismatch.message);
+        useTypeErrorStore.getState().addError({
+          sourceNode: connection.source!,
+          sourcePort: connection.sourceHandle!,
+          sourceType: mismatch.sourceType,
+          targetNode: connection.target!,
+          targetPort: connection.targetHandle!,
+          targetType: mismatch.targetType,
+          message: mismatch.message
+        });
         return;
       }
+
+      useTypeErrorStore.getState().removeError(connection.target!, connection.targetHandle!);
 
       useGraphStore.getState().addEdge({
         id: `e_${connection.source}_${connection.sourceHandle}-${connection.target}_${connection.targetHandle}_${Date.now().toString(36)}`,
@@ -480,12 +498,24 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
               newConnection.targetHandle
             );
             if (mismatch) {
-              showTypeMismatch(mismatch);
+              showTypeMismatch(mismatch.message);
+              useTypeErrorStore.getState().addError({
+                sourceNode: newConnection.source!,
+                sourcePort: newConnection.sourceHandle!,
+                sourceType: mismatch.sourceType,
+                targetNode: newConnection.target!,
+                targetPort: newConnection.targetHandle!,
+                targetType: mismatch.targetType,
+                message: mismatch.message
+              });
               return;
             }
           }
           const state = useGraphStore.getState();
           state.removeEdge(oldEdge.id);
+          const oldTarget = (oldEdge as any).targetNode || (oldEdge as any).target;
+          const oldTargetPort = (oldEdge as any).targetPort || (oldEdge as any).targetHandle;
+          if (oldTarget) useTypeErrorStore.getState().removeError(oldTarget, oldTargetPort);
           const sourceHandle = newConnection.sourceHandle;
           const targetHandle = newConnection.targetHandle;
           if (newConnection.source && newConnection.target && sourceHandle && targetHandle) {
@@ -496,6 +526,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
               targetNode: newConnection.target,
               targetPort: targetHandle,
             });
+            useTypeErrorStore.getState().removeError(newConnection.target!, targetHandle);
           }
         }}
         onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
