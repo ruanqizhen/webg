@@ -424,8 +424,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
   return (
     <>
       {typeMismatch && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-3.5 py-2 rounded-lg shadow-float flex items-center gap-2 text-sm animate-in slide-in-from-top-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <circle cx="12" cy="16" r="1" fill="currentColor" />
@@ -490,9 +490,9 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         multiSelectionKeyCode="Shift"
         selectionKeyCode="Shift"
       >
-        <Background color="#eee" gap={16} />
-        <Controls />
-        <MiniMap zoomable pannable />
+        <Background color="hsl(var(--border))" gap={24} size={1} />
+        <Controls className="bg-card border border-border rounded-lg shadow-sm [&>button]:!bg-card [&>button]:!border-border hover:[&>button]:!bg-accent" />
+        <MiniMap className="bg-card border border-border rounded-lg shadow-sm" zoomable pannable />
       </ReactFlow>
     </>
   );

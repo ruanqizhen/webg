@@ -1,6 +1,9 @@
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { NodeRegistry } from '../../engine/registry';
+import { Panel, PanelHeader } from '../ui/panel';
+import { FieldGroup, FieldLabel, FieldInput, FieldSelect, FieldTextarea } from '../ui/field';
+import { Button } from '../ui/button';
 
 export function PropertiesPanel() {
   const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
@@ -12,416 +15,238 @@ export function PropertiesPanel() {
 
   if (!activeNode && !activeControl && !activeEdge) {
     return (
-      <div className="w-64 border-l bg-gray-50 p-4 h-full shrink-0 text-sm text-gray-400 italic">
-        Select a node, control, or connection to view properties.
-      </div>
+      <Panel className="w-64 border-l border-panel-border bg-panel">
+        <PanelHeader>Properties</PanelHeader>
+        <div className="p-6 text-center text-xs text-muted-foreground">Select a node, control, or connection to view properties.</div>
+      </Panel>
     );
   }
 
   const isCaseStructure = activeNode?.type === 'structure.case';
 
   return (
-    <div className="w-64 border-l bg-gray-50 flex flex-col h-full shrink-0 shadow-inner">
-      <div className="p-3 text-sm font-bold text-gray-700 uppercase tracking-wide border-b bg-white top-0 sticky">
-        Properties
-      </div>
+    <Panel className="w-64 border-l border-panel-border bg-panel">
+      <PanelHeader>Properties</PanelHeader>
 
-      <div className="p-4 flex flex-col gap-4 text-sm overflow-y-auto">
+      <div className="p-3 flex flex-col gap-5 text-sm overflow-y-auto">
         {activeNode && (
            <>
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Node Type</label>
-                 <div className="font-mono bg-white border px-2 py-1 rounded text-xs">{NodeRegistry[activeNode.type]?.label || activeNode.type}</div>
-              </div>
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Node ID</label>
-                 <div className="font-mono text-[10px] text-gray-400 break-all">{activeNode.id}</div>
-              </div>
+              <FieldGroup>
+                 <FieldLabel>Node Type</FieldLabel>
+                 <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{NodeRegistry[activeNode.type]?.label || activeNode.type}</div>
+              </FieldGroup>
+              <FieldGroup>
+                 <FieldLabel>Node ID</FieldLabel>
+                 <div className="font-mono text-[10px] text-muted-foreground break-all">{activeNode.id}</div>
+              </FieldGroup>
 
-              {/* Special handling for Case Structure */}
               {isCaseStructure && (
                 <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Mode</label>
-                    <select
-                      value={activeNode.params.mode || 'boolean'}
-                      onChange={(e) => {
+                  <FieldGroup>
+                    <FieldLabel>Mode</FieldLabel>
+                    <FieldSelect value={activeNode.params.mode || 'boolean'} onChange={(e) => {
                         const newMode = e.target.value;
                         const newCases = newMode === 'boolean' ? ['true', 'false'] : ['0', '1', '2'];
-                        updateNode(activeNode.id, { 
-                          params: { 
-                            ...activeNode.params, 
-                            mode: newMode,
-                            cases: newCases,
-                            defaultCase: newMode === 'number' ? 'false' : undefined,
-                            activeCase: newCases[0]
-                          } 
-                        });
-                      }}
-                      className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                    >
+                        updateNode(activeNode.id, { params: { ...activeNode.params, mode: newMode, cases: newCases, defaultCase: newMode === 'number' ? 'false' : undefined, activeCase: newCases[0] } });
+                      }}>
                       <option value="boolean">Boolean (True/False)</option>
                       <option value="number">Number (Multi-case)</option>
-                    </select>
-                  </div>
+                    </FieldSelect>
+                  </FieldGroup>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Cases (comma-separated)</label>
-                    <input
-                      type="text"
-                      value={activeNode.params.cases?.join(', ') || ''}
-                      onChange={(e) => {
-                        const newCases = e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                  <FieldGroup>
+                    <FieldLabel>Cases (comma-separated)</FieldLabel>
+                    <FieldInput value={activeNode.params.cases?.join(', ') || ''} placeholder="true, false" onChange={(e) => {
+                        const newCases = e.target.value.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
                         const finalCases = newCases.length > 0 ? newCases : ['true', 'false'];
-                        updateNode(activeNode.id, { 
-                          params: { 
-                            ...activeNode.params, 
-                            cases: finalCases,
-                            activeCase: finalCases[0] || 'true'
-                          } 
-                        });
-
-                        // Clean up orphaned nodes whose caseId is no longer valid — batch as single history entry
-                        const removedCases = new Set(
-                          (activeNode.params.cases || []).filter((c: string) => !finalCases.includes(c))
-                        );
+                        updateNode(activeNode.id, { params: { ...activeNode.params, cases: finalCases, activeCase: finalCases[0] || 'true' } });
+                        const removedCases = new Set((activeNode.params.cases || []).filter((c: string) => !finalCases.includes(c)));
                         if (removedCases.size > 0) {
-                          const orphans = nodes.filter(
-                            n => n.parent === activeNode.id && n.caseId && removedCases.has(n.caseId)
-                          );
-                          if (orphans.length > 0) {
-                            useGraphStore.getState().removeNodes(orphans.map(n => n.id));
-                          }
+                          const orphans = nodes.filter(n => n.parent === activeNode.id && n.caseId && removedCases.has(n.caseId));
+                          if (orphans.length > 0) useGraphStore.getState().removeNodes(orphans.map(n => n.id));
                         }
-                      }}
-                      placeholder="true, false"
-                      className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                    />
-                  </div>
+                      }} />
+                  </FieldGroup>
 
                   {activeNode.params.mode === 'number' && (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-gray-500 font-semibold">Default Case</label>
-                      <select
-                        value={activeNode.params.defaultCase || 'false'}
-                        onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, defaultCase: e.target.value } })}
-                        className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                      >
-                        {activeNode.params.cases?.map((caseName: string) => (
-                          <option key={caseName} value={caseName}>{caseName}</option>
-                        ))}
+                    <FieldGroup>
+                      <FieldLabel>Default Case</FieldLabel>
+                      <FieldSelect value={activeNode.params.defaultCase || 'false'} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, defaultCase: e.target.value } })}>
+                        {activeNode.params.cases?.map((caseName: string) => (<option key={caseName} value={caseName}>{caseName}</option>))}
                         <option value="default">Default (fallback)</option>
-                      </select>
-                    </div>
+                      </FieldSelect>
+                    </FieldGroup>
                   )}
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Active Case (for editing)</label>
-                    <select
-                      value={activeNode.params.activeCase || 'true'}
-                      onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, activeCase: e.target.value } })}
-                      className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                    >
-                      {activeNode.params.cases?.map((caseName: string) => (
-                        <option key={caseName} value={caseName}>{caseName}</option>
-                      ))}
-                      {activeNode.params.mode === 'number' && (
-                        <option value="default">Default</option>
-                      )}
-                    </select>
-                  </div>
+                  <FieldGroup>
+                    <FieldLabel>Active Case (for editing)</FieldLabel>
+                    <FieldSelect value={activeNode.params.activeCase || 'true'} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, activeCase: e.target.value } })}>
+                      {activeNode.params.cases?.map((caseName: string) => (<option key={caseName} value={caseName}>{caseName}</option>))}
+                      {activeNode.params.mode === 'number' && (<option value="default">Default</option>)}
+                    </FieldSelect>
+                  </FieldGroup>
                 </>
               )}
 
-              {/* Number Type selector for source.number */}
               {activeNode.type === 'source.number' && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-gray-500 font-semibold">Number Type</label>
-                  <select
-                    value={activeNode.params.numberType || 'real'}
-                    onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, numberType: e.target.value } })}
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                  >
+                <FieldGroup>
+                  <FieldLabel>Number Type</FieldLabel>
+                  <FieldSelect value={activeNode.params.numberType || 'real'} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, numberType: e.target.value } })}>
                     <option value="real">DBL (Real)</option>
                     <option value="integer">I32 (Integer)</option>
-                  </select>
-                </div>
+                  </FieldSelect>
+                </FieldGroup>
               )}
 
               {!isCaseStructure && NodeRegistry[activeNode.type]?.params?.map(param => (
-                 <div key={param.name} className="flex flex-col gap-1">
-                   <label className="text-gray-500 font-semibold capitalize">{param.name}</label>
+                 <FieldGroup key={param.name}>
+                   <FieldLabel className="capitalize">{param.name}</FieldLabel>
                    {param.type === 'boolean' ? (
-                      <input
-                        type="checkbox"
-                        checked={activeNode.params[param.name] ?? false}
-                        onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: e.target.checked } })}
-                        className="w-4 h-4"
-                      />
+                      <input type="checkbox" checked={activeNode.params[param.name] ?? false} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: e.target.checked } })} className="w-4 h-4 rounded border-input" />
                    ) : param.type === 'array' ? (
-                      <textarea
-                        value={JSON.stringify(activeNode.params[param.name] ?? [])}
-                        onChange={(e) => {
-                           try {
-                             const parsed = JSON.parse(e.target.value);
-                             if (Array.isArray(parsed)) {
-                               updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: parsed } });
-                             }
-                           } catch { /* ignore invalid JSON while typing */ }
-                        }}
-                        placeholder="[1, 2, 3]"
-                        rows={2}
-                        className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm font-mono text-xs"
-                      />
+                      <FieldTextarea value={JSON.stringify(activeNode.params[param.name] ?? [])} placeholder="[1, 2, 3]" onChange={(e) => {
+                           try { const parsed = JSON.parse(e.target.value); if (Array.isArray(parsed)) updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: parsed } }); } catch {}
+                        }} />
                    ) : (
-                      <input
-                        type={param.type === 'number' ? 'number' : 'text'}
-                        value={activeNode.params[param.name] ?? ''}
-                        onChange={(e) => {
+                      <FieldInput type={param.type === 'number' ? 'number' : 'text'} value={activeNode.params[param.name] ?? ''} onChange={(e) => {
                            const v = param.type === 'number' ? Number(e.target.value) : e.target.value;
                            updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: v } });
-                        }}
-                        className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                      />
+                        }} />
                    )}
-                 </div>
+                 </FieldGroup>
               ))}
            </>
         )}
 
         {activeControl && (
            <>
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Control Type</label>
-                 <div className="font-mono bg-white border px-2 py-1 rounded text-xs">{activeControl.type}</div>
-              </div>
+              <FieldGroup>
+                 <FieldLabel>Control Type</FieldLabel>
+                 <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeControl.type}</div>
+              </FieldGroup>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Direction</label>
-                 <select
-                    value={activeControl.direction || 'control'}
-                    onChange={(e) => {
+              <FieldGroup>
+                 <FieldLabel>Direction</FieldLabel>
+                 <FieldSelect value={activeControl.direction || 'control'} onChange={(e) => {
                       const newDirection = e.target.value as 'control' | 'indicator';
                       updateUIControl(activeControl.id, { direction: newDirection });
-                      // Update terminal node ports to match direction
                       const termNode = nodes.find(n => n.id === activeControl.bindingNodeId);
                       if (termNode) {
-                        if (newDirection === 'indicator') {
-                          updateNode(termNode.id, {
-                            inputs: [{ name: 'input', type: 'any', direction: 'input', id: 'input' }],
-                            outputs: []
-                          });
-                        } else {
-                          updateNode(termNode.id, {
-                            inputs: [],
-                            outputs: [{ name: 'output', type: 'any', direction: 'output', id: 'output' }]
-                          });
-                        }
+                        if (newDirection === 'indicator') updateNode(termNode.id, { inputs: [{ name: 'input', type: 'any', direction: 'input', id: 'input' }], outputs: [] });
+                        else updateNode(termNode.id, { inputs: [], outputs: [{ name: 'output', type: 'any', direction: 'output', id: 'output' }] });
                       }
-                    }}
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                 >
+                    }}>
                     <option value="control">▶ Control (Input)</option>
                     <option value="indicator">◀ Indicator (Output)</option>
-                 </select>
-              </div>
+                 </FieldSelect>
+              </FieldGroup>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Label</label>
-                 <input
-                    value={activeControl.label}
-                    onChange={(e) => updateUIControl(activeControl.id, { label: e.target.value })}
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                 />
-              </div>
+              <FieldGroup>
+                 <FieldLabel>Label</FieldLabel>
+                 <FieldInput value={activeControl.label} onChange={(e) => updateUIControl(activeControl.id, { label: e.target.value })} />
+              </FieldGroup>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Width (px)</label>
-                 <input
-                    type="number"
-                    value={activeControl.width ?? ''}
-                    onChange={(e) => updateUIControl(activeControl.id, { width: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="Auto"
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                 />
-              </div>
+              <FieldGroup>
+                 <FieldLabel>Width (px)</FieldLabel>
+                 <FieldInput type="number" value={activeControl.width ?? ''} placeholder="Auto" onChange={(e) => updateUIControl(activeControl.id, { width: e.target.value ? Number(e.target.value) : undefined })} />
+              </FieldGroup>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-gray-500 font-semibold">Height (px)</label>
-                 <input
-                    type="number"
-                    value={activeControl.height ?? ''}
-                    onChange={(e) => updateUIControl(activeControl.id, { height: e.target.value ? Number(e.target.value) : undefined })}
-                    placeholder="Auto"
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                 />
-              </div>
+              <FieldGroup>
+                 <FieldLabel>Height (px)</FieldLabel>
+                 <FieldInput type="number" value={activeControl.height ?? ''} placeholder="Auto" onChange={(e) => updateUIControl(activeControl.id, { height: e.target.value ? Number(e.target.value) : undefined })} />
+              </FieldGroup>
 
-              {/* Number Type for numeric controls */}
               {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-gray-500 font-semibold">Number Type</label>
-                  <select
-                    value={activeControl.numberType || 'real'}
-                    onChange={(e) => {
+                <FieldGroup>
+                  <FieldLabel>Number Type</FieldLabel>
+                  <FieldSelect value={activeControl.numberType || 'real'} onChange={(e) => {
                       const newNumberType = e.target.value as 'real' | 'integer';
                       updateUIControl(activeControl.id, { numberType: newNumberType });
-                      // Update terminal node port type to match
                       const termNode = nodes.find(n => n.id === activeControl.bindingNodeId);
                       if (termNode) {
                         const portType = newNumberType === 'integer' ? 'integer' : 'number';
-                        if (activeControl.direction === 'indicator') {
-                          updateNode(termNode.id, {
-                            inputs: [{ name: 'input', type: portType, direction: 'input', id: 'input' }]
-                          });
-                        } else {
-                          updateNode(termNode.id, {
-                            outputs: [{ name: 'output', type: portType, direction: 'output', id: 'output' }]
-                          });
-                        }
+                        if (activeControl.direction === 'indicator') updateNode(termNode.id, { inputs: [{ name: 'input', type: portType, direction: 'input', id: 'input' }] });
+                        else updateNode(termNode.id, { outputs: [{ name: 'output', type: portType, direction: 'output', id: 'output' }] });
                       }
-                    }}
-                    className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                  >
+                    }}>
                     <option value="real">DBL (Real)</option>
                     <option value="integer">I32 (Integer)</option>
-                  </select>
-                </div>
+                  </FieldSelect>
+                </FieldGroup>
               )}
 
-              {/* Min/Max/Step for numeric controls */}
               {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
                 <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Min</label>
-                    <input
-                      type="number"
-                      value={activeControl.min ?? ''}
-                      onChange={(e) => updateUIControl(activeControl.id, { min: e.target.value ? Number(e.target.value) : undefined })}
-                      placeholder="No limit"
-                      className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Max</label>
-                    <input
-                      type="number"
-                      value={activeControl.max ?? ''}
-                      onChange={(e) => updateUIControl(activeControl.id, { max: e.target.value ? Number(e.target.value) : undefined })}
-                      placeholder="No limit"
-                      className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                    />
-                  </div>
-
+                  <FieldGroup>
+                    <FieldLabel>Min</FieldLabel>
+                    <FieldInput type="number" value={activeControl.min ?? ''} placeholder="No limit" onChange={(e) => updateUIControl(activeControl.id, { min: e.target.value ? Number(e.target.value) : undefined })} />
+                  </FieldGroup>
+                  <FieldGroup>
+                    <FieldLabel>Max</FieldLabel>
+                    <FieldInput type="number" value={activeControl.max ?? ''} placeholder="No limit" onChange={(e) => updateUIControl(activeControl.id, { max: e.target.value ? Number(e.target.value) : undefined })} />
+                  </FieldGroup>
                   {['numberInput', 'slider', 'knob'].includes(activeControl.type) && (
-                    <div className="flex flex-col gap-1">
-                      <label className="text-gray-500 font-semibold">Step</label>
-                      <input
-                        type="number"
-                        value={activeControl.step ?? 1}
-                        onChange={(e) => updateUIControl(activeControl.id, { step: Number(e.target.value) || 1 })}
-                        className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                      />
-                    </div>
+                    <FieldGroup>
+                      <FieldLabel>Step</FieldLabel>
+                      <FieldInput type="number" value={activeControl.step ?? 1} onChange={(e) => updateUIControl(activeControl.id, { step: Number(e.target.value) || 1 })} />
+                    </FieldGroup>
                   )}
                 </>
               )}
 
-              {/* Color On/Off for boolean and some indicators */}
               {['button', 'indicatorLight', 'gauge', 'tank'].includes(activeControl.type) && (
                 <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Color (On/Active)</label>
-                    <input
-                      type="color"
-                      value={activeControl.colorOn || '#4CAF50'}
-                      onChange={(e) => updateUIControl(activeControl.id, { colorOn: e.target.value })}
-                      className="w-full h-8 border rounded cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-gray-500 font-semibold">Color (Off/Inactive)</label>
-                    <input
-                      type="color"
-                      value={activeControl.colorOff || '#cccccc'}
-                      onChange={(e) => updateUIControl(activeControl.id, { colorOff: e.target.value })}
-                      className="w-full h-8 border rounded cursor-pointer"
-                    />
-                  </div>
+                  <FieldGroup>
+                    <FieldLabel>Color (On/Active)</FieldLabel>
+                    <input type="color" value={activeControl.colorOn || '#2E7D32'} onChange={(e) => updateUIControl(activeControl.id, { colorOn: e.target.value })} className="w-full h-8 rounded-md border border-input cursor-pointer" />
+                  </FieldGroup>
+                  <FieldGroup>
+                    <FieldLabel>Color (Off/Inactive)</FieldLabel>
+                    <input type="color" value={activeControl.colorOff || '#E5E7EB'} onChange={(e) => updateUIControl(activeControl.id, { colorOff: e.target.value })} className="w-full h-8 rounded-md border border-input cursor-pointer" />
+                  </FieldGroup>
                 </>
               )}
 
-              {/* Default Value for controllers */}
               {['numberInput', 'button'].includes(activeControl.type) && (
-                 <div className="flex flex-col gap-1">
-                   <label className="text-gray-500 font-semibold">Default Value</label>
+                 <FieldGroup>
+                   <FieldLabel>Default Value</FieldLabel>
                    {activeControl.type === 'button' ? (
-                       <input
-                         type="checkbox"
-                         checked={activeControl.defaultValue}
-                         onChange={(e) => updateUIControl(activeControl.id, { defaultValue: e.target.checked })}
-                         className="w-4 h-4"
-                       />
+                       <input type="checkbox" checked={!!activeControl.defaultValue} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: e.target.checked })} className="w-4 h-4 rounded border-input" />
                    ) : (
-                       <input
-                         type="number"
-                         value={activeControl.defaultValue}
-                         onChange={(e) => updateUIControl(activeControl.id, { defaultValue: Number(e.target.value) })}
-                         className="border p-2 rounded hover:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400 transition-colors bg-white shadow-sm"
-                       />
+                       <FieldInput type="number" value={activeControl.defaultValue ?? ''} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: Number(e.target.value) })} />
                    )}
-                 </div>
+                 </FieldGroup>
               )}
            </>
         )}
 
         {activeEdge && (
           <>
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-semibold">Connection</label>
-              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
-                {activeEdge.sourceNode} → {activeEdge.targetNode}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-semibold">Source Port</label>
-              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
-                {activeEdge.sourcePort}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-semibold">Target Port</label>
-              <div className="font-mono bg-white border px-2 py-1 rounded text-xs">
-                {activeEdge.targetPort}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-gray-500 font-semibold">Edge ID</label>
-              <div className="font-mono text-[10px] text-gray-400 break-all">{activeEdge.id}</div>
-            </div>
-
-            <div className="pt-2 border-t">
-              <button
-                onClick={() => {
-                  removeEdge(activeEdge.id);
-                }}
-                className="w-full bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+            <FieldGroup>
+              <FieldLabel>Connection</FieldLabel>
+              <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeEdge.sourceNode.slice(0,8)} → {activeEdge.targetNode.slice(0,8)}</div>
+            </FieldGroup>
+            <FieldGroup>
+              <FieldLabel>Source Port</FieldLabel>
+              <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeEdge.sourcePort}</div>
+            </FieldGroup>
+            <FieldGroup>
+              <FieldLabel>Target Port</FieldLabel>
+              <div className="font-mono bg-muted border border-border rounded-md px-2.5 py-1.5 text-xs">{activeEdge.targetPort}</div>
+            </FieldGroup>
+            <FieldGroup>
+              <FieldLabel>Edge ID</FieldLabel>
+              <div className="font-mono text-[10px] text-muted-foreground break-all">{activeEdge.id}</div>
+            </FieldGroup>
+            <div className="pt-2 border-t border-border">
+              <Button variant="destructive" size="sm" className="w-full gap-1.5" onClick={() => removeEdge(activeEdge.id)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 Delete Connection
-              </button>
+              </Button>
             </div>
           </>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

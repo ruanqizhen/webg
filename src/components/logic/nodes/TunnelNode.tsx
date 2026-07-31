@@ -149,66 +149,46 @@ export function TunnelNode({ id, selected }: NodeProps) {
 
   return (
     <>
-      <div 
-        className={`relative w-4 h-4 flex items-center justify-center rounded-[1px] cursor-pointer hover:scale-110 transition-transform ${isFullyWired ? 'shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.5)]' : ''} ${selected ? 'ring-2 ring-blue-500' : ''} ${nodeState === 'running' ? 'animate-pulse' : ''}`}
-        style={isFullyWired ? { backgroundColor: bgColor, border: '1px solid #111' } : { backgroundColor: '#fff', border: `2px solid ${bgColor}` }}
+      <div
+        className={`relative w-4 h-4 flex items-center justify-center rounded-[2px] cursor-pointer hover:scale-110 transition-transform ${isFullyWired ? 'shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_1px_2px_rgba(0,0,0,0.3)]' : ''} ${selected ? 'ring-2 ring-ring ring-offset-1' : ''} ${nodeState === 'running' ? 'animate-pulse' : ''}`}
+        style={isFullyWired ? { backgroundColor: bgColor, border: '1px solid hsl(var(--foreground) / 0.2)' } : { backgroundColor: 'hsl(var(--card))', border: `2px solid ${bgColor}` }}
         onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
         onContextMenu={handleContextMenu}
         title={isShiftRegister ? `Shift Register (${side}) ${displayVal}` : (displayVal !== '' ? displayVal : 'Tunnel')}
       >
         <Handle type="target" position={Position.Left} id="input" style={{ opacity: 0, width: 2, height: 2, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }} />
         <Handle type="source" position={Position.Right} id="output" style={{ opacity: 0, width: 2, height: 2, right: '50%', top: '50%', transform: 'translate(50%, -50%)' }} />
-        
-        {/* Inner symbol */}
+
         {isShiftRegister ? (
-           <svg width="10" height="10" viewBox="0 0 10 10" className="pointer-events-none drop-shadow-sm">
-             <polygon 
-                points={isLeft ? "1,2 9,2 5,9" : "5,1 1,8 9,8"} 
-                fill={isFullyWired ? '#ffffff' : bgColor} 
-             />
+           <svg width="10" height="10" viewBox="0 0 10 10" className="pointer-events-none">
+             <polygon points={isLeft ? "1,2 9,2 5,9" : "5,1 1,8 9,8"} fill={isFullyWired ? '#ffffff' : bgColor} />
            </svg>
         ) : (isIndexing && isInLoop) ? (
-           <svg width="10" height="10" viewBox="0 0 12 12" className="pointer-events-none drop-shadow-sm">
-             <path d="M 4,2 L 2,2 L 2,10 L 4,10" fill="none" stroke={isFullyWired ? '#ffffff' : bgColor} strokeWidth="1.5" />
-             <path d="M 8,2 L 10,2 L 10,10 L 8,10" fill="none" stroke={isFullyWired ? '#ffffff' : bgColor} strokeWidth="1.5" />
+           <svg width="10" height="10" viewBox="0 0 12 12" className="pointer-events-none">
+             <path d="M 4,2 L 2,2 L 2,10 L 4,10" fill="none" stroke={isFullyWired ? '#ffffff' : bgColor} strokeWidth="1.3" />
+             <path d="M 8,2 L 10,2 L 10,10 L 8,10" fill="none" stroke={isFullyWired ? '#ffffff' : bgColor} strokeWidth="1.3" />
            </svg>
         ) : null}
       </div>
 
-      {/* Context menu */}
       {showMenu && typeof document !== 'undefined' && createPortal(
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setShowMenu(false)} onContextMenu={(e) => { e.preventDefault(); setShowMenu(false); }} />
-          <div 
-            className="fixed z-[9999] bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[160px] text-xs"
-            style={{ left: menuPos.x, top: menuPos.y }}
-          >
+          <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[180px] text-xs animate-in fade-in zoom-in-95 duration-100" style={{ left: menuPos.x, top: menuPos.y }}>
             {!isShiftRegister && (
               <>
-                <button
-                  className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2"
-                  onClick={toggleIndexing}
-                >
-                  <span className="text-sm font-bold">{isIndexing ? '■' : '[ ]'}</span>
-                  {isIndexing ? 'Disable Indexing' : 'Enable Indexing'}
+                <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={toggleIndexing}>
+                  <span className="text-[11px] font-mono w-4">{isIndexing ? '■' : '[ ]'}</span>{isIndexing ? 'Disable Indexing' : 'Enable Indexing'}
                 </button>
-                <div className="h-[1px] bg-gray-200 my-1 mx-2" />
-                <button
-                  className="w-full text-left px-3 py-1.5 hover:bg-purple-50 flex items-center gap-2"
-                  onClick={replaceWithShiftRegister}
-                >
-                  <span className="text-sm font-bold text-purple-600">↻</span>
-                  Replace with Shift Register
+                <div className="h-px bg-border my-1 mx-2" />
+                <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={replaceWithShiftRegister}>
+                  <span className="text-sm font-medium w-4 text-center">↻</span>Replace with Shift Register
                 </button>
               </>
             )}
             {isShiftRegister && (
-              <button
-                className="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2"
-                onClick={revertToTunnel}
-              >
-                <span className="text-sm font-bold text-blue-600">■</span>
-                Revert to Tunnel
+              <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors" onClick={revertToTunnel}>
+                <span className="text-sm font-medium text-primary w-4 text-center">■</span>Revert to Tunnel
               </button>
             )}
           </div>

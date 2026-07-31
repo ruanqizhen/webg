@@ -6,6 +6,7 @@ import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { ExecutionEngine } from '../../engine/scheduler';
 import { Button } from '../ui/button';
+import { BadgeDot } from '../ui/badge-dot';
 import { useRef } from 'react';
 
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
@@ -18,12 +19,11 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleRun = async () => {
     if (nodes.length === 0) return;
-    if (engineRef.current) return; // Prevent concurrent executions
+    if (engineRef.current) return;
     try {
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);
       runtimeStore.setStepMode(false);
-      
       const engine = new ExecutionEngine(
          { nodes, edges, uiControls },
          runtimeStore,
@@ -35,7 +35,6 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       engineRef.current = engine;
       await engine.executeAll();
     } catch (err: any) {
-      console.error("Execution Error:", err);
       if (err.message !== 'Execution Aborted') {
         runtimeStore.setError(err.message || 'Unknown execution error');
       }
@@ -47,12 +46,11 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleStepRun = async () => {
     if (nodes.length === 0) return;
-    if (engineRef.current) return; // Prevent concurrent executions
+    if (engineRef.current) return;
     try {
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);
       runtimeStore.setStepMode(true);
-      
       const engine = new ExecutionEngine(
          { nodes, edges, uiControls },
          runtimeStore,
@@ -61,18 +59,11 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
          {
            isPaused: () => runtimeStore.checkIsPaused(),
            onContinue: () => {},
-           onNodeStart: (nodeId) => {
-             runtimeStore.setCurrentStepNode(nodeId);
-           },
-           onNodeFinish: () => {
-             runtimeStore.setCurrentStepNode(null);
-           },
+           onNodeStart: (nodeId) => runtimeStore.setCurrentStepNode(nodeId),
+           onNodeFinish: () => runtimeStore.setCurrentStepNode(null),
            shouldPause: async (nodeId) => {
              const node = nodes.find(n => n.id === nodeId);
-             const isStepMode = runtimeStore.isStepMode;
-             const hasBreakpoint = node?.breakpoint;
-             
-             if (isStepMode || hasBreakpoint) {
+             if (runtimeStore.isStepMode || node?.breakpoint) {
                runtimeStore.setCurrentStepNode(nodeId);
                await runtimeStore.waitForStep();
                return true;
@@ -84,7 +75,6 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       engineRef.current = engine;
       await engine.executeAll();
     } catch (err: any) {
-      console.error("Execution Error:", err);
       if (err.message !== 'Execution Aborted') {
         runtimeStore.setError(err.message || 'Unknown execution error');
       }
@@ -110,8 +100,7 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
   };
 
   const handleLoadExample = () => {
-    const example = createExampleProject();
-    loadGraph(example);
+    loadGraph(createExampleProject());
   };
 
   const handleClear = () => {
@@ -120,26 +109,13 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     }
   };
 
-  const handleReset = () => {
-    runtimeStore.resetRuntime();
-  };
-
-  const handleContinue = () => {
-    runtimeStore.continueExecution();
-  };
+  const handleReset = () => runtimeStore.resetRuntime();
+  const handleContinue = () => runtimeStore.continueExecution();
 
   const handleSave = () => {
     try {
       const graph = exportGraph();
-      const fileData = {
-        version: "1.1",
-        graph: graph,
-        ui: {
-          panelLayout: {},
-          viewport: {}
-        }
-      };
-      const json = JSON.stringify(fileData, null, 2);
+      const json = JSON.stringify({ version: "1.1", graph, ui: { panelLayout: {}, viewport: {} } }, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -148,208 +124,112 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      // Delay revoke to avoid interrupting download in some browsers
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (err: any) {
-      console.error('Failed to save project:', err);
-      alert('Failed to save project: ' + (err?.message || 'Unknown error'));
+      alert('Failed to save: ' + (err?.message || 'Unknown error'));
     }
   };
 
-  const handleLoad = () => {
-    fileInputRef.current?.click();
-  };
-
-  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+  const handleLoad = () => fileInputRef.current?.click();
+  const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > MAX_FILE_SIZE) {
-      alert(`File too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_FILE_SIZE/1024/1024}MB.`);
+      alert(`File too large (${(file.size/1024/1024).toFixed(1)}MB). Max 20MB.`);
       e.target.value = '';
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const result = event.target?.result;
-        if (typeof result !== 'string') {
-          throw new Error('Invalid file content');
-        }
+        if (typeof result !== 'string') throw new Error('Invalid file content');
         const data = JSON.parse(result);
-        if (data.graph) {
-          loadGraph(data.graph);
-        } else if (data.nodes) {
-          loadGraph(data);
-        } else {
-          throw new Error('Invalid file format');
-        }
+        if (data.graph) loadGraph(data.graph);
+        else if (data.nodes) loadGraph(data);
+        else throw new Error('Invalid file format');
       } catch (err: any) {
-        console.error("Failed to load file:", err);
-        alert("Failed to load file: " + (err.message || 'Unknown error'));
+        alert("Failed to load: " + (err.message || 'Unknown error'));
       }
     };
-    reader.onerror = () => {
-      console.error("Failed to read file");
-      alert("Failed to read file");
-    };
+    reader.onerror = () => alert("Failed to read file");
     reader.readAsText(file);
     e.target.value = '';
   };
 
   const hasError = !!runtimeStore.errorMessage;
-
-  const currentStatus = hasError ? 'Error' : runtimeStore.isRunning ? (runtimeStore.isPaused ? 'Paused' : 'Running') : 'Idle';
-  const statusColor = hasError ? 'bg-red-500' : runtimeStore.isPaused ? 'bg-yellow-500 animate-pulse' : runtimeStore.isRunning ? 'bg-blue-500 animate-pulse' : 'bg-gray-400';
-  const statusTextColor = hasError ? 'text-red-600 font-semibold' : 'text-gray-500';
+  const statusMeta = hasError
+    ? { dot: 'error' as const, label: 'Error', pulse: false }
+    : runtimeStore.isPaused
+      ? { dot: 'paused' as const, label: 'Paused', pulse: true }
+      : runtimeStore.isRunning
+        ? { dot: 'running' as const, label: 'Running', pulse: true }
+        : { dot: 'idle' as const, label: 'Idle', pulse: false };
 
   return (
     <>
-      <div className="h-14 border-b flex items-center px-4 justify-between bg-white shrink-0 shadow-sm">
-        {/* Hidden file input for loading */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".webg,.json"
-          className="hidden"
-        />
+      <div className="h-12 border-b border-border flex items-center px-3 justify-between bg-card shrink-0">
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".webg,.json" className="hidden" />
 
-        {/* Left: Logo */}
-        <div className="flex items-center gap-3">
-          <h1 className="font-extrabold text-xl mr-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-indigo-600">WebG</h1>
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-7 h-7 rounded-md bg-foreground text-background flex items-center justify-center font-bold text-[13px] tracking-tight">W</div>
+          <span className="font-semibold text-[15px] tracking-tight">WebG</span>
+          <span className="text-[11px] text-muted-foreground font-mono ml-1 hidden sm:inline">v0</span>
         </div>
 
-        {/* Center: File & Canvas Controls */}
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={handleSave} className="gap-1">
-            <Save size={14} /> Save
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleLoad} className="gap-1">
-            <FolderOpen size={14} /> Load
-          </Button>
-          <Button size="sm" variant="outline" onClick={onZoomFit} className="gap-1" title="Zoom Fit (Ctrl+0)">
-            <ZoomIn size={14} /> Fit
-          </Button>
-          
-          <div className="w-px h-6 bg-gray-200 mx-1"></div>
-          
-          {/* Execution controls */}
+        {/* Center */}
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="secondary" onClick={handleSave} className="gap-1.5 h-7"><Save size={14} /> Save</Button>
+          <Button size="sm" variant="secondary" onClick={handleLoad} className="gap-1.5 h-7"><FolderOpen size={14} /> Load</Button>
+          <Button size="sm" variant="secondary" onClick={onZoomFit} className="gap-1.5 h-7"><ZoomIn size={14} /> Fit</Button>
+
+          <div className="w-px h-4 bg-border mx-1.5" />
+
           {runtimeStore.isPaused ? (
-            <Button 
-              size="sm" 
-              variant="default" 
-              onClick={handleContinue} 
-              className="bg-blue-600 hover:bg-blue-700 gap-1"
-              title="Continue (resume execution)"
-            >
-              <Play size={14} /> Continue
-            </Button>
+            <Button size="sm" onClick={handleContinue} className="gap-1.5 h-7"><Play size={14} /> Continue</Button>
           ) : (
             <>
-              <Button 
-                size="sm" 
-                variant="default" 
-                onClick={handleRun} 
-                disabled={runtimeStore.isRunning} 
-                className="bg-green-600 hover:bg-green-700 gap-1"
-              >
-                <Play size={14} /> Run
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={handleStepRun} 
-                disabled={runtimeStore.isRunning} 
-                className="gap-1 border-purple-300 text-purple-600 hover:bg-purple-50"
-                title="Step through nodes one by one"
-              >
-                <StepForward size={14} /> Step
-              </Button>
+              <Button size="sm" onClick={handleRun} disabled={runtimeStore.isRunning} className="gap-1.5 h-7"><Play size={14} /> Run</Button>
+              <Button size="sm" variant="secondary" onClick={handleStepRun} disabled={runtimeStore.isRunning} className="gap-1.5 h-7"><StepForward size={14} /> Step</Button>
             </>
           )}
-          
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={handleStop} 
-            disabled={!runtimeStore.isRunning}
-            className="gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-            title="Stop execution"
-          >
-            <Square size={14} /> Stop
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={handleReset} 
-            disabled={runtimeStore.isRunning && !runtimeStore.isPaused}
-            className="gap-1 text-gray-500 hover:text-gray-700"
-            title="Reset all node states"
-          >
-            <RotateCcw size={14} /> Reset
-          </Button>
+
+          <Button size="sm" variant="secondary" onClick={handleStop} disabled={!runtimeStore.isRunning} className="gap-1.5 h-7"><Square size={14} /> Stop</Button>
+          <Button size="sm" variant="ghost" onClick={handleReset} disabled={runtimeStore.isRunning && !runtimeStore.isPaused} className="gap-1.5 h-7 text-muted-foreground"><RotateCcw size={14} /> Reset</Button>
         </div>
 
-        {/* Right: Status + Help + Clear */}
-        <div className="flex items-center gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-1.5">
-             <span className={`w-2.5 h-2.5 rounded-full ${statusColor}`}></span>
-             <span className={statusTextColor}>{currentStatus}</span>
+        {/* Right */}
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-muted/50 border border-transparent mr-1">
+            <BadgeDot status={statusMeta.dot} pulse={statusMeta.pulse} />
+            <span className="text-xs font-medium text-muted-foreground">{statusMeta.label}</span>
           </div>
-          <div className="w-px h-6 bg-gray-200"></div>
-          <Button size="sm" variant="ghost" onClick={handleLoadExample} className="gap-1 text-gray-400 hover:text-yellow-500" title="Load example project">
-            <Lightbulb size={14} /> Example
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleClear} className="gap-1 text-gray-400 hover:text-red-500">
-            <Trash2 size={14} /> Clear
-          </Button>
-          <div className="w-px h-6 bg-gray-200"></div>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={cycleTheme}
-            className="gap-1 text-gray-400 hover:text-yellow-500"
-            title={`Theme: ${theme}`}
-          >
+
+          <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
+
+          <Button size="sm" variant="ghost" onClick={handleLoadExample} className="h-7 w-7 p-0 text-muted-foreground" title="Example"><Lightbulb size={14} /></Button>
+          <Button size="sm" variant="ghost" onClick={handleClear} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Clear"><Trash2 size={14} /></Button>
+
+          <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
+
+          <Button size="sm" variant="ghost" onClick={cycleTheme} className="h-7 w-7 p-0 text-muted-foreground" title={`Theme: ${theme}`}>
             {theme === 'light' && <Sun size={14} />}
             {theme === 'dark' && <Moon size={14} />}
             {theme === 'system' && <Monitor size={14} />}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => useLogStore.getState().toggleVisible()}
-            className={`gap-1 ${consoleVisible ? 'text-green-500' : 'text-gray-400 hover:text-green-500'}`}
-            title="Toggle Output Console"
-          >
-            <Terminal size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => window.open('https://github.com/ruanqizhen/webg/blob/main/README.md', '_blank')}
-            className="gap-1 text-gray-400 hover:text-blue-500"
-          >
-            <HelpCircle size={14} /> Help
-          </Button>
+          <Button size="sm" variant="ghost" onClick={() => useLogStore.getState().toggleVisible()} className={`h-7 w-7 p-0 ${consoleVisible ? 'text-foreground' : 'text-muted-foreground'}`} title="Console"><Terminal size={14} /></Button>
+          <Button size="sm" variant="ghost" onClick={() => window.open('https://github.com/ruanqizhen/webg/blob/main/README.md', '_blank')} className="h-7 w-7 p-0 text-muted-foreground" title="Help"><HelpCircle size={14} /></Button>
         </div>
       </div>
 
-      {/* Error banner */}
       {hasError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-3 text-sm">
-          <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
-          <span className="text-red-700 font-medium flex-1 truncate">{runtimeStore.errorMessage}</span>
-          <button 
-            onClick={() => runtimeStore.setError(null)}
-            className="text-red-400 hover:text-red-600 transition-colors"
-          >
-            <X size={16} />
-          </button>
+        <div className="bg-destructive/10 border-b border-destructive/20 px-3 py-2 flex items-center gap-2.5 text-sm">
+          <BadgeDot status="error" />
+          <span className="text-destructive font-medium flex-1 truncate text-xs">{runtimeStore.errorMessage}</span>
+          <Button size="sm" variant="ghost" onClick={() => runtimeStore.setError(null)} className="h-6 w-6 p-0 text-destructive/60 hover:text-destructive"><X size={14} /></Button>
         </div>
       )}
     </>

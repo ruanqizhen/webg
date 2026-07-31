@@ -300,31 +300,31 @@ function IdeLayoutInner() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-white overflow-hidden text-gray-800 font-sans">
+    <div className="flex flex-col h-screen w-full bg-background text-foreground overflow-hidden">
       <Toolbar onZoomFit={handleZoomFit} />
       <div className="flex flex-1 overflow-hidden relative">
          <Palette />
-         
-         <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-gray-200 dark:border-gray-700">
+
+         <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-border">
             {/* Tabs Header */}
-            <div className="flex bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700 shrink-0 px-2 pt-2 gap-1 select-none">
-               <button 
-                  className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'ui' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+            <div className="flex bg-muted/40 border-b border-border shrink-0 px-2 h-10 items-center gap-1 select-none">
+               <button
+                  className={`relative h-full px-3.5 text-sm font-medium flex items-center gap-1.5 transition-colors border-b-2 -mb-px ${viewMode === 'ui' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                   onClick={() => setViewMode('ui')}
                >
-                  <MousePointer2 size={16} /> UI
+                  <MousePointer2 size={14} /> UI
                </button>
-               <button 
-                  className={`px-4 py-2 font-medium text-sm rounded-t-lg border-t border-l border-r flex items-center gap-2 transition-colors ${viewMode === 'logic' ? 'bg-white text-purple-600 border-gray-200 border-b-white translate-y-[1px] shadow-sm' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
+               <button
+                  className={`relative h-full px-3.5 text-sm font-medium flex items-center gap-1.5 transition-colors border-b-2 -mb-px ${viewMode === 'logic' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                   onClick={() => setViewMode('logic')}
                >
-                  <Network size={16} /> Logic
+                  <Network size={14} /> Logic
                </button>
             </div>
-            
+
             {/* Tab Contents */}
             <div
-              className="flex-1 flex overflow-hidden relative bg-white"
+              className="flex-1 flex overflow-hidden relative bg-canvas-bg"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >

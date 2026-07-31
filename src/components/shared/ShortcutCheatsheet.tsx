@@ -1,4 +1,6 @@
 import { createPortal } from 'react-dom';
+import { Kbd } from '../ui/kbd';
+import { Button } from '../ui/button';
 
 interface ShortcutCheatsheetProps {
   isOpen: boolean;
@@ -30,7 +32,6 @@ const SHORTCUTS = [
   ['General', [
     ['Escape', 'Deselect all'],
     ['?', 'Show this cheatsheet'],
-    ['Ctrl+S', 'Save (browser)'],
   ]],
 ];
 
@@ -40,41 +41,29 @@ export function ShortcutCheatsheet({ isOpen, onClose }: ShortcutCheatsheetProps)
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/30 z-[9998]" onClick={onClose} />
-      <div className="fixed top-[10%] left-1/2 -translate-x-1/2 z-[9999] w-[520px] max-h-[80vh] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">Keyboard Shortcuts</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+      <div className="fixed inset-0 bg-black/30 z-[9998] backdrop-blur-[1px]" onClick={onClose} />
+      <div className="fixed top-[10%] left-1/2 -translate-x-1/2 z-[9999] w-[480px] max-h-[80vh] bg-popover rounded-xl shadow-xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+          <h2 className="text-sm font-semibold tracking-tight">Keyboard Shortcuts</h2>
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-7 w-7 p-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></Button>
         </div>
-        <div className="p-5 overflow-y-auto space-y-5">
+        <div className="p-4 overflow-y-auto space-y-5 flex-1">
           {SHORTCUTS.map(([category, items]) => (
             <div key={category as string}>
-              <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
-                {category as string}
-              </h3>
-              <div className="space-y-1">
+              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1">{category as string}</h3>
+              <div className="space-y-0.5">
                 {(items as string[][]).map(([key, desc]) => (
-                  <div key={key} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-gray-750 text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">{desc}</span>
-                    <kbd className="text-[11px] font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600">
-                      {key}
-                    </kbd>
+                  <div key={key} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-accent text-sm transition-colors">
+                    <span className="text-muted-foreground text-xs">{desc}</span>
+                    <Kbd>{key}</Kbd>
                   </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700 text-center text-[11px] text-gray-400 dark:text-gray-500">
-          Press <kbd className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">?</kbd> any time to show this panel
+        <div className="px-5 py-2.5 border-t border-border text-center text-[11px] text-muted-foreground">
+          Press <Kbd className="mx-1">?</Kbd> any time to show this panel
         </div>
       </div>
     </>,

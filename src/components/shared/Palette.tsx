@@ -5,7 +5,9 @@ import { getNodeColor } from '../../lib/colors';
 import { useGraphStore } from '../../store/useGraphStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { controlDefaults } from '../../lib/controlDefaults';
-import { 
+import { Panel, PanelHeader } from '../ui/panel';
+import { FieldInput } from '../ui/field';
+import {
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
   EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box,
@@ -78,25 +80,20 @@ export function Palette() {
   };
 
   const handleClickLogic = (nodeType: string) => {
-    const id = generateId();
     addNode({
-      id,
+      id: generateId(),
       type: nodeType,
       position: { x: 100, y: 100 },
       inputs: [],
       outputs: [],
-      params: NodeRegistry[nodeType]?.params?.reduce((acc: any, p) => { acc[p.name] = p.defaultValue; return acc; }, {}) || {}
+      params: NodeRegistry[nodeType]?.params?.reduce((acc: any, p: any) => { acc[p.name] = p.defaultValue; return acc; }, {}) || {}
     });
   };
 
   const handleClickUI = (controlDef: any) => {
     const termId = generateId();
     const ctrlId = generateId();
-
     const direction: 'control' | 'indicator' = controlDef.direction || 'control';
-    const isIndicator = direction === 'indicator';
-
-    // Deterministic placement to avoid pure-render impurity and overlapping
     const existingCount = useGraphStore.getState().nodes.length;
     const offsetX = (existingCount % 6) * 40;
     const offsetY = Math.floor(existingCount / 6) * 50;
@@ -109,23 +106,19 @@ export function Palette() {
       outputs: [],
       params: { value: controlDef.type === 'button' ? false : 0 }
     };
-
     const getPortType = (type: string) => {
       if (type === 'button' || type === 'indicatorLight') return 'boolean';
       if (type === 'textLabel') return 'string';
       return 'number';
     };
     const portType = getPortType(controlDef.type);
-
-    if (isIndicator) {
+    if (controlDef.direction === 'indicator') {
        terminalDef.inputs = [{ name: 'input', type: portType, direction: 'input', id: 'input' }];
     } else {
        terminalDef.outputs = [{ name: 'output', type: portType, direction: 'output', id: 'output' }];
     }
-
     const existingLabels = uiControls.map(c => c.label);
     const uniqueLabel = generateUniqueLabel(controlDef.label, existingLabels);
-
     addUIControl({
       id: ctrlId,
       type: controlDef.type,
@@ -153,112 +146,89 @@ export function Palette() {
     return acc;
   }, {});
 
-  // Filter nodes and controls based on search query
-  const filteredCategories: Record<string, typeof NodeRegistry[string][]> = searchQuery
+  const q = searchQuery.toLowerCase();
+  const filteredCategories = q
     ? Object.entries(categories)
-        .map(([cat, catNodes]) => [cat, catNodes.filter((n) => n.label.toLowerCase().includes(searchQuery.toLowerCase()))] as const)
+        .map(([cat, catNodes]) => [cat, catNodes.filter((n) => n.label.toLowerCase().includes(q))] as const)
         .filter(([, catNodes]) => catNodes.length > 0)
         .reduce((acc, [cat, catNodes]) => ({ ...acc, [cat]: catNodes }), {} as Record<string, typeof NodeRegistry[string][]>)
     : categories;
 
-  const filteredUIControls = searchQuery
-    ? UI_CONTROLS.filter(c => c.label.toLowerCase().includes(searchQuery.toLowerCase()))
-    : UI_CONTROLS;
+  const filteredUIControls = q ? UI_CONTROLS.filter(c => c.label.toLowerCase().includes(q)) : UI_CONTROLS;
 
   return (
-    <div className="w-64 border-r bg-gray-50 flex flex-col h-full overflow-y-auto shrink-0 shadow-inner">
-      <div className="p-3 text-sm font-bold text-gray-700 uppercase tracking-wide border-b bg-white top-0 sticky">
-        Palette
-      </div>
-      
-      {/* Search input */}
-      <div className="p-3 border-b bg-white">
-        <input
-          type="text"
-          placeholder="Search nodes..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-400"
-        />
+    <Panel className="w-64 border-r border-panel-border bg-panel">
+      <PanelHeader>Palette</PanelHeader>
+      <div className="p-2.5 border-b border-panel-border bg-panel-header">
+        <FieldInput placeholder="Search nodes…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 text-xs" />
       </div>
 
-      <div className="p-3 flex flex-col gap-4">
+      <div className="p-2.5 flex flex-col gap-5 overflow-y-auto flex-1">
         {viewMode === 'logic' ? (
           Object.entries(filteredCategories).map(([cat, catNodes]) => (
-             <div key={cat} className="flex flex-col gap-2">
-                <div className="text-xs font-semibold text-gray-500 capitalize px-1">{cat}</div>
+             <div key={cat} className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1">{cat}</div>
                 {catNodes.map((node) => {
                    const Icon = LOGIC_ICONS[node.type] || Box;
+                   const accent = getNodeColor(cat);
                    return (
-                     <div 
+                     <div
                        key={node.type}
-                       className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing flex items-center border-l-4 gap-2"
-                       style={{ borderLeftColor: getNodeColor(cat) }}
+                       className="group flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-sm cursor-grab hover:border-border/80 hover:shadow-sm active:cursor-grabbing transition-colors"
                        onDragStart={(e) => handleDragStartLogic(e, node.type)}
                        onClick={() => handleClickLogic(node.type)}
                        draggable
                      >
-                       <Icon className="w-4 h-4 text-gray-400" />
-                       <span className="truncate">{node.label}</span>
+                       <span className="w-0.5 self-stretch rounded-full shrink-0" style={{ backgroundColor: accent }} />
+                       <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                       <span className="truncate text-xs font-medium">{node.label}</span>
                      </div>
                    );
                 })}
              </div>
           ))
         ) : (
-          <div className="flex flex-col gap-4">
-             {/* Controls (Input) */}
-             <div className="flex flex-col gap-2">
-               <div className="text-xs font-semibold text-gray-500 px-1 flex items-center gap-1">
-                 <span className="text-green-500">▶</span> CONTROLS (Input)
+          <div className="flex flex-col gap-5">
+             <div className="flex flex-col gap-1.5">
+               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-1.5">
+                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> CONTROLS
                </div>
                {filteredUIControls.filter(c => c.direction === 'control').map((ctrl) => {
                  const Icon = UI_ICONS[ctrl.type] || Box;
                  return (
-                    <div
-                      key={ctrl.type}
-                      className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md hover:border-green-300 transition-all flex items-center border-l-4 border-l-green-400"
-                      onClick={() => handleClickUI(ctrl)}
-                      onDragStart={(e) => handleDragStartUI(e, ctrl)}
-                      draggable
-                    >
-                     <Icon className="w-4 h-4 mr-2 text-green-500" />
-                     {ctrl.label}
+                    <div key={`${ctrl.type}-control`} className="group flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-sm cursor-grab hover:border-emerald-500/30 hover:shadow-sm transition-colors" onClick={() => handleClickUI(ctrl)} onDragStart={(e) => handleDragStartUI(e, ctrl)} draggable>
+                     <span className="w-0.5 self-stretch rounded-full bg-emerald-500/70" />
+                     <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                     <span className="text-xs font-medium">{ctrl.label}</span>
                    </div>
                  );
                })}
              </div>
-             {/* Indicators (Output) */}
-             <div className="flex flex-col gap-2">
-               <div className="text-xs font-semibold text-gray-500 px-1 flex items-center gap-1">
-                 <span className="text-orange-500">◀</span> INDICATORS (Output)
+             <div className="flex flex-col gap-1.5">
+               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-1.5">
+                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> INDICATORS
                </div>
                {filteredUIControls.filter(c => c.direction === 'indicator').map((ctrl) => {
                  const Icon = UI_ICONS[ctrl.type] || Box;
                  return (
-                    <div
-                      key={ctrl.type}
-                      className="bg-white border p-2 rounded text-sm cursor-grab hover:shadow-md hover:border-orange-300 transition-all flex items-center border-l-4 border-l-orange-400"
-                      onClick={() => handleClickUI(ctrl)}
-                      onDragStart={(e) => handleDragStartUI(e, ctrl)}
-                      draggable
-                    >
-                     <Icon className="w-4 h-4 mr-2 text-orange-500" />
-                     {ctrl.label}
+                    <div key={`${ctrl.type}-indicator`} className="group flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-sm cursor-grab hover:border-amber-500/30 hover:shadow-sm transition-colors" onClick={() => handleClickUI(ctrl)} onDragStart={(e) => handleDragStartUI(e, ctrl)} draggable>
+                     <span className="w-0.5 self-stretch rounded-full bg-amber-500/70" />
+                     <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                     <span className="text-xs font-medium">{ctrl.label}</span>
                    </div>
                  );
                })}
              </div>
           </div>
         )}
-        
-        {searchQuery && viewMode === 'logic' && Object.keys(filteredCategories).length === 0 && (
-          <div className="text-center text-gray-400 text-sm py-4">No nodes found</div>
+
+        {q && viewMode === 'logic' && Object.keys(filteredCategories).length === 0 && (
+          <div className="text-center text-muted-foreground text-xs py-6">No nodes found</div>
         )}
-        {searchQuery && viewMode === 'ui' && filteredUIControls.length === 0 && (
-          <div className="text-center text-gray-400 text-sm py-4">No controls found</div>
+        {q && viewMode === 'ui' && filteredUIControls.length === 0 && (
+          <div className="text-center text-muted-foreground text-xs py-6">No controls found</div>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

@@ -1,88 +1,43 @@
 import { useRef, useEffect } from 'react';
 import { useLogStore } from '../../store/useLogStore';
-import { X, Trash2, ChevronDown } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
+import { Button } from '../ui/button';
+import { PanelHeader } from '../ui/panel';
+import { BadgeDot } from '../ui/badge-dot';
 
 export function OutputConsole() {
   const { logs, isVisible, clearLogs, setVisible } = useLogStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [logs.length]);
 
   if (!isVisible) return null;
 
-  const typeStyle: Record<string, string> = {
-    log: 'text-gray-700 dark:text-gray-300',
-    error: 'text-red-600 dark:text-red-400',
-    warn: 'text-yellow-600 dark:text-yellow-400',
-    info: 'text-blue-600 dark:text-blue-400',
-  };
-
-  const typeIcon: Record<string, string> = {
-    log: 'i',
-    error: '!',
-    warn: '▲',
-    info: '▶',
-  };
-
-  const typeBadge: Record<string, string> = {
-    log: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-    error: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-    warn: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
-    info: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  };
-
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col shrink-0" style={{ height: 160 }}>
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-850 shrink-0">
-        <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-          <ChevronDown size={12} />
+    <div className="border-t border-panel-border bg-panel flex flex-col shrink-0 h-[160px]">
+      <PanelHeader className="h-8 justify-between px-3">
+        <span className="flex items-center gap-2">
           Output Console
-          <span className="text-gray-300 dark:text-gray-600 font-normal">({logs.length})</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={clearLogs}
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="Clear console"
-          >
-            <Trash2 size={12} />
-          </button>
-          <button
-            onClick={() => setVisible(false)}
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="Close console"
-          >
-            <X size={12} />
-          </button>
-        </div>
-      </div>
+          <span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-muted text-[10px] font-mono text-muted-foreground">{logs.length}</span>
+        </span>
+        <span className="flex items-center gap-0.5">
+          <Button size="sm" variant="ghost" onClick={clearLogs} className="h-6 w-6 p-0" title="Clear"><Trash2 size={12} /></Button>
+          <Button size="sm" variant="ghost" onClick={() => setVisible(false)} className="h-6 w-6 p-0" title="Close"><X size={12} /></Button>
+        </span>
+      </PanelHeader>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-1.5 font-mono text-[11px] leading-relaxed bg-gray-50/50 dark:bg-gray-950/50">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-1.5 font-mono text-[12px] leading-6 bg-card/50">
         {logs.length === 0 ? (
-          <div className="text-gray-300 dark:text-gray-600 italic text-center py-4">
-            Run the graph to see output here. Connect nodes to <span className="font-semibold">Console Log</span> or <span className="font-semibold">Display</span>.
-          </div>
+          <div className="text-muted-foreground text-xs text-center py-8">Run the graph to see output here. Connect nodes to <span className="font-semibold text-foreground">Console Log</span> or <span className="font-semibold text-foreground">Display</span>.</div>
         ) : (
           logs.map((entry) => (
-            <div key={entry.id} className="flex items-start gap-2 py-0.5 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded px-1 group">
-              <span className={`shrink-0 mt-0.5 text-[9px] font-bold w-4 text-center ${typeBadge[entry.type]} rounded-full`}>
-                {typeIcon[entry.type]}
-              </span>
-              <span className="text-gray-300 dark:text-gray-600 shrink-0 w-12 text-right tabular-nums">
-                {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false })}
-              </span>
-              {entry.nodeLabel && (
-                <span className="text-gray-400 dark:text-gray-500 shrink-0 bg-gray-100 dark:bg-gray-800 px-1 rounded text-[10px]">
-                  {entry.nodeLabel}
-                </span>
-              )}
-              <span className={`${typeStyle[entry.type]} break-all`}>
-                {entry.message}
-              </span>
+            <div key={entry.id} className="flex items-start gap-2 py-0.5 hover:bg-accent/50 rounded px-1">
+              <BadgeDot status={entry.type as any} className="mt-1.5" />
+              <span className="text-muted-foreground/60 shrink-0 w-[52px] text-right tabular-nums text-[11px]">{new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false })}</span>
+              {entry.nodeLabel && <span className="shrink-0 bg-muted px-1.5 py-0 rounded text-[10px] text-muted-foreground">{entry.nodeLabel}</span>}
+              <span className={`${entry.type === 'error' ? 'text-destructive' : entry.type === 'warn' ? 'text-amber-600 dark:text-amber-400' : entry.type === 'info' ? 'text-sky-600 dark:text-sky-400' : 'text-foreground/80'} break-all`}>{entry.message}</span>
             </div>
           ))
         )}

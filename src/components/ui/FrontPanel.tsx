@@ -1,96 +1,43 @@
-import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import type { UIControl } from '../../types/graph';
 
+// Professional flat controls — tokenized, minimal, elegant
+
 function Gauge({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
   const rawRange = max - min;
   const range = rawRange === 0 ? 1 : rawRange;
   const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
-  const rotation = percentage * 1.8 - 90; // -90 to 90 degrees
+  const rotation = percentage * 1.8 - 90;
 
   return (
-    <div className="relative w-[144px] h-[76px] flex justify-center items-end drop-shadow-md pb-2">
-      {/* Outer Casing - Metallic */}
-      <div className="absolute -bottom-[2px] w-[136px] h-[68px] rounded-t-full bg-gradient-to-b from-gray-200 to-gray-500 border-[3px] border-b-0 border-[#d1d5db] shadow-xl overflow-hidden">
-          {/* Inner dark dial */}
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[116px] h-[58px] rounded-t-full bg-[#111] shadow-[inset_0_5px_10px_rgba(0,0,0,0.9)] border border-b-0 border-gray-600">
-          </div>
+    <div className="relative w-[132px] h-[72px] flex justify-center items-end pb-1">
+      <div className="absolute bottom-0 w-[116px] h-[58px] rounded-t-full bg-card border border-border overflow-hidden">
+        <div className="absolute inset-0 rounded-t-full bg-muted/30" />
       </div>
-
-      {/* SVG Arc and Ticks */}
-      <div className="absolute bottom-0 w-[116px] h-[58px] overflow-visible mix-blend-screen isolate pointer-events-none z-10 rounded-t-full">
+      <div className="absolute bottom-0 w-[116px] h-[58px] overflow-visible pointer-events-none z-10 rounded-t-full">
          <svg viewBox="0 0 116 58" className="w-full h-full overflow-visible">
-            {/* Background Arc */}
-            <path d="M 13 58 A 45 45 0 0 1 103 58" fill="none" stroke="#333" strokeWidth="6" strokeLinecap="round" />
-            
-            {/* Active Color Sweep */}
-            <path 
-               d="M 13 58 A 45 45 0 0 1 103 58" 
-               fill="none" 
-               stroke={color} 
-               strokeWidth="6" 
-               strokeDasharray="141.37" 
-               strokeDashoffset={141.37 - (percentage / 100) * 141.37} 
-               strokeLinecap="round" 
-               style={{ transition: 'stroke-dashoffset 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
-            />
-
-            {/* Ticks */}
-            {[...Array(21)].map((_, i) => {
-              const angle = 180 - (i * 9); // 180 to 0
+            <path d="M 13 58 A 45 45 0 0 1 103 58" fill="none" stroke="hsl(var(--border))" strokeWidth="5" strokeLinecap="round" />
+            <path d="M 13 58 A 45 45 0 0 1 103 58" fill="none" stroke={color} strokeWidth="5" strokeDasharray="141.37" strokeDashoffset={141.37 - (percentage / 100) * 141.37} strokeLinecap="round" className="transition-[stroke-dashoffset] duration-300" />
+            {[...Array(11)].map((_, i) => {
+              const angle = 180 - (i * 18);
               const rad = (angle * Math.PI) / 180;
-              const isMajor = i % 5 === 0;
-              const r1 = isMajor ? 50 : 54;
-              const r2 = 58;
-              const x1 = 58 + r1 * Math.cos(rad);
-              const y1 = 58 - r1 * Math.sin(rad);
-              const x2 = 58 + r2 * Math.cos(rad);
-              const y2 = 58 - r2 * Math.sin(rad);
-              // Calculate text positions for major ticks
-              const tx = 58 + 40 * Math.cos(rad);
-              const ty = 58 - 38 * Math.sin(rad);
-              const tickVal = min + (i / 20) * (max - min);
-              
-              return (
-                <g key={i}>
-                  <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isMajor ? '#e5e7eb' : '#6b7280'} strokeWidth={isMajor ? 2 : 1} />
-                  {isMajor && angle !== 0 && angle !== 180 && (
-                    <text x={tx} y={ty} fill="#9ca3af" fontSize="6px" fontWeight="bold" fontFamily="monospace" textAnchor="middle" dominantBaseline="middle" opacity="0.8">
-                      {Math.round(tickVal)}
-                    </text>
-                  )}
-                </g>
-              )
+              const r1 = 50; const r2 = 57;
+              const x1 = 58 + r1 * Math.cos(rad); const y1 = 58 - r1 * Math.sin(rad);
+              const x2 = 58 + r2 * Math.cos(rad); const y2 = 58 - r2 * Math.sin(rad);
+              return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth={i % 2 === 0 ? 1.2 : 0.8} />;
             })}
          </svg>
       </div>
-
-      {/* Min/Max/Current Value Labels */}
-      <span className="absolute bottom-1 left-3 text-[8px] font-mono font-bold text-gray-300 z-20 drop-shadow-md">{min}</span>
-      <span className="absolute bottom-1 right-3 text-[8px] font-mono font-bold text-gray-300 z-20 drop-shadow-md">{max}</span>
-      
-      <div className="absolute bottom-[20px] text-[10px] font-mono font-bold text-[#0f0] drop-shadow-[0_0_3px_#0f0] z-20 bg-black/60 px-1.5 py-0.5 rounded shadow-inner leading-none border border-gray-800 tracking-wider">
-         {Number(value).toFixed(1)}
+      <span className="absolute bottom-0 left-2 text-[8px] font-mono text-muted-foreground">{min}</span>
+      <span className="absolute bottom-0 right-2 text-[8px] font-mono text-muted-foreground">{max}</span>
+      <div className="absolute bottom-[18px] text-[11px] font-mono font-medium tabular-nums bg-card border border-border rounded px-1.5 py-0.5 shadow-sm z-20">{Number(value).toFixed(1)}</div>
+      <div className="absolute bottom-0 left-1/2 w-0.5 h-[52px] -translate-x-1/2 origin-bottom transition-transform duration-300 ease-out z-30" style={{ transform: `translateX(-50%) rotate(${rotation}deg)` }}>
+         <div className="w-full h-full bg-destructive rounded-full" />
       </div>
-
-      {/* Realistic Needle */}
-      <div className="absolute bottom-[-5px] left-1/2 w-[5px] h-[58px] -translate-x-1/2 origin-[center_100%] transition-transform duration-300 ease-out z-30 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] filter"
-           style={{ transform: `rotate(${rotation}deg)` }}
-      >
-         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[2.5px] border-r-[2.5px] border-b-[58px] border-l-transparent border-r-transparent border-b-[#dc2626]"></div>
-         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[1.25px] border-r-[1.25px] border-b-[58px] border-l-transparent border-r-transparent border-b-white/30"></div>
-      </div>
-
-      {/* Center cap - Brushed metal look */}
-      <div className="absolute bottom-[-10px] left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gradient-to-br from-gray-300 to-gray-600 shadow-[0_3px_6px_rgba(0,0,0,0.7)] z-40 flex items-center justify-center border-2 border-gray-400">
-         <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 shadow-[inset_0_1px_3px_rgba(0,0,0,1)] flex items-center justify-center">
-            <div className="w-1 h-1 rounded-full bg-gray-500"></div>
-         </div>
-         <div className="absolute w-[80%] h-px bg-white/40 rotate-45 shadow-[0_1px_0_rgba(0,0,0,0.2)]"></div>
-         <div className="absolute w-px h-[80%] bg-white/40 rotate-45 shadow-[1px_0_0_rgba(0,0,0,0.2)]"></div>
-      </div>
+      <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-card border border-border shadow-sm z-40 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-foreground/60" /></div>
     </div>
   );
 }
@@ -99,46 +46,33 @@ function Knob({ value, min, max, onChange, disabled }: { value: number; min: num
   const rawRange = max - min;
   const range = rawRange === 0 ? 1 : rawRange;
   const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
-  const rotation = percentage * 2.7 - 135; // mapping 0-100% to -135deg to +135deg
+  const rotation = percentage * 2.7 - 135;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled || e.button !== 0) return;
     e.stopPropagation();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startVal = value;
-
+    const startX = e.clientX; const startY = e.clientY; const startVal = value;
     const handlePointerMove = (moveEvent: PointerEvent) => {
-        const deltaY = startY - moveEvent.clientY; // upward drag increases
-        const deltaX = moveEvent.clientX - startX; // rightward drag increases
-        const range = max - min;
-        // 150px drag = full range
+        const deltaY = startY - moveEvent.clientY;
+        const deltaX = moveEvent.clientX - startX;
         let newVal = startVal + ((deltaY + deltaX) / 150) * range;
         newVal = Math.max(min, Math.min(max, newVal));
         onChange?.(newVal);
     };
-
     const handlePointerUp = () => {
         document.removeEventListener('pointermove', handlePointerMove);
         document.removeEventListener('pointerup', handlePointerUp);
     };
-
     document.addEventListener('pointermove', handlePointerMove);
     document.addEventListener('pointerup', handlePointerUp);
   };
 
   return (
-    <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-gray-200 to-gray-400 shadow-xl border-4 border-gray-100 touch-none flex items-center justify-center cursor-ns-resize mx-auto"
-         onPointerDown={handlePointerDown}
-    >
-      <div 
-         className="w-[46px] h-[46px] rounded-full bg-gradient-to-tr from-gray-300 to-gray-500 shadow-inner transition-transform duration-75 relative z-10 pointer-events-none"
-         style={{ transform: `rotate(${rotation}deg)` }}
-      >
-         <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-3 bg-gray-800 rounded-full shadow-[0_1px_1px_rgba(255,255,255,0.5)]"></div>
-         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-gray-400/50"></div>
+    <div className="relative w-[56px] h-[56px] rounded-full bg-card border border-border shadow-sm flex items-center justify-center cursor-grab active:cursor-grabbing mx-auto" onPointerDown={handlePointerDown}>
+      <div className="w-[42px] h-[42px] rounded-full bg-muted border border-border shadow-inner transition-transform duration-75 relative z-10 pointer-events-none" style={{ transform: `rotate(${rotation}deg)` }}>
+         <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-2.5 bg-foreground rounded-full" />
       </div>
-      <div className="absolute -bottom-3 text-[9px] text-gray-500 font-mono w-full text-center pointer-events-none">{Number(value).toFixed(1)}</div>
+      <div className="absolute -bottom-4 text-[10px] text-muted-foreground font-mono tabular-nums pointer-events-none">{Number(value).toFixed(1)}</div>
     </div>
   );
 }
@@ -147,21 +81,12 @@ function Tank({ value, min, max, color }: { value: number; min: number; max: num
   const rawRange = max - min;
   const range = rawRange === 0 ? 1 : rawRange;
   const percentage = rawRange === 0 ? 0 : Math.min(100, Math.max(0, ((value - min) / range) * 100));
-  
   return (
-    <div className="relative w-full max-w-[60%] h-full min-h-[50px] bg-gray-200 rounded-md border-[3px] border-[#9ca3af] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-end mx-auto">
-       <div 
-          className="w-full transition-all duration-300 opacity-90 shadow-[0_-2px_10px_rgba(0,0,0,0.3)] relative group"
-          style={{ height: `${percentage}%`, backgroundColor: color }}
-       >
-          <div className="w-full h-1 bg-white/40"></div>
-          {/* Bubbles effect */}
-          <div className="absolute bottom-2 left-2 w-1.5 h-1.5 rounded-full bg-white/30"></div>
-          <div className="absolute bottom-6 left-6 w-2 h-2 rounded-full bg-white/30"></div>
-          <div className="absolute bottom-4 right-3 w-1 h-1 rounded-full bg-white/30"></div>
+    <div className="relative w-[56px] h-full min-h-[60px] bg-muted rounded-md border border-border overflow-hidden flex flex-col justify-end mx-auto shadow-inner">
+       <div className="w-full transition-all duration-300" style={{ height: `${percentage}%`, backgroundColor: color }}>
+          <div className="w-full h-px bg-white/30" />
        </div>
-       <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-white/20 pointer-events-none border border-black/10"></div>
-       <div className="absolute bottom-0 w-full bg-black/30 backdrop-blur-[1px] text-center text-white text-[10px] font-mono font-bold drop-shadow-md z-10 py-0.5 pointer-events-none select-none">{Number(value).toFixed(1)}</div>
+       <div className="absolute bottom-0 w-full bg-foreground/60 text-background text-center text-[10px] font-mono font-medium py-0.5">{Number(value).toFixed(1)}</div>
     </div>
   );
 }
@@ -184,181 +109,71 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
   return (
     <>
       {control.type === 'numberInput' && (
-          <div 
-           className="flex-1 flex items-center bg-[#e8e8e8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] border border-gray-400 rounded p-1"
-         >
-           <input
-             type="number"
-             value={displayVal}
-             onChange={handleChange}
-             min={min}
-             max={max}
-             step={step}
-             className="bg-transparent text-center font-mono font-semibold text-gray-800 w-full h-full focus:outline-none focus:text-blue-600"
-             style={{ fontSize: `${Math.max(14, Math.min(height / 2, width / 6))}px` }}
-             disabled={isIndicatorDir}
-             onPointerDown={e => e.stopPropagation()}
-           />
+          <div className="flex-1 flex items-center bg-card border border-input rounded-md px-1 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
+           <input type="number" value={displayVal ?? ''} onChange={handleChange} min={min} max={max} step={step} className="bg-transparent text-center font-mono text-sm font-medium text-foreground w-full h-7 focus:outline-none" disabled={isIndicatorDir} onPointerDown={e => e.stopPropagation()} />
          </div>
       )}
 
       {control.type === 'button' && (
-          <div className="w-full h-full flex items-center justify-center p-1">
-            <label className="relative inline-flex items-center cursor-pointer select-none"
-                   style={{ transform: `scale(${Math.max(0.5, Math.min((width - 8) / 60, (height - 30) / 40))})`, transformOrigin: 'center center' }}
-                   onPointerDown={e => e.stopPropagation()}
-            >
-              <input
-                type="checkbox"
-                checked={displayVal as boolean}
-                onChange={handleChange}
-                disabled={isIndicatorDir}
-                className="sr-only peer"
-              />
-              <div className={`w-14 h-8 rounded-full shadow-[inset_0_3px_6px_rgba(0,0,0,0.4)] border border-gray-400 transition-colors drop-shadow-sm`} 
-                   style={{ backgroundColor: displayVal ? colorOn : colorOff }}
-              >
-                 <div className={`absolute top-[2px] left-[2px] bg-gradient-to-b from-gray-100 to-gray-400 border border-gray-500 shadow-[0_2px_4px_rgba(0,0,0,0.5)] rounded-full h-6 w-6 transition-all duration-200 flex items-center justify-center ${displayVal ? 'translate-x-[24px]' : ''}`}>
-                    <div className="flex gap-[2px]">
-                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                       <div className="w-0.5 h-3 bg-gray-500/50 rounded-full"></div>
-                    </div>
-                 </div>
+          <div className="w-full h-full flex items-center justify-center">
+            <label className="relative inline-flex items-center cursor-pointer select-none" onPointerDown={e => e.stopPropagation()}>
+              <input type="checkbox" checked={!!displayVal} onChange={handleChange} disabled={isIndicatorDir} className="sr-only peer" />
+              <div className="w-12 h-6 rounded-full bg-input border border-border shadow-inner transition-colors peer-checked:bg-primary relative">
+                 <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card border border-border shadow-sm transition-transform peer-checked:translate-x-6" />
               </div>
             </label>
           </div>
       )}
 
       {control.type === 'numberIndicator' && (
-         <div className="bg-[#111] px-3 py-2 text-xl rounded shadow-[inset_0_4px_10px_rgba(0,0,0,1)] border-b border-r border-gray-500 border-t-2 border-l-2 border-t-black border-l-black text-right font-mono flex-1 flex items-center justify-end overflow-hidden relative">
-           <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-           <span className="text-[#39ff14] drop-shadow-[0_0_8px_rgba(57,255,20,0.9)] z-10 select-all">
-             {Number(displayVal ?? 0).toFixed(2)}
-           </span>
-         </div>
+         <div className="bg-muted border border-border rounded-md px-2.5 py-1.5 text-sm font-mono tabular-nums font-medium text-foreground text-right flex-1 flex items-center justify-end shadow-inner">{Number(displayVal ?? 0).toFixed(2)}</div>
       )}
 
       {control.type === 'textLabel' && (
-         <div className="bg-gradient-to-b from-[#f8f8f0] to-[#e8e8e0] px-3 py-1.5 text-sm rounded border border-gray-400 text-gray-800 min-w-[6rem] font-medium text-center relative overflow-hidden flex-1 shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
-           <div className="absolute left-1 top-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 rotate-45"></div></div>
-           <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-12"></div></div>
-           <div className="absolute left-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 -rotate-45"></div></div>
-           <div className="absolute right-1 bottom-1 w-1.5 h-1.5 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)] bg-gray-400 flex items-center justify-center"><div className="w-full h-px bg-gray-600 rotate-12"></div></div>
-           <span className="relative z-10 pointer-events-none drop-shadow-sm select-all">{String(displayVal ?? '')}</span>
+         <div className="bg-card border border-dashed border-border rounded-md px-2.5 py-1.5 text-sm text-foreground text-center flex-1 flex items-center justify-center shadow-sm">
+           <span className="truncate text-xs">{String(displayVal ?? '')}</span>
          </div>
       )}
 
       {control.type === 'indicatorLight' && (
-         <div className="flex-1 flex items-center justify-center relative">
-            <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 40, (height - 40) / 40))})`, transformOrigin: 'center center' }}>
-                 <div className="relative mx-auto w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-500 p-[2px] shadow-[0_3px_6px_rgba(0,0,0,0.4)] flex items-center justify-center">
-                    <div className="w-full h-full rounded-full bg-[#333] p-[2px] shadow-[inset_0_3px_5px_rgba(0,0,0,0.8)] border border-gray-600">
-                       <div
-                         className="w-full h-full rounded-full transition-all duration-300 relative overflow-hidden"
-                         style={{
-                           background: displayVal ? `radial-gradient(circle at 35% 35%, #fff 5%, ${colorOn} 40%, #000 95%)` : `radial-gradient(circle at 35% 35%, #666 5%, #222 40%, #000 95%)`,
-                           boxShadow: displayVal ? `0 0 15px 3px ${colorOn}` : 'none',
-                         }}
-                       >
-                         {displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-70 blur-[1px] rotate-[-40deg]" />}
-                         {!displayVal && <div className="absolute top-[10%] left-[20%] w-[30%] h-[15%] bg-white rounded-full opacity-10 blur-[1px] rotate-[-40deg]" />}
-                       </div>
-                    </div>
-                 </div>
+         <div className="flex-1 flex items-center justify-center">
+            <div className="relative w-8 h-8 rounded-full bg-card border border-border shadow-sm flex items-center justify-center p-1">
+               <div className="w-full h-full rounded-full transition-all duration-300" style={{ background: displayVal ? colorOn : colorOff, boxShadow: displayVal ? `0 0 10px ${colorOn}80` : 'none' }} />
             </div>
-            {!isIndicatorDir && (
-               <input type="checkbox" checked={displayVal as boolean} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50 m-0" />
-            )}
+            {!isIndicatorDir && <input type="checkbox" checked={!!displayVal} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" />}
          </div>
       )}
 
       {control.type === 'gauge' && (
-        <div className="flex-1 flex items-center justify-center overflow-hidden relative">
-          <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 144, (height - 40) / 84))})`, transformOrigin: 'center center' }}>
-             <Gauge
-              value={Number(displayVal) || 0}
-              min={min ?? 0}
-              max={max ?? 100}
-              color={colorOn}
-            />
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <div style={{ transform: `scale(${Math.max(0.3, Math.min((width - 16) / 132, (height - 20) / 72))})`, transformOrigin: 'center center' }}>
+             <Gauge value={Number(displayVal) || 0} min={min ?? 0} max={max ?? 100} color={colorOn} />
           </div>
-          {!isIndicatorDir && (
-             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-50 m-0" />
-          )}
+          {!isIndicatorDir && <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10" />}
         </div>
       )}
 
       {control.type === 'slider' && (
-         <div className="w-full h-full flex-1 flex flex-col justify-around py-2 px-1">
-             <style>{`
-                .slider-${control.id}::-webkit-slider-thumb {
-                  -webkit-appearance: none;
-                  appearance: none;
-                  width: ${Math.max(16, height * 0.2)}px;
-                  height: ${Math.max(16, height * 0.2)}px;
-                  background: #2563eb;
-                  border-radius: 50%;
-                  cursor: pointer;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-                }
-                .slider-${control.id}::-moz-range-thumb {
-                  width: ${Math.max(16, height * 0.2)}px;
-                  height: ${Math.max(16, height * 0.2)}px;
-                  background: #2563eb;
-                  border-radius: 50%;
-                  cursor: pointer;
-                  border: none;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-                }
-             `}</style>
-             <div className="flex-1 flex flex-col justify-center">
-                 <input 
-                    type="range"
-                    min={min ?? 0}
-                    max={max ?? 100}
-                    step={step ?? 1}
-                    value={displayVal}
-                    onChange={handleChange}
-                    disabled={isIndicatorDir}
-                    className={`w-full bg-gray-300 rounded-lg appearance-none cursor-ew-resize accent-blue-600 focus:outline-none slider-${control.id}`}
-                    style={{ height: `${Math.max(6, height * 0.1)}px` }}
-                    onPointerDown={e => e.stopPropagation()}
-                 />
-             </div>
-             <div className="flex justify-between items-center mt-auto group px-0.5 shrink-0" style={{ fontSize: `${Math.max(9, height * 0.15)}px` }}>
-                 <span className="text-gray-400">{min ?? 0}</span>
-                 <span className="font-mono font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded" style={{ fontSize: `${Math.max(10, height * 0.16)}px` }}>{Number(displayVal ?? 0).toFixed(1)}</span>
-                 <span className="text-gray-400">{max ?? 100}</span>
+         <div className="w-full flex-1 flex flex-col justify-center gap-1.5 px-1">
+             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal ?? 0} onChange={handleChange} disabled={isIndicatorDir} className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" onPointerDown={e => e.stopPropagation()} />
+             <div className="flex justify-between items-center text-[10px] text-muted-foreground font-mono">
+                 <span>{min ?? 0}</span><span className="font-medium text-foreground bg-muted px-1 rounded">{Number(displayVal ?? 0).toFixed(1)}</span><span>{max ?? 100}</span>
              </div>
          </div>
       )}
 
       {control.type === 'knob' && (
          <div className="w-full h-full flex flex-col justify-center items-center flex-1 py-1">
-             <div style={{ transform: `scale(${Math.max(0.2, Math.min((width - 16) / 64, (height - 40) / 72))})`, transformOrigin: 'center center' }}>
-                 <Knob
-                    value={displayVal}
-                    min={min ?? 0}
-                    max={max ?? 100}
-                    onChange={(v) => handleChange({ target: { value: String(v) } })}
-                    disabled={isIndicatorDir}
-                 />
+             <div style={{ transform: `scale(${Math.max(0.3, Math.min((width - 16) / 64, (height - 32) / 64))})`, transformOrigin: 'center center' }}>
+                 <Knob value={displayVal as number} min={min ?? 0} max={max ?? 100} onChange={(v) => handleChange({ target: { value: String(v) } } as any)} disabled={isIndicatorDir} />
              </div>
          </div>
       )}
 
       {control.type === 'tank' && (
-         <div className="w-full h-full flex items-center justify-center flex-1 py-1 relative">
-             <Tank
-                value={Number(displayVal) || 0}
-                min={min ?? 0}
-                max={max ?? 100}
-                color={colorOn}
-             />
-             {!isIndicatorDir && (
-                <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ appearance: 'slider-vertical', writingMode: 'bt-lr' } as unknown as React.CSSProperties} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-50 m-0" />
-             )}
+         <div className="w-full h-full flex items-center justify-center flex-1 py-1">
+             <Tank value={Number(displayVal) || 0} min={min ?? 0} max={max ?? 100} color={colorOn} />
+             {!isIndicatorDir && <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal as number} onChange={handleChange} onPointerDown={e => e.stopPropagation()} style={{ writingMode: 'vertical-lr', direction: 'rtl' } as any} className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize z-10" />}
          </div>
       )}
     </>
@@ -368,21 +183,11 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
 function ControlItem({ control, transform }: { control: UIControl; transform: { x: number; y: number; scale: number } }) {
   const { updateUIControl, updateNode, pushHistory } = useGraphStore();
   const { selectedControlId, setSelectedControlId } = useUIStore();
-
   const terminalId = control.bindingNodeId;
   const inputVal = useRuntimeStore(s => s.portValues[`${terminalId}_input`]);
   const [isDragging, setIsDragging] = useState(false);
   const [resizeMode, setResizeMode] = useState<string | null>(null);
-  const dragMetaRef = useRef<{
-    pointerId: number | null;
-    element: EventTarget | null;
-    clientX: number;
-    clientY: number;
-    origX: number;
-    origY: number;
-    origW: number;
-    origH: number;
-  }>({ pointerId: null, element: null, clientX: 0, clientY: 0, origX: 0, origY: 0, origW: 0, origH: 0 });
+  const dragMetaRef = useRef<{ pointerId: number | null; element: EventTarget | null; clientX: number; clientY: number; origX: number; origY: number; origW: number; origH: number; }>({ pointerId: null, element: null, clientX: 0, clientY: 0, origX: 0, origY: 0, origW: 0, origH: 0 });
   const originalPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -397,7 +202,6 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     dragMetaRef.current.origX = control.x ?? 50;
     dragMetaRef.current.origY = control.y ?? 50;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-
     originalPosRef.current = { x: control.x ?? 50, y: control.y ?? 50 };
   };
 
@@ -411,8 +215,8 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     dragMetaRef.current.element = e.currentTarget;
     dragMetaRef.current.clientX = e.clientX;
     dragMetaRef.current.clientY = e.clientY;
-    dragMetaRef.current.origW = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
-    dragMetaRef.current.origH = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
+    dragMetaRef.current.origW = control.width || 120;
+    dragMetaRef.current.origH = control.height || 60;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -421,24 +225,15 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     const dx = e.clientX - dragMetaRef.current.clientX;
     const dy = e.clientY - dragMetaRef.current.clientY;
     if (!resizeMode) {
-      // Use accumulated delta from drag start for stability with pointer capture
       const totalDx = e.clientX - dragMetaRef.current.clientX;
       const totalDy = e.clientY - dragMetaRef.current.clientY;
-      updateUIControl(control.id, {
-        x: dragMetaRef.current.origX + totalDx / transform.scale,
-        y: dragMetaRef.current.origY + totalDy / transform.scale,
-      }, true);
+      updateUIControl(control.id, { x: dragMetaRef.current.origX + totalDx / transform.scale, y: dragMetaRef.current.origY + totalDy / transform.scale }, true);
     } else {
       let newWidth = dragMetaRef.current.origW;
       let newHeight = dragMetaRef.current.origH;
-
-      if (resizeMode.includes('e')) newWidth = Math.max(30, dragMetaRef.current.origW + dx / transform.scale);
-      if (resizeMode.includes('s')) newHeight = Math.max(30, dragMetaRef.current.origH + dy / transform.scale);
-
-      updateUIControl(control.id, {
-        width: newWidth,
-        height: newHeight,
-      }, true);
+      if (resizeMode.includes('e')) newWidth = Math.max(36, dragMetaRef.current.origW + dx / transform.scale);
+      if (resizeMode.includes('s')) newHeight = Math.max(36, dragMetaRef.current.origH + dy / transform.scale);
+      updateUIControl(control.id, { width: newWidth, height: newHeight }, true);
     }
   };
 
@@ -447,57 +242,27 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     setIsDragging(false);
     setResizeMode(null);
     const meta = dragMetaRef.current;
-    meta.pointerId = null;
-    meta.element = null;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-
+    meta.pointerId = null; meta.element = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     if (!resizeMode && originalPosRef.current) {
-        const myX = control.x ?? 50;
-        const myY = control.y ?? 50;
-        const myW = width;
-        const myH = height;
-
+        const myX = control.x ?? 50; const myY = control.y ?? 50;
+        const myW = width; const myH = height;
         const allControls = useGraphStore.getState().uiControls;
         const allNodes = useGraphStore.getState().nodes;
-
-        let overlappingArray: UIControl | null = null;
-        let hasOverlap = false;
-
+        let overlappingArray: UIControl | null = null; let hasOverlap = false;
         for (const other of allControls) {
             if (other.id === control.id) continue;
-            const oX = other.x ?? 50;
-            const oY = other.y ?? 50;
-            const oW = other.width || (other.type === 'gauge' ? 120 : other.type === 'indicatorLight' || other.type === 'button' ? 80 : 140);
-            const oH = other.height || (other.type === 'gauge' ? 100 : other.type === 'indicatorLight' || other.type === 'button' ? 60 : 60);
-
+            const oX = other.x ?? 50; const oY = other.y ?? 50;
+            const oW = other.width || 120; const oH = other.height || 60;
             if (myX < oX + oW && myX + myW > oX && myY < oY + oH && myY + myH > oY) {
                 hasOverlap = true;
-                if (other.type === 'array' && other.direction === control.direction && control.type !== 'array') {
-                    overlappingArray = other;
-                    break;
-                }
+                if (other.type === 'array' && other.direction === control.direction && control.type !== 'array') { overlappingArray = other; break; }
             }
         }
-
         if (overlappingArray) {
-            const getPortType = (type: string) => {
-                if (type === 'button' || type === 'indicatorLight') return 'boolean';
-                if (type === 'textLabel') return 'string';
-                return 'number';
-            };
+            const getPortType = (type: string) => { if (type === 'button' || type === 'indicatorLight') return 'boolean'; if (type === 'textLabel') return 'string'; return 'number'; };
             const portType = getPortType(control.type);
-
-            updateUIControl(overlappingArray.id, {
-                elementDef: {
-                    ...control,
-                    id: undefined
-                },
-                width: Math.max(overlappingArray.width || 120, 46 + myW),
-                height: Math.max(overlappingArray.height || 60, myH)
-            });
-
+            updateUIControl(overlappingArray.id, { elementDef: { ...control, id: undefined }, width: Math.max(overlappingArray.width || 120, 46 + myW), height: Math.max(overlappingArray.height || 60, myH) });
             const currentTerminal = allNodes.find(n => n.id === overlappingArray!.bindingNodeId);
             if (currentTerminal) {
                 const isIndicator = overlappingArray!.direction === 'indicator';
@@ -505,8 +270,6 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
                 const newOutputs = !isIndicator ? currentTerminal.outputs.map(p => ({ ...p, type: `${portType}[]` })) : currentTerminal.outputs;
                 useGraphStore.getState().updateNode(currentTerminal.id, { inputs: newInputs, outputs: newOutputs });
             }
-
-            // Remove dragged control and its terminal — also cleans its edges via removeNode
             useGraphStore.getState().removeNode(control.bindingNodeId);
         } else if (hasOverlap) {
             updateUIControl(control.id, { x: originalPosRef.current!.x, y: originalPosRef.current!.y }, true);
@@ -514,29 +277,9 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     }
   };
 
-  // Cleanup on unmount — snapshot element ref to avoid stale closure warning
-  const cleanupElementRef = useRef<EventTarget | null>(null);
-  useEffect(() => {
-    cleanupElementRef.current = dragMetaRef.current.element;
-    return () => {
-      const el = dragMetaRef.current.element;
-      const pid = dragMetaRef.current.pointerId;
-      if (el && pid !== null) {
-        try {
-          (el as HTMLElement).releasePointerCapture(pid);
-        } catch {
-          // Ignore
-        }
-      }
-    };
-  }, []);
-
   const [arrayIndex, setArrayIndex] = useState(0);
-
   const isIndicatorDir = (control.direction || 'control') === 'indicator';
   const isArray = control.type === 'array';
-  
-  // For array elements, we bind to an element array.
   let displayVal: any;
   if (isArray) {
      const arr = Array.isArray(inputVal) ? inputVal : (Array.isArray(control.defaultValue) ? control.defaultValue : []);
@@ -548,10 +291,8 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   const handleChange = (e: any) => {
     let newVal = e.target.value;
     const targetType = isArray ? control.elementDef?.type : control.type;
-    
     if (['numberInput', 'slider', 'knob', 'gauge', 'tank'].includes(targetType)) newVal = Number(newVal);
     if (['button', 'indicatorLight'].includes(targetType)) newVal = e.target.checked;
-
     if (isArray) {
        const arr = Array.isArray(control.defaultValue) ? [...control.defaultValue] : [];
        arr[arrayIndex] = newVal;
@@ -561,121 +302,54 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
        updateUIControl(control.id, { defaultValue: newVal });
        updateNode(terminalId, { params: { value: newVal } });
     }
-  }
+  };
 
-  // Control dimensions
-  const width = control.width || (control.type === 'gauge' ? 120 : control.type === 'indicatorLight' || control.type === 'button' ? 80 : 140);
-  const height = control.height || (control.type === 'gauge' ? 100 : control.type === 'indicatorLight' || control.type === 'button' ? 60 : 60);
-
-  // Colors for button and indicator light
-  const colorOn = control.colorOn || '#4CAF50';
-  const colorOff = control.colorOff || '#cccccc';
-
-  // Min/Max/Step for number input
-  const min = control.min !== undefined ? control.min : undefined;
-  const max = control.max !== undefined ? control.max : undefined;
-  const step = control.step !== undefined ? control.step : 1;
-
+  const width = control.width || 120;
+  const height = control.height || 48;
+  const colorOn = control.colorOn || '#2E7D32';
+  const colorOff = control.colorOff || 'hsl(var(--muted))';
+  const min = control.min; const max = control.max; const step = control.step ?? 1;
   const isSelected = selectedControlId === control.id;
 
   return (
-    <div
-      className={`absolute flex flex-col rounded ${isSelected ? 'bg-blue-50/50 outline outline-1 outline-blue-400 z-10' : 'hover:outline hover:outline-1 hover:outline-gray-300'} select-none transition-all duration-200`}
-      style={{ left: control.x || 50, top: control.y || 50, width: width, height: height, minHeight: height, cursor: isDragging && !resizeMode ? 'move' : 'move' }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-move z-20">
-        <label className="text-xs font-bold text-gray-600 drop-shadow-sm cursor-inherit select-none">
-          {control.label}
-        </label>
+    <div className={`absolute flex flex-col rounded-md transition-colors ${isSelected ? 'bg-accent/40 outline outline-1 outline-ring z-10' : 'hover:outline hover:outline-1 hover:outline-border'} select-none`} style={{ left: control.x ?? 50, top: control.y ?? 50, width, height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-grab z-20">
+        <label className="text-[11px] font-medium text-muted-foreground tracking-wide select-none">{control.label}</label>
       </div>
 
       {control.type === 'array' ? (
-        <div className="flex-1 flex flex-row overflow-hidden border-2 border-gray-400 bg-gray-50 rounded-sm">
-           {/* Index Stepper Area */}
-           <div className="w-10 flex border-r border-gray-400 bg-gray-200 shrink-0">
-               <div className="w-4 flex flex-col justify-between border-r border-gray-300">
-                   <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 border-b border-gray-300 cursor-pointer">
-                      <span className="text-[8px]">▲</span>
-                   </button>
-                   <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-gray-300 active:bg-gray-400 cursor-pointer">
-                      <span className="text-[8px]">▼</span>
-                   </button>
-               </div>
-               <div className="flex-1 flex items-center justify-center">
-                  <span className="font-mono text-xs font-bold">{arrayIndex}</span>
-               </div>
+        <div className="flex-1 flex flex-row overflow-hidden border border-border bg-card rounded-md shadow-sm">
+           <div className="w-9 flex flex-col border-r border-border bg-muted/50 shrink-0">
+               <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.min(99, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-b border-border">▲</button>
+               <div className="flex-1 flex items-center justify-center font-mono text-[11px] font-medium">{arrayIndex}</div>
+               <button onPointerDown={(e) => { e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-t border-border">▼</button>
            </div>
-           
-           {/* Content Area */}
-           <div className="flex-1 overflow-hidden relative border-[3px] border-transparent">
+           <div className="flex-1 overflow-hidden relative">
                {control.elementDef ? (
-                 <div className="absolute inset-0.5 overflow-hidden flex items-center justify-center">
-                   <InnerControlRender 
-                     control={{...control.elementDef, id: `${control.id}_inner`}} 
-                     displayVal={displayVal} 
-                     handleChange={handleChange}
-                     width={(width-46)} 
-                     height={height}
-                     colorOn={control.elementDef.colorOn || '#4CAF50'}
-                     colorOff={control.elementDef.colorOff || '#cccccc'}
-                     min={control.elementDef.min}
-                     max={control.elementDef.max}
-                     step={control.elementDef.step}
-                     isIndicatorDir={isIndicatorDir}
-                   />
+                 <div className="absolute inset-1 flex items-center justify-center">
+                   <InnerControlRender control={{...control.elementDef, id: `${control.id}_inner`}} displayVal={displayVal} handleChange={handleChange} width={width-40} height={height} colorOn={control.elementDef.colorOn || '#2E7D32'} colorOff={control.elementDef.colorOff || 'hsl(var(--muted))'} min={control.elementDef.min} max={control.elementDef.max} step={control.elementDef.step} isIndicatorDir={isIndicatorDir} />
                  </div>
                ) : (
-                 <div className="w-full h-full flex items-center justify-center pointer-events-none">
-                     <span className="text-[10px] text-gray-400 uppercase font-semibold border-2 border-dashed border-gray-300 px-2 py-1 bg-white/50">Drop Element</span>
-                 </div>
+                 <div className="w-full h-full flex items-center justify-center"><span className="text-[10px] text-muted-foreground border border-dashed border-border rounded px-2 py-1 bg-muted/30">Drop Element</span></div>
                )}
            </div>
         </div>
       ) : (
-        <InnerControlRender 
-          control={control} 
-          displayVal={displayVal} 
-          handleChange={handleChange}
-          width={width} 
-          height={height}
-          colorOn={colorOn}
-          colorOff={colorOff}
-          min={min}
-          max={max}
-          step={step}
-          isIndicatorDir={isIndicatorDir}
-        />
+        <InnerControlRender control={control} displayVal={displayVal} handleChange={handleChange} width={width} height={height} colorOn={colorOn} colorOff={colorOff} min={min} max={max} step={step} isIndicatorDir={isIndicatorDir} />
       )}
 
-      {/* Resize Handles */}
       {isSelected && (
          <>
-           {/* East Handle */}
-           <div 
-             className="absolute top-0 right-[-4px] bottom-0 w-[8px] cursor-e-resize z-50 hover:bg-blue-400/50 transition-colors"
-             onPointerDown={onResizePointerDown('e')}
-           />
-           {/* South Handle */}
-           <div 
-             className="absolute bottom-[-4px] left-0 right-0 h-[8px] cursor-s-resize z-50 hover:bg-blue-400/50 transition-colors"
-             onPointerDown={onResizePointerDown('s')}
-           />
-           {/* South-East Handle */}
-           <div 
-             className="absolute bottom-[-6px] right-[-6px] w-[12px] h-[12px] bg-white border-2 border-blue-500 cursor-se-resize z-50 rounded-full shadow-sm hover:scale-125 transition-transform"
-             onPointerDown={onResizePointerDown('se')}
-           />
+           <div className="absolute top-0 right-[-4px] bottom-0 w-2 cursor-e-resize z-10 hover:bg-ring/20" onPointerDown={onResizePointerDown('e')} />
+           <div className="absolute bottom-[-4px] left-0 right-0 h-2 cursor-s-resize z-10 hover:bg-ring/20" onPointerDown={onResizePointerDown('s')} />
+           <div className="absolute bottom-[-5px] right-[-5px] w-2.5 h-2.5 bg-card border border-ring rounded-full shadow-sm cursor-se-resize z-10 hover:scale-110 transition-transform" onPointerDown={onResizePointerDown('se')} />
          </>
       )}
     </div>
   );
 }
 
-export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, screenY: number) => { x: number, y: number } }, { containerRef?: React.RefObject<HTMLDivElement | null> }>(({ containerRef }, ref) => {
+export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, screenY: number) => { x: number; y: number } }, { containerRef?: React.RefObject<HTMLDivElement | null> }>(({ containerRef }, ref) => {
   const { uiControls } = useGraphStore();
   const { setSelectedControlId } = useUIStore();
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -688,10 +362,7 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
       const rect = internalRef.current?.getBoundingClientRect();
       if (!rect) return { x: screenX, y: screenY };
       const safeScale = transform.scale === 0 ? 1 : transform.scale;
-      return {
-        x: (screenX - rect.left - transform.x) / safeScale,
-        y: (screenY - rect.top - transform.y) / safeScale
-      };
+      return { x: (screenX - rect.left - transform.x) / safeScale, y: (screenY - rect.top - transform.y) / safeScale };
     }
   }));
 
@@ -700,24 +371,15 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
       e.preventDefault();
       const rect = internalRef.current?.getBoundingClientRect();
       if (!rect) return;
-
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
+      const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
       const zoomFactor = Math.pow(0.999, e.deltaY);
       const newScale = Math.max(0.1, Math.min(5, transform.scale * zoomFactor));
-
       const safeScale = transform.scale === 0 ? 1 : transform.scale;
       const newX = mouseX - (mouseX - transform.x) * (newScale / safeScale);
       const newY = mouseY - (mouseY - transform.y) * (newScale / safeScale);
-
       setTransform({ x: newX, y: newY, scale: newScale });
     } else {
-      setTransform(t => ({
-        ...t,
-        x: t.x - e.deltaX,
-        y: t.y - e.deltaY
-      }));
+      setTransform(t => ({ ...t, x: t.x - e.deltaX, y: t.y - e.deltaY }));
     }
   };
 
@@ -736,11 +398,7 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
     if (isPanning && panRef.current) {
       const dx = e.clientX - panRef.current.clientX;
       const dy = e.clientY - panRef.current.clientY;
-      setTransform({
-        x: panRef.current.tx + dx,
-        y: panRef.current.ty + dy,
-        scale: transform.scale
-      });
+      setTransform({ x: panRef.current.tx + dx, y: panRef.current.ty + dy, scale: transform.scale });
     }
   };
 
@@ -748,15 +406,12 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
     if (isPanning) {
       setIsPanning(false);
       panRef.current = null;
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch { /* Ignore */ }
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
     }
   };
 
   const panelCallbackRef = (node: HTMLDivElement | null) => {
     internalRef.current = node;
-    // containerRef is a mutable ref object passed from parent — sync its .current
     if (containerRef) {
       // eslint-disable-next-line react-hooks/immutability
       (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
@@ -764,33 +419,10 @@ export const FrontPanel = forwardRef<{ screenToPanelPosition: (screenX: number, 
   };
 
   return (
-    <div
-      ref={panelCallbackRef}
-      className={`w-full h-full relative overflow-hidden flex-grow select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
-      style={{
-        backgroundColor: '#f8fafc',
-        backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
-        backgroundSize: `${16 * transform.scale}px ${16 * transform.scale}px`,
-        backgroundPosition: `${transform.x}px ${transform.y}px`,
-      }}
-      onWheel={handleWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onDragOver={(e) => e.preventDefault()}
-    >
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-          transformOrigin: '0 0'
-        }}
-      >
+    <div ref={panelCallbackRef} className={`w-full h-full relative overflow-hidden flex-grow select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'} bg-canvas-bg`} style={{ backgroundImage: 'radial-gradient(hsl(var(--border)) 1px, transparent 1px)', backgroundSize: `${16 * transform.scale}px ${16 * transform.scale}px`, backgroundPosition: `${transform.x}px ${transform.y}px` }} onWheel={handleWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDragOver={(e) => e.preventDefault()}>
+      <div className="absolute inset-0 pointer-events-none" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`, transformOrigin: '0 0' }}>
         <div className="pointer-events-auto">
-          {uiControls.map(c => (
-            <ControlItem key={c.id} control={c} transform={transform} />
-          ))}
+          {uiControls.map(c => (<ControlItem key={c.id} control={c} transform={transform} />))}
         </div>
       </div>
     </div>

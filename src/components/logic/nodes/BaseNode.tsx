@@ -182,15 +182,15 @@ function spreadPositions(count: number): number[] {
 }
 
 /* ═══════════════════════════════════════════════════════
-   State ring CSS helper
+   State ring CSS helper — tokenized, professional, consistent
    ═══════════════════════════════════════════════════════ */
 
 function stateRingClass(nodeState: string, selected: boolean, isCurrentStep: boolean): string {
-  if (isCurrentStep) return 'ring-[3px] ring-yellow-400 shadow-lg shadow-yellow-400/40 animate-pulse';
-  if (nodeState === 'error') return 'ring-2 ring-red-500 shadow-md shadow-red-500/30';
-  if (nodeState === 'running') return 'ring-2 ring-blue-500 animate-pulse';
-  if (nodeState === 'done') return 'ring-2 ring-green-500';
-  if (selected) return 'ring-2 ring-blue-400 shadow-md';
+  if (isCurrentStep) return 'ring-[3px] ring-amber-400 shadow-lg shadow-amber-400/20 animate-pulse';
+  if (nodeState === 'error') return 'ring-2 ring-destructive shadow-md shadow-destructive/20';
+  if (nodeState === 'running') return 'ring-2 ring-[var(--status-running)] animate-pulse';
+  if (nodeState === 'done') return 'ring-2 ring-emerald-500/70';
+  if (selected) return 'ring-2 ring-ring ring-offset-1 shadow-sm';
   return '';
 }
 
@@ -287,7 +287,7 @@ function ArrayConstantNode({ id, node, updateNode, nodeState, isCurrentStep, sel
                {elementType === 'source.boolean' && <label className="w-full h-full flex items-center justify-center bg-[#E8F5E9] border border-[#A5D6A7] cursor-pointer nodrag"><input type="checkbox" checked={!!innerVal} onChange={handleInnerChange} onPointerDown={e => e.stopPropagation()} className="mr-1" /><span className="text-[10px] font-bold text-green-800">{innerVal ? 'T' : 'F'}</span></label>}
              </div>
           ) : (
-             <span className="text-[8px] text-gray-400 font-bold uppercase text-center border border-dashed border-gray-300 w-full h-full flex items-center justify-center">Drop</span>
+             <span className="text-[8px] text-muted-foreground font-semibold uppercase text-center border border-dashed border-border w-full h-full flex items-center justify-center rounded-sm">Drop</span>
           )}
        </div>
        <OptimizedHandle nodeId={id} port={{ ...outPort, name: 'value', type: outPort.type }} position={Position.Right} topPct={50} isInput={false} />
@@ -449,7 +449,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
         </div>
 
         {/* Label below */}
-        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-gray-400 font-medium pointer-events-none select-none">
+        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground font-medium pointer-events-none select-none tracking-wide">
           {actualType === 'io.terminal' ? (boundControlLabel || def.label) : def.label}
         </div>
 
@@ -489,26 +489,26 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
 
   /* ── Fallback: generic rectangular node ────────────── */
   const category = actualType.split('.')[0];
-  const headerColor = category === 'source' ? '#388E3C' : category === 'math' ? '#1565C0'
-    : category === 'logic' ? '#6A1B9A' : category === 'sink' ? '#E65100' : '#546E7A';
+  const headerColor = category === 'source' ? '#2E7D32' : category === 'math' ? '#1565C0'
+    : category === 'logic' ? '#6A1B9A' : category === 'sink' ? '#E65100' : '#607D8B';
 
-  let stateBorder = 'ring-1 ring-gray-300';
-  if (selected) stateBorder = 'ring-2 ring-blue-400 shadow-lg';
-  if (nodeState === 'error') stateBorder = 'ring-2 ring-red-500';
-  else if (nodeState === 'running') stateBorder = 'ring-2 ring-blue-500 animate-pulse';
-  else if (nodeState === 'done') stateBorder = 'ring-2 ring-green-500';
-  if (isCurrentStep) stateBorder = 'ring-4 ring-yellow-400 animate-pulse';
+  let stateBorder = 'ring-1 ring-border';
+  if (selected) stateBorder = 'ring-2 ring-ring shadow-md';
+  if (nodeState === 'error') stateBorder = 'ring-2 ring-destructive';
+  else if (nodeState === 'running') stateBorder = 'ring-2 ring-[var(--status-running)] animate-pulse';
+  else if (nodeState === 'done') stateBorder = 'ring-2 ring-emerald-500/70';
+  if (isCurrentStep) stateBorder = 'ring-[3px] ring-amber-400 animate-pulse';
 
   return (
     <div
-      className={`flex flex-col rounded-md shadow-md bg-white overflow-hidden min-w-[120px] transition-all ${stateBorder}`}
+      className={`flex flex-col rounded-md shadow-sm bg-card border border-border overflow-hidden min-w-[120px] transition-colors ${stateBorder}`}
       onClick={() => setSelectedNodeId(id)}
     >
-      <div className="px-2 py-1 text-white text-xs font-semibold flex justify-between items-center"
+      <div className="px-2.5 py-1 text-white text-xs font-medium flex justify-between items-center"
            style={{ backgroundColor: headerColor }}>
         <span>{def.label}</span>
         <button
-          className={`w-4 h-4 rounded-full border border-white/50 flex items-center justify-center transition-colors ${hasBreakpoint ? 'bg-red-500' : 'bg-transparent hover:bg-white/20'}`}
+          className={`w-4 h-4 rounded-full border border-white/30 flex items-center justify-center transition-colors ${hasBreakpoint ? 'bg-destructive' : 'bg-white/10 hover:bg-white/20'}`}
           onClick={(e) => { e.stopPropagation(); updateNode(id, { breakpoint: !hasBreakpoint }); }}
         >
           {hasBreakpoint && <svg width="8" height="8" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="8"/></svg>}
