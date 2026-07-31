@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/useUIStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import type { UIControl } from '../../types/graph';
 import { generateId } from '../../lib/utils';
+import { findNonOverlappingPosition, nodesToRects, controlsToRects } from '../../lib/layout';
 
 // Professional flat controls — tokenized, minimal, elegant
 
@@ -218,8 +219,16 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     const store = useGraphStore.getState();
     const termNode = store.nodes.find(n => n.id === control.bindingNodeId);
     if (!termNode) return;
-    const newTerm = { ...termNode, id: newTermId, position: { x: (termNode.position?.x ?? 0) + 20, y: (termNode.position?.y ?? 0) + 20 } };
-    const newCtrl = { ...control, id: newCtrlId, bindingNodeId: newTermId, x: (control.x ?? 50) + 20, y: (control.y ?? 50) + 20 };
+    // Find non-overlapping positions for both control and terminal
+    const existingControlRects = controlsToRects(store.uiControls.map(c => ({ x: c.x, y: c.y, width: c.width, height: c.height })));
+    const desiredCtrl = { x: (control.x ?? 50) + 20, y: (control.y ?? 50) + 20 };
+    const freeCtrlPos = findNonOverlappingPosition(desiredCtrl, existingControlRects, { w: control.width || 120, h: control.height || 60 });
+    const rootNodes = store.nodes.filter((n: any) => !n.parent);
+    const rootRects = nodesToRects(rootNodes.map((n: any) => ({ position: n.position, width: n.width || 120, height: n.height || 60 })));
+    const desiredTerm = { x: (termNode.position?.x ?? 0) + 20, y: (termNode.position?.y ?? 0) + 20 };
+    const freeTermPos = findNonOverlappingPosition(desiredTerm, rootRects, { w: 64, h: 36 });
+    const newTerm = { ...termNode, id: newTermId, position: freeTermPos };
+    const newCtrl = { ...control, id: newCtrlId, bindingNodeId: newTermId, x: freeCtrlPos.x, y: freeCtrlPos.y };
     store.addUIControl(newCtrl, newTerm as any);
     useUIStore.getState().setSelectedControlId(newCtrlId);
   };

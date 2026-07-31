@@ -7,6 +7,8 @@ import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { controlDefaults } from '../../lib/controlDefaults';
 import { Panel, PanelHeader } from '../ui/panel';
 import { FieldInput } from '../ui/field';
+import { findNonOverlappingPosition, nodesToRects, controlsToRects } from '../../lib/layout';
+import { resolveNodeOverlaps } from '../logic/GraphEditor';
 import {
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk, Pointer,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
@@ -80,28 +82,48 @@ export function Palette() {
   };
 
   const handleClickLogic = (nodeType: string) => {
+    const store = useGraphStore.getState();
+    const currentNodes = store.nodes.filter(n => !n.parent);
+    const existingRects = nodesToRects(currentNodes.map(n => ({ position: n.position, width: n.width || (String(n.type).startsWith('structure') ? 320 : 120), height: n.height || (String(n.type).startsWith('structure') ? 220 : 60) })));
+    const isStructure = nodeType.startsWith('structure');
+    const size = { w: isStructure ? 320 : 120, h: isStructure ? 220 : 60 };
+    const pos = findNonOverlappingPosition({ x: 100, y: 100 }, existingRects, size);
+    const newId = generateId();
     addNode({
-      id: generateId(),
+      id: newId,
       type: nodeType,
-      position: { x: 100, y: 100 },
+      position: pos,
       inputs: [],
       outputs: [],
       params: NodeRegistry[nodeType]?.params?.reduce((acc: any, p: any) => { acc[p.name] = p.defaultValue; return acc; }, {}) || {}
     });
+    // Secondary push-apart guarantee
+    setTimeout(() => resolveNodeOverlaps(newId), 60);
   };
 
   const handleClickUI = (controlDef: any) => {
+    const store = useGraphStore.getState();
     const termId = generateId();
     const ctrlId = generateId();
     const direction: 'control' | 'indicator' = controlDef.direction || 'control';
-    const existingCount = useGraphStore.getState().nodes.length;
-    const offsetX = (existingCount % 6) * 40;
-    const offsetY = Math.floor(existingCount / 6) * 50;
+
+    // UI controls — find free spot in FrontPanel
+    const existingControls = store.uiControls;
+    const existingControlRects = controlsToRects(existingControls as any);
+    const defW = controlDefaults[controlDef.type]?.width || 140;
+    const defH = controlDefaults[controlDef.type]?.height || 48;
+    const uiPos = findNonOverlappingPosition({ x: 50, y: 50 }, existingControlRects, { w: defW, h: defH });
+
+    // Terminal nodes — find free spot in Logic canvas root
+    const rootNodes = store.nodes.filter(n => !n.parent);
+    const rootRects = nodesToRects(rootNodes.map(n => ({ position: n.position, width: n.width || 120, height: n.height || 60 })));
+    const termDesired = { x: 80 + (existingControls.length % 6) * 40, y: 80 + Math.floor(existingControls.length / 6) * 50 };
+    const termPos = findNonOverlappingPosition(termDesired, rootRects, { w: 64, h: 36 });
 
     const terminalDef: any = {
       id: termId,
       type: 'io.terminal',
-      position: { x: 80 + offsetX, y: 80 + offsetY },
+      position: termPos,
       inputs: [],
       outputs: [],
       params: { value: controlDef.type === 'button' ? false : 0 }
@@ -126,8 +148,8 @@ export function Palette() {
       label: uniqueLabel,
       defaultValue: controlDefaults[controlDef.type]?.defaultValue ?? 0,
       bindingNodeId: termId,
-      x: 50,
-      y: 50,
+      x: uiPos.x,
+      y: uiPos.y,
       width: controlDefaults[controlDef.type]?.width,
       height: controlDefaults[controlDef.type]?.height,
       min: controlDefaults[controlDef.type]?.min,
