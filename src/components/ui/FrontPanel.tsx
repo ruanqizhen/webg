@@ -7,7 +7,29 @@ import type { UIControl } from '../../types/graph';
 import { generateId } from '../../lib/utils';
 import { findNonOverlappingPosition, nodesToRects, controlsToRects } from '../../lib/layout';
 
-// Professional flat controls — tokenized, minimal, elegant
+// ── Data-type tint mapping — subtle 5-8% background, 60% accent dot, 15% border ──
+function getControlTint(type: string) {
+  const t = type.toLowerCase();
+  const isNumber = ['numberinput', 'numberindicator', 'gauge', 'slider', 'knob', 'tank', 'number'].includes(t);
+  const isBoolean = ['button', 'switch', 'indicatorlight', 'boolean'].includes(t);
+  const isString = ['textlabel', 'string'].includes(t);
+  const isArray = ['array'].includes(t);
+  if (isNumber) {
+    return { token: 'var(--data-number)', bg: 'bg-[var(--data-number)]/5', bgStrong: 'bg-[var(--data-number)]/8', border: 'border-[var(--data-number)]/15', accent: 'bg-[var(--data-number)]/60', accentStrong: 'bg-[var(--data-number)]' };
+  }
+  if (isBoolean) {
+    return { token: 'var(--data-boolean)', bg: 'bg-[var(--data-boolean)]/5', bgStrong: 'bg-[var(--data-boolean)]/8', border: 'border-[var(--data-boolean)]/15', accent: 'bg-[var(--data-boolean)]/60', accentStrong: 'bg-[var(--data-boolean)]' };
+  }
+  if (isString) {
+    return { token: 'var(--data-string)', bg: 'bg-[var(--data-string)]/5', bgStrong: 'bg-[var(--data-string)]/8', border: 'border-[var(--data-string)]/15', accent: 'bg-[var(--data-string)]/60', accentStrong: 'bg-[var(--data-string)]' };
+  }
+  if (isArray) {
+    return { token: 'var(--data-array)', bg: 'bg-[var(--data-array)]/5', bgStrong: 'bg-[var(--data-array)]/8', border: 'border-[var(--data-array)]/15', accent: 'bg-[var(--data-array)]/60', accentStrong: 'bg-[var(--data-array)]' };
+  }
+  return { token: 'var(--border)', bg: 'bg-card', bgStrong: 'bg-muted/30', border: 'border-border', accent: 'bg-muted-foreground/30', accentStrong: 'bg-muted-foreground/50' };
+}
+
+// Professional flat controls — tokenized, minimal, elegant with subtle tint
 
 function Gauge({ value, min, max, color }: { value: number; min: number; max: number; color: string }) {
   const rawRange = max - min;
@@ -109,10 +131,11 @@ interface InnerControlRenderProps {
 }
 
 function InnerControlRender({ control, displayVal, handleChange, width, height, colorOn, colorOff, min, max, step, isIndicatorDir }: InnerControlRenderProps) {
+  const tint = getControlTint(control.type);
   return (
     <>
       {control.type === 'numberInput' && (
-          <div className="flex-1 flex items-center bg-card border border-input rounded-md px-1 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition-all">
+          <div className={`flex-1 flex items-center border rounded-md px-1 shadow-sm focus-within:ring-2 focus-within:ring-ring transition-all ${tint.bg} ${tint.border} bg-card`}>
            <input type="number" value={displayVal ?? ''} onChange={handleChange} min={min} max={max} step={step} className="bg-transparent text-center font-mono text-sm font-medium text-foreground w-full h-7 focus:outline-none" disabled={isIndicatorDir} onPointerDown={e => e.stopPropagation()} />
          </div>
       )}
@@ -121,7 +144,7 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
           <div className="w-full h-full flex items-center justify-center">
             <label className="relative inline-flex items-center cursor-pointer select-none" onPointerDown={e => e.stopPropagation()}>
               <input type="checkbox" checked={!!displayVal} onChange={handleChange} disabled={isIndicatorDir} className="sr-only" />
-              <div className={`w-12 h-6 rounded-full border shadow-inner transition-colors relative ${displayVal ? 'bg-primary border-primary' : 'bg-input border-border'}`}>
+              <div className={`w-12 h-6 rounded-full border shadow-inner transition-colors relative ${displayVal ? 'bg-primary border-primary' : `${tint.bg} ${tint.border}`}`}>
                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card border border-border shadow-sm transition-transform duration-200 ${displayVal ? 'translate-x-6' : 'translate-x-0'}`} />
               </div>
             </label>
@@ -129,18 +152,18 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
       )}
 
       {control.type === 'numberIndicator' && (
-         <div className="bg-muted border border-border rounded-md px-2.5 py-1.5 text-sm font-mono tabular-nums font-medium text-foreground text-right flex-1 flex items-center justify-end shadow-inner">{Number(displayVal ?? 0).toFixed(2)}</div>
+         <div className={`border rounded-md px-2.5 py-1.5 text-sm font-mono tabular-nums font-medium text-foreground text-right flex-1 flex items-center justify-end shadow-inner ${tint.bgStrong} ${tint.border}`}>{Number(displayVal ?? 0).toFixed(2)}</div>
       )}
 
       {control.type === 'textLabel' && (
-         <div className="bg-card border border-dashed border-border rounded-md px-2.5 py-1.5 text-sm text-foreground text-center flex-1 flex items-center justify-center shadow-sm">
+         <div className={`border border-dashed rounded-md px-2.5 py-1.5 text-sm text-foreground text-center flex-1 flex items-center justify-center shadow-sm ${tint.bg} ${tint.border}`}>
            <span className="truncate text-xs">{String(displayVal ?? '')}</span>
          </div>
       )}
 
       {control.type === 'indicatorLight' && (
          <div className="flex-1 flex items-center justify-center">
-            <div className="relative w-8 h-8 rounded-full bg-card border border-border shadow-sm flex items-center justify-center p-1">
+            <div className={`relative w-8 h-8 rounded-full border shadow-sm flex items-center justify-center p-1 ${tint.bg} ${tint.border}`}>
                <div className="w-full h-full rounded-full transition-all duration-300" style={{ background: displayVal ? colorOn : colorOff, boxShadow: displayVal ? `0 0 10px ${colorOn}80` : 'none' }} />
             </div>
             {!isIndicatorDir && <input type="checkbox" checked={!!displayVal} onChange={handleChange} onPointerDown={e => e.stopPropagation()} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 m-0" />}
@@ -158,9 +181,9 @@ function InnerControlRender({ control, displayVal, handleChange, width, height, 
 
       {control.type === 'slider' && (
          <div className="w-full flex-1 flex flex-col justify-center gap-1.5 px-1">
-             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal ?? 0} onChange={handleChange} disabled={isIndicatorDir} className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" onPointerDown={e => e.stopPropagation()} />
+             <input type="range" min={min ?? 0} max={max ?? 100} step={step ?? 1} value={displayVal ?? 0} onChange={handleChange} disabled={isIndicatorDir} className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-primary" style={{ accentColor: tint.token } as any} onPointerDown={e => e.stopPropagation()} />
              <div className="flex justify-between items-center text-[10px] text-muted-foreground font-mono">
-                 <span>{min ?? 0}</span><span className="font-medium text-foreground bg-muted px-1 rounded">{Number(displayVal ?? 0).toFixed(1)}</span><span>{max ?? 100}</span>
+                 <span>{min ?? 0}</span><span className={`font-medium text-foreground px-1 rounded ${tint.bgStrong}`}>{Number(displayVal ?? 0).toFixed(1)}</span><span>{max ?? 100}</span>
              </div>
          </div>
       )}
@@ -206,9 +229,23 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
     setShowMenu(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setShowMenu(false);
-    useGraphStore.getState().removeUIControl(control.id);
+    // Use direct store removal — ensure both control and its terminal are cleaned
+    const store = useGraphStore.getState();
+    // First try removeUIControl (which also removes terminal and edges)
+    store.removeUIControl(control.id);
+    // Fallback: if control still exists (race), remove its terminal node directly
+    setTimeout(() => {
+      const s = useGraphStore.getState();
+      if (s.uiControls.find(c => c.id === control.id)) {
+        const c = s.uiControls.find(c => c.id === control.id);
+        if (c) s.removeNode(c.bindingNodeId);
+      }
+      useUIStore.getState().setSelectedControlId(null);
+    }, 0);
     useUIStore.getState().setSelectedControlId(null);
   };
 
@@ -355,16 +392,20 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
   const colorOff = control.colorOff || 'hsl(var(--muted))';
   const min = control.min; const max = control.max; const step = control.step ?? 1;
   const isSelected = selectedControlId === control.id;
+  const tint = getControlTint(control.type);
 
   return (
-    <div className={`absolute flex flex-col rounded-md transition-colors ${isSelected ? 'bg-accent/40 outline outline-1 outline-ring z-10' : 'hover:outline hover:outline-1 hover:outline-border'} select-none`} style={{ left: control.x ?? 50, top: control.y ?? 50, width, height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onContextMenu={handleContextMenu}>
-      <div className="absolute bottom-full left-0 mb-1 flex items-center whitespace-nowrap pointer-events-auto cursor-grab z-20">
+    <div className={`absolute flex flex-col rounded-md border transition-colors ${tint.border} ${tint.bg} ${isSelected ? 'bg-accent/40 outline outline-1 outline-ring z-10 shadow-sm' : 'hover:outline hover:outline-1 hover:outline-border bg-card'} select-none`} style={{ left: control.x ?? 50, top: control.y ?? 50, width, height, cursor: isDragging && !resizeMode ? 'grabbing' : 'grab' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onContextMenu={handleContextMenu}>
+      <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 whitespace-nowrap pointer-events-auto cursor-grab z-20">
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tint.accent}`} />
         <label className="text-[11px] font-medium text-muted-foreground tracking-wide select-none">{control.label}</label>
       </div>
+      {/* Left accent bar */}
+      <div className={`absolute left-0 top-1 bottom-1 w-0.5 rounded-full ${tint.accent} pointer-events-none`} />
 
       {control.type === 'array' ? (
-        <div className="flex-1 flex flex-row overflow-hidden border border-border bg-card rounded-md shadow-sm">
-           <div className="w-9 flex flex-col border-r border-border bg-muted/50 shrink-0">
+        <div className={`flex-1 flex flex-row overflow-hidden border ${tint.border} ${tint.bgStrong} bg-card rounded-md shadow-sm ml-0.5`}>
+           <div className={`w-9 flex flex-col border-r ${tint.border} bg-muted/30 shrink-0`}>
                <button onPointerDown={(e) => { if ((e as any).button !== 0) return; e.stopPropagation(); setArrayIndex(a => Math.min(99, a + 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-b border-border">▲</button>
                <div className="flex-1 flex items-center justify-center font-mono text-[11px] font-medium">{arrayIndex}</div>
                <button onPointerDown={(e) => { if ((e as any).button !== 0) return; e.stopPropagation(); setArrayIndex(a => Math.max(0, a - 1)); }} className="h-1/2 flex items-center justify-center hover:bg-accent text-[10px] border-t border-border">▼</button>
@@ -397,14 +438,14 @@ function ControlItem({ control, transform }: { control: UIControl; transform: { 
           <div className="fixed z-[9999] bg-popover rounded-lg shadow-xl border border-border py-1 min-w-[160px] text-xs animate-in fade-in zoom-in-95" style={{ left: menuPos.x, top: menuPos.y }}>
             <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground truncate">{control.label}</div>
             <div className="h-px bg-border my-1 mx-2" />
-            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onClick={() => { setShowMenu(false); setSelectedControlId(control.id); }}>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setShowMenu(false); setSelectedControlId(control.id); }}>
               <span className="w-4 text-center">⚙</span>Properties
             </button>
-            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onClick={handleDuplicate}>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}>
               <span className="w-4 text-center">⎘</span>Duplicate
             </button>
             <div className="h-px bg-border my-1 mx-2" />
-            <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onClick={handleDelete}>
+            <button className="w-full text-left px-3 py-1.5 hover:bg-destructive/10 text-destructive flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDelete(e); }}>
               <span className="w-4 text-center">🗑</span>Delete Control
             </button>
           </div>
