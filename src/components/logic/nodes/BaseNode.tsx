@@ -242,7 +242,7 @@ function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverrid
   })() : '—';
 
   return (
-    <div className="group relative">
+    <div className="group">
       <Handle
         type={isInput ? "target" : "source"}
         position={position}
