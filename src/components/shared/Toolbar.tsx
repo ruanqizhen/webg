@@ -26,12 +26,14 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     if (nodes.length === 0) return;
     if (engineRef.current) return;
     try {
+      // Clear stale port values / node states from previous runs (deleted nodes, rewired edges)
+      runtimeStore.resetRuntime();
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);
       runtimeStore.setStepMode(false);
       const engine = new ExecutionEngine(
          { nodes, edges, uiControls },
-         runtimeStore,
+         useRuntimeStore.getState(),
          runtimeStore.setNodeState,
          runtimeStore.setPortValue,
          undefined,
@@ -53,12 +55,14 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     if (nodes.length === 0) return;
     if (engineRef.current) return;
     try {
+      // Clear stale port values / node states from previous runs (deleted nodes, rewired edges)
+      runtimeStore.resetRuntime();
       runtimeStore.setRunning(true);
       runtimeStore.setError(null);
       runtimeStore.setStepMode(true);
       const engine = new ExecutionEngine(
          { nodes, edges, uiControls },
-         runtimeStore,
+         useRuntimeStore.getState(),
          runtimeStore.setNodeState,
          runtimeStore.setPortValue,
          {

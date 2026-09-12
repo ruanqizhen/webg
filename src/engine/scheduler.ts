@@ -64,6 +64,23 @@ export class ExecutionEngine {
     }
   }
 
+  /** Buffered node-state update: always recorded internally, synced to the store immediately only when not batching. */
+  private setNodeStateBuffered(id: string, s: NodeState) {
+    this.runtime.nodeState[id] = s;
+    if (!this.batchMode) {
+      this.updateNodeState(id, s);
+    }
+  }
+
+  /** Flush all buffered node states to the external store (batch mode only) */
+  private flushNodeStates() {
+    if (this.batchMode) {
+      for (const [nodeId, state] of Object.entries(this.runtime.nodeState)) {
+        this.updateNodeState(nodeId, state as NodeState);
+      }
+    }
+  }
+
   /** Build the edge and node lookup maps once for the entire execution */
   private buildMaps() {
     this.edgeByNodePort.clear();
@@ -91,6 +108,68 @@ export class ExecutionEngine {
       curr = nextCurr;
     }
     return null;
+  }
+
+  /** Look up a port's declared type: instance dynamic ports first, then registry def. */
+  private getPortType(nodeId: string, portName: string, direction: 'input' | 'output'): string | undefined {
+    const node = this.nodeMap.get(nodeId);
+    if (!node) return undefined;
+    const instancePorts = direction === 'input' ? node.inputs : node.outputs;
+    const inst = instancePorts?.find(p => p.name === portName);
+    if (inst?.type && inst.type !== 'any') return inst.type;
+    const def = NodeRegistry[node.type];
+    const defPorts = direction === 'input' ? def?.inputs : def?.outputs;
+    const dep = defPorts?.find((p: any) => p.name === portName);
+    if (dep?.type && (dep as any).type !== 'any') return (dep as any).type;
+    // LabVIEW-style: integer-configured number constant / terminal reports integer
+    if (node.type === 'source.number' && node.params?.numberType === 'integer') return 'integer';
+    if (node.type === 'io.terminal') {
+      const ctrl = this.graph.uiControls.find(c => c.bindingNodeId === node.id);
+      if (ctrl?.numberType === 'integer') return 'integer';
+    }
+    return inst?.type ?? (dep as any)?.type;
+  }
+
+  /** Walk upstream past tunnels/SRs to find the first concrete value type feeding a tunnel/SR. */
+  private inferTunnelType(tunnelId: string): string | undefined {
+    const seen = new Set<string>();
+    const stack: string[] = [tunnelId];
+    let hops = 0;
+    while (stack.length > 0 && hops < 50) {
+      const currId = stack.pop()!;
+      if (seen.has(currId)) continue;
+      seen.add(currId);
+      hops++;
+      const incoming = this.graph.edges.filter(e => e.targetNode === currId);
+      for (const edge of incoming) {
+        const srcNode = this.nodeMap.get(edge.sourceNode);
+        if (!srcNode) continue;
+        if (srcNode.type === 'io.tunnel' || srcNode.type === 'io.shiftRegister') {
+          stack.push(srcNode.id);
+          continue;
+        }
+        const t = this.getPortType(edge.sourceNode, edge.sourcePort, 'output');
+        if (t && t.toLowerCase() !== 'any') return t;
+      }
+    }
+    return undefined;
+  }
+
+  /** LabVIEW-like default for a declared type. */
+  private defaultForType(type: string | undefined): any {
+    if (!type) return 0;
+    const lower = type.toLowerCase();
+    if (lower.endsWith('[]') || lower === 'array') return [];
+    const base = lower.replace('[]', '');
+    if (base === 'boolean') return false;
+    if (base === 'string') return '';
+    if (base === 'number' || base === 'integer') return 0;
+    return 0;
+  }
+
+  /** Type-aware tunnel default (boolean->false, string->"", array->[], else 0). */
+  private defaultForTunnelTypeById(tunnelId: string): any {
+    return this.defaultForType(this.inferTunnelType(tunnelId));
   }
 
   public detectCycles(): boolean {
@@ -225,10 +304,8 @@ export class ExecutionEngine {
       if (this.debugCallbacks?.onNodeStart) {
         this.debugCallbacks.onNodeStart(node.id);
       }
-      
-      if (!this.batchMode) {
-        this.updateNodeState(node.id, 'running');
-      }
+
+      this.setNodeStateBuffered(node.id, 'running');
 
       try {
         const def = NodeRegistry[node.type];
@@ -254,6 +331,8 @@ export class ExecutionEngine {
         let result: Record<string, any> = {};
 
          if (node.type === 'structure.forLoop' || node.type === 'structure.whileLoop') {
+            // Show the loop container as running immediately even in batch mode (inner nodes stay buffered)
+            this.updateNodeState(node.id, 'running');
             // Find all tunnels belonging to this loop
             const childTunnels = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.tunnel');
 
@@ -335,10 +414,7 @@ export class ExecutionEngine {
               return 0;
             };
 
-            const defaultForTunnelType = (_tunnelId: string): any => {
-              // If no info, return 0 — LabVIEW default for untyped
-              return 0;
-            };
+            const defaultForTunnelType = (tunnelId: string): any => this.defaultForTunnelTypeById(tunnelId);
 
             if (hasExplicitN && autoN >= 0 && N > autoN) {
               console.warn(`For Loop "${node.id}": N=${N} but input arrays have length ${autoN}. Out-of-range iterations will use default values.`);
@@ -464,6 +540,8 @@ export class ExecutionEngine {
                }
                for (let i = 0; i < limit; i++) {
                   await runIteration(i);
+                  // Yield periodically so large N doesn't block the main thread / abort stays responsive
+                  if (i % 50 === 49) await new Promise<void>(r => setTimeout(r, 0));
                   // Check conditional terminal (optional break)
                   if (forHasConditional) {
                     const condRaw = this.runtime.portValues[`${node.id}_conditional`];
@@ -601,15 +679,14 @@ export class ExecutionEngine {
             }
         }
 
-        if (!this.batchMode) {
-          this.updateNodeState(node.id, 'done');
-        }
+        this.setNodeStateBuffered(node.id, 'done');
         
         if (this.debugCallbacks?.onNodeFinish) {
           this.debugCallbacks.onNodeFinish(node.id);
         }
 
       } catch (err: any) {
+        this.runtime.nodeState[node.id] = 'error';
         this.updateNodeState(node.id, 'error');
         throw err;
       }
@@ -638,6 +715,11 @@ export class ExecutionEngine {
       throw new Error("Circular Dependency Detected");
     }
 
+    // Start from a clean runtime: stale port values / node states from a
+    // previous run (or deleted nodes) must never leak into this execution.
+    this.runtime.portValues = {};
+    this.runtime.nodeState = {};
+
     for (const n of this.graph.nodes) {
       this.updateNodeState(n.id, 'idle');
     }
@@ -654,7 +736,13 @@ export class ExecutionEngine {
       }
     }
 
-    await this.executeSubgraph(undefined);
+    try {
+      await this.executeSubgraph(undefined);
+    } finally {
+      // Buffered node states always flush (done/error mapping survives failures);
+      // port values only flush on success to avoid surfacing partial garbage on error/abort.
+      this.flushNodeStates();
+    }
     this.flushPortValues();
   }
 }

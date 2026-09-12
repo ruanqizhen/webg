@@ -5,7 +5,10 @@
       "PowerShell(npx tsc -b --noEmit 2>&1)",
       "PowerShell(npx vite build 2>&1)",
       "Bash(npx tsc *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "PowerShell(npx tsc -b)",
+      "PowerShell(npx eslint src/engine/scheduler.ts src/components/shared/Toolbar.tsx)",
+      "PowerShell(git stash *)"
     ]
   }
 }
