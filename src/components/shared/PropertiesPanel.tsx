@@ -1,3 +1,4 @@
+import { useState, useRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -7,6 +8,64 @@ import { getTypeColor } from '../../lib/colors';
 import { Panel, PanelHeader } from '../ui/panel';
 import { FieldGroup, FieldLabel, FieldInput, FieldSelect, FieldTextarea } from '../ui/field';
 import { Button } from '../ui/button';
+
+/** Text input that commits to the store on blur / Enter instead of every keystroke.
+ *  Per-keystroke commits each push a full-graph deepClone history entry, so typing
+ *  a label would flood the 50-entry undo stack (and stutter on large graphs). */
+function CommitInput({ value, onCommit, ...props }: { value: string | number | undefined; onCommit: (raw: string) => void } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [text, setText] = useState(String(value ?? ''));
+  const [prevValue, setPrevValue] = useState(value);
+  const skipCommitRef = useRef(false);
+  // Re-sync when the external value changes (undo, selection change, committed parse normalization)
+  if (!Object.is(prevValue, value)) {
+    setPrevValue(value);
+    setText(String(value ?? ''));
+  }
+  const commit = () => {
+    if (skipCommitRef.current) { skipCommitRef.current = false; return; }
+    if (text !== String(value ?? '')) onCommit(text);
+  };
+  return (
+    <FieldInput
+      {...props}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') { skipCommitRef.current = true; setText(String(value ?? '')); (e.target as HTMLInputElement).blur(); }
+        props.onKeyDown?.(e);
+      }}
+    />
+  );
+}
+
+/** Multiline variant — commits on blur only (Enter inserts newline), Escape reverts. */
+function CommitTextarea({ value, onCommit, ...props }: { value: string | undefined; onCommit: (raw: string) => void } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>) {
+  const [text, setText] = useState(value ?? '');
+  const [prevValue, setPrevValue] = useState(value);
+  const skipCommitRef = useRef(false);
+  if (!Object.is(prevValue, value)) {
+    setPrevValue(value);
+    setText(value ?? '');
+  }
+  const commit = () => {
+    if (skipCommitRef.current) { skipCommitRef.current = false; return; }
+    if (text !== (value ?? '')) onCommit(text);
+  };
+  return (
+    <FieldTextarea
+      {...props}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') { skipCommitRef.current = true; setText(value ?? ''); (e.target as HTMLTextAreaElement).blur(); }
+        props.onKeyDown?.(e);
+      }}
+    />
+  );
+}
 
 export function PropertiesPanel() {
   const { selectedNodeId, selectedControlId, selectedEdgeId } = useUIStore();
@@ -66,7 +125,7 @@ export function PropertiesPanel() {
                   )}
                   <FieldGroup>
                     <FieldLabel>Max Iterations (0 = unlimited)</FieldLabel>
-                    <FieldInput type="number" value={activeNode.params.maxIterations ?? ''} placeholder="0 = no limit" onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: e.target.value ? Number(e.target.value) : 0 } })} />
+                    <CommitInput type="number" value={activeNode.params.maxIterations ?? ''} placeholder="0 = no limit" onCommit={(raw) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: raw ? Number(raw) : 0 } })} />
                   </FieldGroup>
                 </>
               )}
@@ -84,7 +143,7 @@ export function PropertiesPanel() {
                   </FieldGroup>
                   <FieldGroup>
                     <FieldLabel>Max Iterations (safety)</FieldLabel>
-                    <FieldInput type="number" value={activeNode.params.maxIterations ?? 100000} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: e.target.value ? Number(e.target.value) : 100000 } })} />
+                    <CommitInput type="number" value={activeNode.params.maxIterations ?? 100000} onCommit={(raw) => updateNode(activeNode.id, { params: { ...activeNode.params, maxIterations: raw ? Number(raw) : 100000 } })} />
                   </FieldGroup>
                 </>
               )}
@@ -105,8 +164,8 @@ export function PropertiesPanel() {
 
                   <FieldGroup>
                     <FieldLabel>Cases (comma-separated)</FieldLabel>
-                    <FieldInput value={activeNode.params.cases?.join(', ') || ''} placeholder="true, false" onChange={(e) => {
-                        const newCases = e.target.value.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                    <CommitInput value={activeNode.params.cases?.join(', ') || ''} placeholder="true, false" onCommit={(raw) => {
+                        const newCases = raw.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
                         const finalCases = newCases.length > 0 ? newCases : ['true', 'false'];
                         updateNode(activeNode.id, { params: { ...activeNode.params, cases: finalCases, activeCase: finalCases[0] || 'true' } });
                         const removedCases = new Set((activeNode.params.cases || []).filter((c: string) => !finalCases.includes(c)));
@@ -153,12 +212,12 @@ export function PropertiesPanel() {
                    {param.type === 'boolean' ? (
                       <input type="checkbox" checked={activeNode.params[param.name] ?? false} onChange={(e) => updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: e.target.checked } })} className="w-4 h-4 rounded border-input" />
                    ) : param.type === 'array' ? (
-                      <FieldTextarea value={JSON.stringify(activeNode.params[param.name] ?? [])} placeholder="[1, 2, 3]" onChange={(e) => {
-                           try { const parsed = JSON.parse(e.target.value); if (Array.isArray(parsed)) updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: parsed } }); } catch {}
+                      <CommitTextarea value={JSON.stringify(activeNode.params[param.name] ?? [])} placeholder="[1, 2, 3]" onCommit={(raw) => {
+                           try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: parsed } }); } catch {}
                         }} />
                    ) : (
-                      <FieldInput type={param.type === 'number' ? 'number' : 'text'} value={activeNode.params[param.name] ?? ''} onChange={(e) => {
-                           const v = param.type === 'number' ? Number(e.target.value) : e.target.value;
+                      <CommitInput type={param.type === 'number' ? 'number' : 'text'} value={activeNode.params[param.name] ?? ''} onCommit={(raw) => {
+                           const v = param.type === 'number' ? Number(raw) : raw;
                            updateNode(activeNode.id, { params: { ...activeNode.params, [param.name]: v } });
                         }} />
                    )}
@@ -219,17 +278,17 @@ export function PropertiesPanel() {
 
               <FieldGroup>
                  <FieldLabel>Label</FieldLabel>
-                 <FieldInput value={activeControl.label} onChange={(e) => updateUIControl(activeControl.id, { label: e.target.value })} />
+                 <CommitInput value={activeControl.label} onCommit={(raw) => updateUIControl(activeControl.id, { label: raw })} />
               </FieldGroup>
 
               <FieldGroup>
                  <FieldLabel>Width (px)</FieldLabel>
-                 <FieldInput type="number" value={activeControl.width ?? ''} placeholder="Auto" onChange={(e) => updateUIControl(activeControl.id, { width: e.target.value ? Number(e.target.value) : undefined })} />
+                 <CommitInput type="number" value={activeControl.width ?? ''} placeholder="Auto" onCommit={(raw) => updateUIControl(activeControl.id, { width: raw ? Number(raw) : undefined })} />
               </FieldGroup>
 
               <FieldGroup>
                  <FieldLabel>Height (px)</FieldLabel>
-                 <FieldInput type="number" value={activeControl.height ?? ''} placeholder="Auto" onChange={(e) => updateUIControl(activeControl.id, { height: e.target.value ? Number(e.target.value) : undefined })} />
+                 <CommitInput type="number" value={activeControl.height ?? ''} placeholder="Auto" onCommit={(raw) => updateUIControl(activeControl.id, { height: raw ? Number(raw) : undefined })} />
               </FieldGroup>
 
               {['numberInput', 'gauge', 'slider', 'knob', 'tank'].includes(activeControl.type) && (
@@ -255,16 +314,16 @@ export function PropertiesPanel() {
                 <>
                   <FieldGroup>
                     <FieldLabel>Min</FieldLabel>
-                    <FieldInput type="number" value={activeControl.min ?? ''} placeholder="No limit" onChange={(e) => updateUIControl(activeControl.id, { min: e.target.value ? Number(e.target.value) : undefined })} />
+                    <CommitInput type="number" value={activeControl.min ?? ''} placeholder="No limit" onCommit={(raw) => updateUIControl(activeControl.id, { min: raw ? Number(raw) : undefined })} />
                   </FieldGroup>
                   <FieldGroup>
                     <FieldLabel>Max</FieldLabel>
-                    <FieldInput type="number" value={activeControl.max ?? ''} placeholder="No limit" onChange={(e) => updateUIControl(activeControl.id, { max: e.target.value ? Number(e.target.value) : undefined })} />
+                    <CommitInput type="number" value={activeControl.max ?? ''} placeholder="No limit" onCommit={(raw) => updateUIControl(activeControl.id, { max: raw ? Number(raw) : undefined })} />
                   </FieldGroup>
                   {['numberInput', 'slider', 'knob'].includes(activeControl.type) && (
                     <FieldGroup>
                       <FieldLabel>Step</FieldLabel>
-                      <FieldInput type="number" value={activeControl.step ?? 1} onChange={(e) => updateUIControl(activeControl.id, { step: Number(e.target.value) || 1 })} />
+                      <CommitInput type="number" value={activeControl.step ?? 1} onCommit={(raw) => updateUIControl(activeControl.id, { step: Number(raw) || 1 })} />
                     </FieldGroup>
                   )}
                 </>
@@ -289,7 +348,7 @@ export function PropertiesPanel() {
                    {activeControl.type === 'button' || activeControl.type === 'switch' ? (
                        <input type="checkbox" checked={!!activeControl.defaultValue} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: e.target.checked })} className="w-4 h-4 rounded border-input" />
                    ) : (
-                       <FieldInput type="number" value={activeControl.defaultValue ?? ''} onChange={(e) => updateUIControl(activeControl.id, { defaultValue: Number(e.target.value) })} />
+                       <CommitInput type="number" value={activeControl.defaultValue ?? ''} onCommit={(raw) => updateUIControl(activeControl.id, { defaultValue: Number(raw) })} />
                    )}
                  </FieldGroup>
               )}

@@ -79,17 +79,20 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
 
   return (
     <div
-      className={`relative rounded-lg min-w-[320px] min-h-[200px] pointer-events-none bg-canvas-bg/50 backdrop-blur-[1px] ${stateBorder} ${isForLoop ? 'shadow-[0_0_0_1px_hsl(var(--border)),0_2px_8px_hsl(var(--border))]' : ''}`}
+      // Transparent overlay: the frosted fill lives on the BackdropNode mirror
+      // (zIndex -1, below the edges layer) so wires inside stay crisp.
+      // Chrome (header, ports, resizer, rings) stays here, above the wires.
+      className={`relative rounded-lg min-w-[320px] min-h-[200px] pointer-events-none ${stateBorder}`}
       style={{ width: node?.width || 320, height: node?.height || 220 }}
       onContextMenu={handleContextMenu}
     >
       <div className="pointer-events-auto">
-        <NodeResizer color="hsl(var(--ring))" isVisible={selected} minWidth={320} minHeight={200} />
+        <NodeResizer color="hsl(var(--ring))" isVisible={selected} minWidth={320} minHeight={200} onResizeStart={() => useGraphStore.getState().pushHistory()} />
       </div>
 
       {/* Header */}
       <div
-        className="px-2.5 py-1 text-xs font-medium select-none flex justify-between items-center rounded-t-lg bg-muted/60 text-muted-foreground border-b border-border pointer-events-auto cursor-pointer h-8 backdrop-blur-sm"
+        className="px-2.5 py-1 text-xs font-medium select-none flex justify-between items-center rounded-t-lg bg-muted/60 text-muted-foreground border-b border-border pointer-events-auto cursor-pointer h-8"
         onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       >
         <span className="flex items-center gap-1.5 tracking-tight">

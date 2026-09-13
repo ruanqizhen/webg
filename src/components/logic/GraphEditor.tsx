@@ -21,6 +21,7 @@ import { BaseNode } from './nodes/BaseNode';
 import { CustomEdge } from './CustomEdge';
 import { NodeRegistry } from '../../engine/registry';
 import { StructureNode } from './nodes/StructureNode';
+import { BackdropNode } from './nodes/BackdropNode';
 import { TunnelNode } from './nodes/TunnelNode';
 
 export const resolveNodeOverlaps = (draggedNodeId: string) => {
@@ -75,17 +76,22 @@ export const resolveNodeOverlaps = (draggedNodeId: string) => {
 
         pushOverlaps(draggedNodeId, new Set());
 
-        for (const r of rects) {
+        const changed = rects.filter(r => {
             const original = currentNodes.find(n => n.id === r.id);
-            if (original && (original.position?.x !== r.x || original.position?.y !== r.y)) {
-                useGraphStore.getState().updateNode(r.id, { position: { x: r.x, y: r.y } });
-            }
+            return original && (original.position?.x !== r.x || original.position?.y !== r.y);
+        });
+        if (changed.length === 0) return;
+        // Single history entry for the whole de-overlap pass (multi-push broke one-shot undo)
+        useGraphStore.getState().pushHistory();
+        for (const r of changed) {
+            useGraphStore.getState().updateNode(r.id, { position: { x: r.x, y: r.y } }, true);
         }
     }, 50);
 };
 
 const initialNodeTypes: any = {
   custom: BaseNode,
+  backdrop: BackdropNode,
   'structure.forLoop': StructureNode,
   'structure.whileLoop': StructureNode,
   'structure.case': StructureNode,
@@ -179,7 +185,9 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           }
         } else if (c.type === 'dimensions' && c.dimensions) {
           const dims = c.dimensions;
-          updateNode(c.id, { width: dims.width, height: dims.height });
+          // skipHistory: resize start pushes one entry (see NodeResizer onResizeStart),
+          // otherwise every tick of a resize drag would flood the 50-entry history stack
+          updateNode(c.id, { width: dims.width, height: dims.height }, true);
 
           const currentNodes = useGraphStore.getState().nodes;
           const parentNode = currentNodes.find(n => n.id === c.id);
@@ -285,7 +293,23 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
   const flowNodes: FlowNode[] = useMemo(() => {
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    return nodes.map(n => {
+    // Absolute (canvas) position of a node, accumulating ancestor offsets.
+    // Backdrop mirrors must be top-level, so they need global coords.
+    const toGlobal = (n: (typeof nodes)[number]) => {
+      let x = n.position?.x ?? 0;
+      let y = n.position?.y ?? 0;
+      let p = n.parent;
+      while (p) {
+        const pn = nodeMap.get(p);
+        if (!pn) break;
+        x += pn.position?.x ?? 0;
+        y += pn.position?.y ?? 0;
+        p = pn.parent;
+      }
+      return { x, y };
+    };
+    const result: FlowNode[] = [];
+    for (const n of nodes) {
       let hidden = false;
       let curr: typeof n | undefined = n;
       // Walk ancestor chain for case hidden logic
@@ -315,7 +339,29 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           break;
         }
       }
-      return {
+      const isStructure = n.type.startsWith('structure.');
+      if (isStructure) {
+        // Pure-background mirror rendered at zIndex -1 (below the edges
+        // layer), so wires inside the structure stay above the frosted fill.
+        // Top-level + absolute coords: ReactFlow has no nested zIndex below edges.
+        const g = toGlobal(n);
+        result.push({
+          id: `${n.id}__bg`,
+          type: 'backdrop',
+          position: g,
+          data: { structureId: n.id, isForLoop: n.type === 'structure.forLoop' },
+          hidden,
+          draggable: false,
+          selectable: false,
+          connectable: false,
+          focusable: false,
+          zIndex: -1,
+          className: 'pointer-events-none',
+          ...(n.width ? { width: n.width } : {}),
+          ...(n.height ? { height: n.height } : {}),
+        });
+      }
+      result.push({
         id: n.id,
         type: n.type.startsWith('structure.') ? n.type : (n.type === 'io.tunnel' || n.type === 'io.shiftRegister' ? n.type : 'custom'),
         position: n.position,
@@ -326,8 +372,9 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         ...(n.height ? { height: n.height } : {}),
         className: n.type.startsWith('structure.') ? 'pointer-events-none' : '',
         zIndex: n.type.startsWith('structure.') ? 0 : 1,
-      };
-    });
+      });
+    }
+    return result;
   }, [nodes]);
 
   const flowEdges: FlowEdge[] = useMemo(() => {

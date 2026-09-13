@@ -8,7 +8,12 @@
       "Bash(npx eslint *)",
       "PowerShell(npx tsc -b)",
       "PowerShell(npx eslint src/engine/scheduler.ts src/components/shared/Toolbar.tsx)",
-      "PowerShell(git stash *)"
+      "PowerShell(git stash *)",
+      "PowerShell(npx eslint src/components/shared/PropertiesPanel.tsx src/components/logic/GraphEditor.tsx src/components/logic/nodes/StructureNode.tsx)",
+      "PowerShell(head *)",
+      "PowerShell(npx tsc -b 2>&1 | Select-Object -First 20; echo \"---tsc exit: $?\")",
+      "PowerShell(npx eslint src/components/logic/GraphEditor.tsx src/components/logic/nodes/StructureNode.tsx src/components/logic/nodes/BackdropNode.tsx 2>&1 | Select-Object -First 30)",
+      "PowerShell(npm run *)"
     ]
   }
 }
