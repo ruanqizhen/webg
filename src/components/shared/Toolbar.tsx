@@ -108,11 +108,18 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     setTheme(next[theme]);
   };
 
+  const confirmDiscardCurrent = () => {
+    if (nodes.length === 0 && edges.length === 0 && uiControls.length === 0) return true;
+    return window.confirm('Loading the example will replace the current program. Unsaved changes will be lost. Continue?');
+  };
+
   const handleLoadExample = () => {
+    if (!confirmDiscardCurrent()) return;
     loadGraph(createExampleProject());
   };
 
   const handleLoadLoopExample = () => {
+    if (!confirmDiscardCurrent()) return;
     loadGraph(createLoopExampleProject());
   };
 
