@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BaseEdge, getBezierPath } from 'reactflow';
 import type { EdgeProps } from 'reactflow';
-import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { getTypeColor, isTypeArray } from '../../lib/colors';
 import { NodeRegistry } from '../../engine/registry';
 import { useGraphStore } from '../../store/useGraphStore';
@@ -91,8 +90,6 @@ export function CustomEdge({
     targetPosition,
   });
 
-  const nodeState = useRuntimeStore((s) => s.nodeState[source]);
-  const isRunning = nodeState === 'running' || nodeState === 'done';
   const { setSelectedEdgeId, selectedEdgeId } = useUIStore();
   const { removeEdge } = useGraphStore();
 
@@ -143,8 +140,8 @@ export function CustomEdge({
                   ...style,
                   stroke: '#f8fafc',
                   strokeWidth: 2,
-                  animation: isRunning ? 'dashdraw 1s linear infinite' : 'none',
-                  strokeDasharray: isRunning ? '6, 6' : 'none',
+                  animation: 'none',
+                  strokeDasharray: 'none',
                 }}
               />
            </>
@@ -157,17 +154,12 @@ export function CustomEdge({
                ...style,
                stroke: isSelected ? '#f59e0b' : strokeColor,
                strokeWidth: isSelected ? 4 : 3,
-               animation: isRunning && !isSelected ? 'dashdraw 1s linear infinite' : 'none',
-               strokeDasharray: isRunning && !isSelected ? '6, 6' : 'none',
+               animation: 'none',
+               strokeDasharray: 'none',
              }}
            />
         )}
       </g>
-      {isRunning && (
-        <circle r="4" fill={strokeColor}>
-          <animateMotion dur="1s" repeatCount="indefinite" path={edgePath} />
-        </circle>
-      )}
       {/* Delete button on selection */}
       {isSelected && (
         <g>
