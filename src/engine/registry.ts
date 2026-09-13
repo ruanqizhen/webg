@@ -191,7 +191,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     label: 'For Loop',
     inputs: [
       { id: 'N', name: 'N', type: 'integer', direction: 'input' },
-      { id: 'conditional', name: 'conditional', type: 'boolean', direction: 'input' }
+      { id: 'conditional', name: 'conditional', type: 'boolean', direction: 'input', isInternal: true }
     ],
     outputs: [{ id: 'i', name: 'i', type: 'integer', direction: 'output', isInternal: true }],
     params: [
@@ -204,7 +204,7 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
   'structure.whileLoop': {
     type: 'structure.whileLoop',
     label: 'While Loop',
-    inputs: [{ id: 'stop', name: 'stop', type: 'boolean', direction: 'input' }],
+    inputs: [{ id: 'stop', name: 'stop', type: 'boolean', direction: 'input', isInternal: true }],
     outputs: [{ id: 'i', name: 'i', type: 'integer', direction: 'output', isInternal: true }],
     params: [
       { name: 'conditionMode', type: 'string', defaultValue: 'stopIfTrue' },

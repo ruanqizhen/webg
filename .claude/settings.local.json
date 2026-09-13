@@ -13,7 +13,8 @@
       "PowerShell(head *)",
       "PowerShell(npx tsc -b 2>&1 | Select-Object -First 20; echo \"---tsc exit: $?\")",
       "PowerShell(npx eslint src/components/logic/GraphEditor.tsx src/components/logic/nodes/StructureNode.tsx src/components/logic/nodes/BackdropNode.tsx 2>&1 | Select-Object -First 30)",
-      "PowerShell(npm run *)"
+      "PowerShell(npm run *)",
+      "PowerShell(npx tsc -b 2>&1 | Select-Object -First 10; echo \"tsc done\")"
     ]
   }
 }
