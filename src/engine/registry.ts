@@ -85,6 +85,53 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
       return { outputs: { result: a / b } };
     }
   },
+  'math.sin': {
+    type: 'math.sin',
+    label: 'Sine',
+    inputs: [{ name: 'x', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => ({ outputs: { result: Math.sin(Number(ctx.inputs.x ?? 0)) } })
+  },
+  'math.cos': {
+    type: 'math.cos',
+    label: 'Cosine',
+    inputs: [{ name: 'x', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => ({ outputs: { result: Math.cos(Number(ctx.inputs.x ?? 0)) } })
+  },
+  'math.tan': {
+    type: 'math.tan',
+    label: 'Tangent',
+    inputs: [{ name: 'x', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => ({ outputs: { result: Math.tan(Number(ctx.inputs.x ?? 0)) } })
+  },
+  'math.sqrt': {
+    type: 'math.sqrt',
+    label: 'Square Root',
+    inputs: [{ name: 'x', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => {
+      const x = Number(ctx.inputs.x ?? 0);
+      if (!isFinite(x)) throw new Error("Invalid input: not a finite number");
+      if (x < 0) throw new Error("Square root of negative number");
+      return { outputs: { result: Math.sqrt(x) } };
+    }
+  },
+  'math.pow': {
+    type: 'math.pow',
+    label: 'Power',
+    inputs: [{ name: 'A', type: 'number' }, { name: 'B', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => ({ outputs: { result: Math.pow(Number(ctx.inputs.A ?? 0), Number(ctx.inputs.B ?? 0)) } })
+  },
+  'math.abs': {
+    type: 'math.abs',
+    label: 'Absolute',
+    inputs: [{ name: 'x', type: 'number' }],
+    outputs: [{ name: 'result', type: 'number' }],
+    executor: (ctx) => ({ outputs: { result: Math.abs(Number(ctx.inputs.x ?? 0)) } })
+  },
 
   // Logic
   'logic.greater': {
@@ -128,6 +175,125 @@ export const NodeRegistry: Record<string, NodeDefinition> = {
     inputs: [{ name: 'A', type: 'boolean' }],
     outputs: [{ name: 'result', type: 'boolean' }],
     executor: (ctx) => ({ outputs: { result: !Boolean(ctx.inputs.A) } })
+  },
+
+  // String
+  'string.concat': {
+    type: 'string.concat',
+    label: 'Concatenate',
+    inputs: [{ name: 'A', type: 'string' }, { name: 'B', type: 'string' }],
+    outputs: [{ name: 'result', type: 'string' }],
+    executor: (ctx) => ({ outputs: { result: String(ctx.inputs.A ?? '') + String(ctx.inputs.B ?? '') } })
+  },
+  'string.length': {
+    type: 'string.length',
+    label: 'String Length',
+    inputs: [{ name: 's', type: 'string' }],
+    outputs: [{ name: 'length', type: 'integer' }],
+    executor: (ctx) => ({ outputs: { length: String(ctx.inputs.s ?? '').length } })
+  },
+  'string.substring': {
+    type: 'string.substring',
+    label: 'Substring',
+    inputs: [{ name: 's', type: 'string' }, { name: 'start', type: 'integer' }, { name: 'length', type: 'integer' }],
+    outputs: [{ name: 'result', type: 'string' }],
+    executor: (ctx) => {
+      const s = String(ctx.inputs.s ?? '');
+      const start = Math.max(0, Math.trunc(Number(ctx.inputs.start ?? 0)));
+      const lenRaw = ctx.inputs.length;
+      if (lenRaw === undefined || lenRaw === '') return { outputs: { result: s.slice(start) } };
+      const len = Math.max(0, Math.trunc(Number(lenRaw)));
+      return { outputs: { result: s.slice(start, start + len) } };
+    }
+  },
+  'string.uppercase': {
+    type: 'string.uppercase',
+    label: 'To Uppercase',
+    inputs: [{ name: 's', type: 'string' }],
+    outputs: [{ name: 'result', type: 'string' }],
+    executor: (ctx) => ({ outputs: { result: String(ctx.inputs.s ?? '').toUpperCase() } })
+  },
+  'string.lowercase': {
+    type: 'string.lowercase',
+    label: 'To Lowercase',
+    inputs: [{ name: 's', type: 'string' }],
+    outputs: [{ name: 'result', type: 'string' }],
+    executor: (ctx) => ({ outputs: { result: String(ctx.inputs.s ?? '').toLowerCase() } })
+  },
+
+  // Array
+  'array.length': {
+    type: 'array.length',
+    label: 'Array Length',
+    inputs: [{ name: 'array', type: 'array' }],
+    outputs: [{ name: 'length', type: 'integer' }],
+    executor: (ctx) => {
+      const arr = ctx.inputs.array;
+      return { outputs: { length: Array.isArray(arr) ? arr.length : 0 } };
+    }
+  },
+  'array.index': {
+    type: 'array.index',
+    label: 'Index Array',
+    inputs: [{ name: 'array', type: 'array' }, { name: 'index', type: 'integer' }],
+    outputs: [{ name: 'element', type: 'any' }],
+    executor: (ctx) => {
+      const arr = ctx.inputs.array;
+      const i = Math.trunc(Number(ctx.inputs.index ?? 0));
+      const el = Array.isArray(arr) && i >= 0 && i < arr.length ? arr[i] : undefined;
+      return { outputs: { element: el } };
+    }
+  },
+  'array.append': {
+    type: 'array.append',
+    label: 'Append to Array',
+    inputs: [{ name: 'array', type: 'array' }, { name: 'element', type: 'any' }],
+    outputs: [{ name: 'result', type: 'array' }],
+    executor: (ctx) => {
+      const arr = Array.isArray(ctx.inputs.array) ? ctx.inputs.array : [];
+      return { outputs: { result: [...arr, ctx.inputs.element] } };
+    }
+  },
+
+  // Random
+  'random.uniform': {
+    type: 'random.uniform',
+    label: 'Random Uniform',
+    inputs: [],
+    outputs: [{ name: 'value', type: 'number' }],
+    params: [
+      { name: 'min', type: 'number', defaultValue: 0 },
+      { name: 'max', type: 'number', defaultValue: 1 },
+      { name: 'integer', type: 'boolean', defaultValue: false }
+    ],
+    executor: (ctx) => {
+      const lo = Math.min(Number(ctx.params.min ?? 0), Number(ctx.params.max ?? 1));
+      const hi = Math.max(Number(ctx.params.min ?? 0), Number(ctx.params.max ?? 1));
+      const v = lo + Math.random() * (hi - lo);
+      return { outputs: { value: ctx.params.integer ? Math.floor(v) : v } };
+    }
+  },
+
+  // Time
+  'time.wait': {
+    type: 'time.wait',
+    label: 'Wait (ms)',
+    inputs: [{ name: 'ms', type: 'number' }],
+    outputs: [{ name: 'done', type: 'boolean' }],
+    params: [{ name: 'defaultMs', type: 'number', defaultValue: 1000 }],
+    executor: async (ctx) => {
+      const raw = ctx.inputs.ms !== undefined ? ctx.inputs.ms : (ctx.params.defaultMs ?? 1000);
+      const ms = Math.max(0, Number(raw));
+      await new Promise<void>((r) => setTimeout(r, ms));
+      return { outputs: { done: true } };
+    }
+  },
+  'time.now': {
+    type: 'time.now',
+    label: 'Timestamp',
+    inputs: [],
+    outputs: [{ name: 'timestamp', type: 'number' }],
+    executor: () => ({ outputs: { timestamp: Date.now() } })
   },
 
   // Sink
