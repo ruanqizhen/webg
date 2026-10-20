@@ -10,6 +10,7 @@ import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor, resolveNodeOverlaps } from '../logic/GraphEditor';
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
+import { createExampleProject } from '../../lib/exampleProject';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { ReactFlowProvider, useReactFlow } from 'reactflow';
@@ -73,10 +74,15 @@ function IdeLayoutInner() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Load from storage on mount and start auto-save
+  // Load from storage on mount and start auto-save.
+  // First visit (nothing saved): load the wired temperature-conversion
+  // example so Run does something meaningful instead of an empty canvas.
   useEffect(() => {
     const graphStore = useGraphStore.getState();
-    graphStore.loadFromStorage();
+    const loaded = graphStore.loadFromStorage();
+    if (!loaded) {
+      graphStore.loadGraph(createExampleProject());
+    }
     const cleanup = graphStore.startAutoSave();
     return cleanup;
   // eslint-disable-next-line react-hooks/exhaustive-deps

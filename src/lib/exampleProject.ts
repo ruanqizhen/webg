@@ -20,6 +20,8 @@ export function createExampleProject(): Graph {
   const terminalOutId = id();
   const ctrlInputId = id();
   const ctrlOutputId = id();
+  const ratioId = id(); // 9/5 = 1.8
+  const const32Id = id(); // +32
 
   return {
     nodes: [
@@ -96,10 +98,28 @@ export function createExampleProject(): Graph {
         outputs: [],
         params: { value: false },
       },
+      {
+        id: ratioId,
+        type: 'source.number',
+        position: { x: 250, y: 180 },
+        inputs: [],
+        outputs: [{ id: 'value', name: 'value', type: 'number', direction: 'output' }],
+        params: { value: 1.8 },
+      },
+      {
+        id: const32Id,
+        type: 'source.number',
+        position: { x: 420, y: 180 },
+        inputs: [],
+        outputs: [{ id: 'value', name: 'value', type: 'number', direction: 'output' }],
+        params: { value: 32 },
+      },
     ],
     edges: [
       { id: id(), sourceNode: celsiusInputId, sourcePort: 'value', targetNode: multiplyNodeId, targetPort: 'A' },
+      { id: id(), sourceNode: ratioId, sourcePort: 'value', targetNode: multiplyNodeId, targetPort: 'B' },
       { id: id(), sourceNode: multiplyNodeId, sourcePort: 'result', targetNode: addNodeId, targetPort: 'A' },
+      { id: id(), sourceNode: const32Id, sourcePort: 'value', targetNode: addNodeId, targetPort: 'B' },
       { id: id(), sourceNode: addNodeId, sourcePort: 'result', targetNode: greaterNodeId, targetPort: 'A' },
       { id: id(), sourceNode: addNodeId, sourcePort: 'result', targetNode: displayId, targetPort: 'value' },
       { id: id(), sourceNode: displayId, sourcePort: 'pass_through', targetNode: logId, targetPort: 'value' },
