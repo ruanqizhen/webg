@@ -197,9 +197,17 @@ Error Banner：`bg-destructive/10 border-destructive/20` + `BadgeDot error` + �
 
 ### Logic 逻辑节点
 
-**Math**：Add/Sub/Mul/Div（Div 0 时抛 Error，除数 `isFinite && !=0`，Mul 修复 `B=0 → 0` 而非 `||1` 误判为 1）
+**Math**：Add/Sub/Mul/Div（Div 0 时抛 Error，除数 `isFinite && !=0`，Mul 修复 `B=0 → 0` 而非 `||1` 误判为 1）、Sin/Cos/Tan（弧度）、Sqrt（负数抛 Error）、Pow、Abs
 
 **Logic**：Greater/Less/Equal/And/Or/Not
+
+**String**：Concatenate、Length、Substring（length 缺省取到末尾）、To Uppercase/Lowercase
+
+**Array**：Length、Index Array（越界返回 undefined）、Append to Array
+
+**Random**：Random Uniform（params：min=0、max=1、integer=false）
+
+**Time**：Wait (ms)（异步，未连线时用 params.defaultMs=1000）、Timestamp（`Date.now()`）
 
 **Sources**：Number/Boolean/String/Array Constant，Array Constant `flex row bg-[#F3F4F6]...` 已保留拟物但 Drop 逻辑 token 化，`innerVal ?? ''` 修复 0 显示空
 

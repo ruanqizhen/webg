@@ -44,6 +44,27 @@ const NODE_ICONS: Record<string, IconDef> = {
   'math.subtract': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'−',  symbolColor:'#78350F', w:56, h:44 },
   'math.multiply': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'×',  symbolColor:'#78350F', w:56, h:44 },
   'math.divide':   { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'÷',  symbolColor:'#78350F', w:56, h:44 },
+  'math.sin':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'sin', symbolColor:'#78350F', w:56, h:44 },
+  'math.cos':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'cos', symbolColor:'#78350F', w:56, h:44 },
+  'math.tan':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'tan', symbolColor:'#78350F', w:56, h:44 },
+  'math.sqrt':     { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'√',  symbolColor:'#78350F', w:56, h:44 },
+  'math.pow':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'xʸ', symbolColor:'#78350F', w:56, h:44 },
+  'math.abs':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'|x|', symbolColor:'#78350F', w:56, h:44 },
+  // ── String ── Pink chevron ──
+  'string.concat':    { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'++',  symbolColor:'#9D174D', w:56, h:44 },
+  'string.length':    { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'len', symbolColor:'#9D174D', w:56, h:44 },
+  'string.substring': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'[..]', symbolColor:'#9D174D', w:56, h:44 },
+  'string.uppercase': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'ABC', symbolColor:'#9D174D', w:56, h:44 },
+  'string.lowercase': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:56, h:44 },
+  // ── Array ── Orange chevron ──
+  'array.length': { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'len', symbolColor:'#BF360C', w:56, h:44 },
+  'array.index':  { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'[i]', symbolColor:'#BF360C', w:56, h:44 },
+  'array.append': { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'+=',  symbolColor:'#BF360C', w:56, h:44 },
+  // ── Random ── Purple chevron ──
+  'random.uniform': { shape:'chevron', bg:'#F5F3FF', stroke:'#7C3AED', symbol:'?', symbolColor:'#5B21B6', w:56, h:44 },
+  // ── Time ── Teal chevron ──
+  'time.wait': { shape:'chevron', bg:'#ECFDF5', stroke:'#059669', symbol:'ms', symbolColor:'#065F46', w:56, h:44 },
+  'time.now':  { shape:'chevron', bg:'#ECFDF5', stroke:'#059669', symbol:'t',  symbolColor:'#065F46', w:56, h:44 },
   // ── Comparison ── Orange hexagon ──
   'logic.greater': { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'>',  symbolColor:'#7C2D12', w:48, h:42 },
   'logic.less':    { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'<',  symbolColor:'#7C2D12', w:48, h:42 },
