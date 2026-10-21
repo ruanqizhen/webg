@@ -30,6 +30,7 @@ export function createLoopExampleProject(): Graph {
 
   const displayForSumId = id();
   const displayForArrayId = id();
+  const forOutputArrayTunnelId = id();
 
   return {
     nodes: [
@@ -106,6 +107,16 @@ export function createLoopExampleProject(): Graph {
         outputs: [],
         params: { indexing: false }
       },
+      // For output tunnel (array pass-through, indexing → collects [1,2,3,4,5])
+      {
+        id: forOutputArrayTunnelId,
+        type: 'io.tunnel',
+        position: { x: 384, y: 120 },
+        parent: forLoopId,
+        inputs: [],
+        outputs: [],
+        params: { indexing: true }
+      },
 
       // For Loop result displays outside loop
       {
@@ -153,8 +164,9 @@ export function createLoopExampleProject(): Graph {
       { id: id(), sourceNode: addInsideForId, sourcePort: 'result', targetNode: srRight1Id, targetPort: 'input' },
       { id: id(), sourceNode: addInsideForId, sourcePort: 'result', targetNode: forOutputTunnelId, targetPort: 'input' },
       { id: id(), sourceNode: forOutputTunnelId, sourcePort: 'output', targetNode: displayForSumId, targetPort: 'value' },
-      // For Loop output array example — pass-through array via tunnel indexing output (create extra tunnel if needed, simplified: same as input array pass-through)
-      { id: id(), sourceNode: forInputTunnelId, sourcePort: 'output', targetNode: displayForArrayId, targetPort: 'value' },
+      // Array pass-through: input element → indexing output tunnel → collects the full array
+      { id: id(), sourceNode: forInputTunnelId, sourcePort: 'output', targetNode: forOutputArrayTunnelId, targetPort: 'input' },
+      { id: id(), sourceNode: forOutputArrayTunnelId, sourcePort: 'output', targetNode: displayForArrayId, targetPort: 'value' },
 
       // While Loop wiring
       { id: id(), sourceNode: srLeft2Id, sourcePort: 'output', targetNode: addInsideWhileId, targetPort: 'A' },
