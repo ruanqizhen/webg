@@ -13,7 +13,10 @@ import {
   Hash, ToggleLeft, Type, Gauge, Lightbulb, SquareAsterisk,
   PlusSquare, MinusSquare, XSquare, DivideSquare, ChevronRightSquare, ChevronLeftSquare,
   EqualSquare, GitMerge, GitBranch, Ban, TerminalSquare, ClipboardList, Repeat, RefreshCw, Layers, ArrowRightSquare, Box,
-  SlidersHorizontal, CircleDot, Database, List
+  SlidersHorizontal, CircleDot, Database, List,
+  // Phase 1 nodes (were falling back to the generic Box icon)
+  ListPlus, ListOrdered, Ruler, MoveHorizontal, Waves, Activity, TrendingUp, Radical, Superscript,
+  Dices, Combine, StretchHorizontal, CaseLower, CaseUpper, Scissors, Clock, Hourglass
 } from 'lucide-react';
 
 const UI_ICONS: Record<string, any> = {
@@ -39,6 +42,12 @@ const LOGIC_ICONS: Record<string, any> = {
   'math.subtract': MinusSquare,
   'math.multiply': XSquare,
   'math.divide': DivideSquare,
+  'math.abs': MoveHorizontal,
+  'math.sin': Activity,
+  'math.cos': Waves,
+  'math.tan': TrendingUp,
+  'math.sqrt': Radical,
+  'math.pow': Superscript,
   'logic.greater': ChevronRightSquare,
   'logic.less': ChevronLeftSquare,
   'logic.equal': EqualSquare,
@@ -47,6 +56,17 @@ const LOGIC_ICONS: Record<string, any> = {
   'logic.not': Ban,
   'sink.display': TerminalSquare,
   'sink.log': ClipboardList,
+  'string.concat': Combine,
+  'string.length': StretchHorizontal,
+  'string.uppercase': CaseUpper,
+  'string.lowercase': CaseLower,
+  'string.substring': Scissors,
+  'array.append': ListPlus,
+  'array.index': ListOrdered,
+  'array.length': Ruler,
+  'random.uniform': Dices,
+  'time.now': Clock,
+  'time.wait': Hourglass,
   'structure.forLoop': Repeat,
   'structure.whileLoop': RefreshCw,
   'structure.case': Layers,
