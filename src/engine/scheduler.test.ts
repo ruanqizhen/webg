@@ -275,19 +275,129 @@ function caseGraph(selectorValue: boolean): Graph {
 }
 
 describe('Case 结构', () => {
-  it('boolean 选择器为 true 只执行 true 分支', async () => {
+  it('boolean 选择器为 true 只执行 true 分支，未执行分支的输出隧道取类型默认值', async () => {
     const { portValues, nodeStates } = await run(caseGraph(true));
     expect(portValues['dT_value']).toBe(1);
-    expect(portValues['dF_value']).toBeUndefined();
+    // LabVIEW 语义：未执行分支没给输出隧道接线时，隧道输出类型默认值（number → 0）
+    expect(portValues['dF_value']).toBe(0);
     expect(nodeStates['nT']).toBe('done');
     expect(nodeStates['nF']).toBe('idle');
   });
 
-  it('boolean 选择器为 false 只执行 false 分支', async () => {
+  it('boolean 选择器为 false 只执行 false 分支，未执行分支的输出隧道取类型默认值', async () => {
     const { portValues, nodeStates } = await run(caseGraph(false));
     expect(portValues['dF_value']).toBe(2);
-    expect(portValues['dT_value']).toBeUndefined();
+    expect(portValues['dT_value']).toBe(0);
     expect(nodeStates['nF']).toBe('done');
     expect(nodeStates['nT']).toBe('idle');
+  });
+});
+
+function numberCaseGraph(selectorValue: number): Graph {
+  return {
+    nodes: [
+      node('sel', 'source.number', { value: selectorValue }),
+      node('cs', 'structure.case', { mode: 'number', cases: ['0', '1..5', 'default'], defaultCase: 'default' }),
+      node('n0', 'source.number', { value: 0 }, 'cs', '0'),
+      node('nR', 'source.number', { value: 1 }, 'cs', '1..5'),
+      node('nD', 'source.number', { value: 9 }, 'cs', 'default'),
+      node('outT', 'io.tunnel', {}, 'cs'),
+      node('disp', 'sink.display'),
+    ],
+    edges: [
+      edge('e1', 'sel', 'value', 'cs', 'selector'),
+      edge('e2', 'n0', 'value', 'outT', 'input'),
+      edge('e3', 'nR', 'value', 'outT', 'input'),
+      edge('e4', 'nD', 'value', 'outT', 'input'),
+      edge('e5', 'outT', 'output', 'disp', 'value'),
+    ],
+    uiControls: [],
+  };
+}
+
+describe('Case 结构 number 模式（LabVIEW 语义）', () => {
+  it('范围分支 1..5 命中 3', async () => {
+    const { portValues } = await run(numberCaseGraph(3));
+    expect(portValues['disp_value']).toBe(1);
+  });
+
+  it('范围边界 5 命中，6 落入 Default', async () => {
+    const { portValues: p5 } = await run(numberCaseGraph(5));
+    expect(p5['disp_value']).toBe(1);
+    const { portValues: p6 } = await run(numberCaseGraph(6));
+    expect(p6['disp_value']).toBe(9);
+  });
+
+  it('精确值 0 优先于范围', async () => {
+    const { portValues } = await run(numberCaseGraph(0));
+    expect(portValues['disp_value']).toBe(0);
+  });
+});
+
+function forCondGraph(mode: 'stopIfTrue' | 'continueIfTrue', cmp: 'greater' | 'less', threshold: number): Graph {
+  return {
+    nodes: [
+      node('cN', 'source.number', { value: 10 }),
+      node('c0', 'source.number', { value: 0 }),
+      node('cT', 'source.number', { value: threshold }),
+      node('loop', 'structure.forLoop', { hasConditional: true, conditionalMode: mode }),
+      node('srL', 'io.shiftRegister', { side: 'left', pairId: 'p1' }, 'loop'),
+      node('srR', 'io.shiftRegister', { side: 'right', pairId: 'p1' }, 'loop'),
+      node('add', 'math.add', {}, 'loop'),
+      node('cmp', `logic.${cmp}`, {}, 'loop'),
+      node('disp', 'sink.display'),
+    ],
+    edges: [
+      edge('e1', 'cN', 'value', 'loop', 'N'),
+      edge('e2', 'c0', 'value', 'srL', 'input'),
+      edge('e3', 'srL', 'output', 'add', 'A'),
+      edge('e4', 'loop', 'i', 'add', 'B'),
+      edge('e5', 'add', 'result', 'srR', 'input'),
+      edge('e6', 'loop', 'i', 'cmp', 'A'),
+      edge('e7', 'cT', 'value', 'cmp', 'B'),
+      edge('e8', 'cmp', 'result', 'loop', 'conditional'),
+      edge('e9', 'srR', 'output', 'disp', 'value'),
+    ],
+    uiControls: [],
+  };
+}
+
+describe('For 循环条件端（LabVIEW 语义）', () => {
+  it('Stop if True：i > 1 时在 i=2 提前退出，累加 0+1+2=3（不停则为 45）', async () => {
+    const { portValues } = await run(forCondGraph('stopIfTrue', 'greater', 1));
+    expect(portValues['disp_value']).toBe(3);
+  });
+
+  it('Continue if True：i < 2 在 i=2 变假时退出，累加 0+1+2=3', async () => {
+    const { portValues } = await run(forCondGraph('continueIfTrue', 'less', 2));
+    expect(portValues['disp_value']).toBe(3);
+  });
+});
+
+describe('While 循环至少执行一次（LabVIEW 语义）', () => {
+  it('停止条件一开始就为真，循环体仍执行一次', async () => {
+    const g: Graph = {
+      nodes: [
+        node('c0', 'source.number', { value: 0 }),
+        node('c1', 'source.number', { value: 1 }),
+        node('t', 'source.boolean', { value: true }),
+        node('w', 'structure.whileLoop', { conditionMode: 'stopIfTrue', maxIterations: 100 }),
+        node('srL', 'io.shiftRegister', { side: 'left', pairId: 'p1' }, 'w'),
+        node('srR', 'io.shiftRegister', { side: 'right', pairId: 'p1' }, 'w'),
+        node('add', 'math.add', {}, 'w'),
+        node('disp', 'sink.display'),
+      ],
+      edges: [
+        edge('e1', 'c0', 'value', 'srL', 'input'),
+        edge('e2', 'c1', 'value', 'add', 'B'),
+        edge('e3', 'srL', 'output', 'add', 'A'),
+        edge('e4', 'add', 'result', 'srR', 'input'),
+        edge('e5', 't', 'value', 'w', 'stop'),
+        edge('e6', 'srR', 'output', 'disp', 'value'),
+      ],
+      uiControls: [],
+    };
+    const { portValues } = await run(g);
+    expect(portValues['disp_value']).toBe(1);
   });
 });

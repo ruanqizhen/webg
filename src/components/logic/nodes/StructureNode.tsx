@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, NodeResizer, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
+import { resolveCaseToExecute } from '../../../engine/caseMatch';
 import { getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -61,19 +62,34 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
   const conditionalMode = node?.params?.conditionalMode || 'stopIfTrue';
   const conditionMode = node?.params?.conditionMode || 'stopIfTrue';
 
-  let stateBorder = 'border border-border';
-  if (selected) stateBorder = 'ring-2 ring-ring ring-offset-1 shadow-md border-border';
-  if (nodeState === 'error') stateBorder = 'ring-2 ring-destructive border-destructive';
-  else if (nodeState === 'running') stateBorder = 'ring-2 ring-[var(--status-running)] animate-pulse border-[var(--status-running)]/50';
-  else if (nodeState === 'done') stateBorder = 'ring-2 ring-emerald-500/30 border-emerald-500/20';
+  const isCaseStructure = type === 'structure.case';
+  const isForLoop = type === 'structure.forLoop';
+  const isWhileLoop = type === 'structure.whileLoop';
+
+  // LabVIEW-style frame: near-square corners, 2px border tinted per structure
+  // (For = integer blue, While = amber, Case = slate), like the classic
+  // LabVIEW diagram borders. State rings overlay the base border.
+  const structureBorder = isForLoop
+    ? 'border-[var(--data-integer)]/60'
+    : isWhileLoop
+      ? 'border-amber-600/60'
+      : 'border-slate-500/60';
+  let stateBorder = `border-2 ${structureBorder}`;
+  if (selected) stateBorder = `ring-2 ring-ring ring-offset-1 shadow-md border-2 ${structureBorder}`;
+  if (nodeState === 'error') stateBorder = 'ring-2 ring-destructive border-2 border-destructive';
+  else if (nodeState === 'running') stateBorder = 'ring-2 ring-[var(--status-running)] animate-pulse border-2 border-[var(--status-running)]/50';
+  else if (nodeState === 'done') stateBorder = 'ring-2 ring-emerald-500/30 border-2 border-emerald-500/20';
+
+  // LabVIEW highlights the case that actually executed. The selector port value
+  // persists from the last run, so highlight it once the structure has run.
+  const selectorValue = useRuntimeStore(s => s.portValues[`${id}_selector`]);
+  const runtimeCase = isCaseStructure && (nodeState === 'running' || nodeState === 'done') && selectorValue !== undefined
+    ? resolveCaseToExecute(selectorValue, mode, cases, node?.params?.defaultCase)
+    : null;
 
   const handleCaseChange = (newCase: string) => {
     updateNode(id, { params: { ...node?.params, activeCase: newCase } });
   };
-
-  const isCaseStructure = type === 'structure.case';
-  const isForLoop = type === 'structure.forLoop';
-  const isWhileLoop = type === 'structure.whileLoop';
 
   const LoopIcon = isForLoop ? Repeat : isWhileLoop ? RefreshCw : Layers;
 
@@ -82,7 +98,7 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
       // Transparent overlay: the frosted fill lives on the BackdropNode mirror
       // (zIndex -1, below the edges layer) so wires inside stay crisp.
       // Chrome (header, ports, resizer, rings) stays here, above the wires.
-      className={`relative rounded-lg min-w-[320px] min-h-[200px] pointer-events-none ${stateBorder}`}
+      className={`relative rounded-[2px] min-w-[320px] min-h-[200px] pointer-events-none ${stateBorder}`}
       style={{ width: node?.width || 320, height: node?.height || 220 }}
       onContextMenu={handleContextMenu}
     >
@@ -92,7 +108,7 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
 
       {/* Header */}
       <div
-        className="px-2.5 py-1 text-xs font-medium select-none flex justify-between items-center rounded-t-lg bg-muted/60 text-muted-foreground border-b border-border pointer-events-auto cursor-pointer h-8"
+        className="px-2.5 py-1 text-xs font-medium select-none flex justify-between items-center rounded-t-[2px] bg-muted/60 text-muted-foreground border-b border-border pointer-events-auto cursor-pointer h-8"
         onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       >
         <span className="flex items-center gap-1.5 tracking-tight">
@@ -109,14 +125,15 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
           <div className="flex gap-1">
             {cases.map((caseName: string) => {
               const caseColor = CASE_COLORS[caseName] || CASE_COLORS['default'];
+              const isRuntimeCase = runtimeCase === caseName;
               return (
-                <button key={caseName} className={`px-2 py-0.5 text-[10px] rounded-md transition-colors flex items-center gap-1 cursor-pointer pointer-events-auto border ${activeCase === caseName ? 'bg-card text-foreground font-medium shadow-sm border-border' : 'bg-transparent text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'}`} onClick={(e) => { e.stopPropagation(); handleCaseChange(caseName); }}>
+                <button key={caseName} title={isRuntimeCase ? 'Case executed in the last run' : undefined} className={`px-2 py-0.5 text-[10px] rounded-md transition-colors flex items-center gap-1 cursor-pointer pointer-events-auto border ${activeCase === caseName ? 'bg-card text-foreground font-medium shadow-sm border-border' : 'bg-transparent text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'} ${isRuntimeCase ? 'ring-2 ring-emerald-500/70' : ''}`} onClick={(e) => { e.stopPropagation(); handleCaseChange(caseName); }}>
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: caseColor }} />{caseName}
                 </button>
               );
             })}
             {mode === 'number' && (
-              <button className={`px-2 py-0.5 text-[10px] rounded-md transition-colors flex items-center gap-1 cursor-pointer pointer-events-auto border ${activeCase === 'default' ? 'bg-card text-foreground font-medium shadow-sm border-border' : 'bg-transparent text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'}`} onClick={(e) => { e.stopPropagation(); handleCaseChange('default'); }}>
+              <button title={runtimeCase === 'default' ? 'Case executed in the last run' : undefined} className={`px-2 py-0.5 text-[10px] rounded-md transition-colors flex items-center gap-1 cursor-pointer pointer-events-auto border ${activeCase === 'default' ? 'bg-card text-foreground font-medium shadow-sm border-border' : 'bg-transparent text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'} ${runtimeCase === 'default' ? 'ring-2 ring-emerald-500/70' : ''}`} onClick={(e) => { e.stopPropagation(); handleCaseChange('default'); }}>
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CASE_COLORS['default'] }} />Default
               </button>
             )}

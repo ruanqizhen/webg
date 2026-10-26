@@ -155,7 +155,7 @@ export function PropertiesPanel() {
                     <FieldSelect value={activeNode.params.mode || 'boolean'} onChange={(e) => {
                         const newMode = e.target.value;
                         const newCases = newMode === 'boolean' ? ['true', 'false'] : ['0', '1', '2'];
-                        updateNode(activeNode.id, { params: { ...activeNode.params, mode: newMode, cases: newCases, defaultCase: newMode === 'number' ? 'false' : undefined, activeCase: newCases[0] } });
+                        updateNode(activeNode.id, { params: { ...activeNode.params, mode: newMode, cases: newCases, defaultCase: newMode === 'number' ? 'default' : undefined, activeCase: newCases[0] } });
                       }}>
                       <option value="boolean">Boolean (True/False)</option>
                       <option value="number">Number (Multi-case)</option>
@@ -164,7 +164,7 @@ export function PropertiesPanel() {
 
                   <FieldGroup>
                     <FieldLabel>Cases (comma-separated)</FieldLabel>
-                    <CommitInput value={activeNode.params.cases?.join(', ') || ''} placeholder="true, false" onCommit={(raw) => {
+                    <CommitInput value={activeNode.params.cases?.join(', ') || ''} placeholder={activeNode.params.mode === 'number' ? '0, 1, 2..5' : 'true, false'} onCommit={(raw) => {
                         const newCases = raw.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
                         const finalCases = newCases.length > 0 ? newCases : ['true', 'false'];
                         updateNode(activeNode.id, { params: { ...activeNode.params, cases: finalCases, activeCase: finalCases[0] || 'true' } });
@@ -174,6 +174,9 @@ export function PropertiesPanel() {
                           if (orphans.length > 0) useGraphStore.getState().removeNodes(orphans.map(n => n.id));
                         }
                       }} />
+                    {activeNode.params.mode === 'number' && (
+                      <span className="text-[11px] text-muted-foreground">Ranges work too: 2..5 matches 2–5 (inclusive). Values matching no case run the Default case.</span>
+                    )}
                   </FieldGroup>
 
                   {activeNode.params.mode === 'number' && (
