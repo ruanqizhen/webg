@@ -1,5 +1,6 @@
 import type { Graph, Edge, NodeInstance } from '../types/graph';
 import { NodeRegistry } from './registry';
+import { resolveCaseToExecute } from './caseMatch';
 import type { NodeState, RuntimeMemory } from '../types/runtime';
 
 interface DebugCallbacks {
@@ -610,21 +611,40 @@ export class ExecutionEngine {
            const selectorValue = inputs.selector;
            const mode = node.params.mode || 'boolean';
            const cases = node.params.cases || ['true', 'false'];
-           const defaultCase = node.params.defaultCase || 'false';
-           
-           // Determine which case to execute based on selector
-           let caseToExecute: string;
-           
-           if (mode === 'boolean') {
-             caseToExecute = selectorValue ? 'true' : 'false';
-           } else {
-             // Number mode - find matching case
-             const matchedCase = cases.find((c: string) => String(selectorValue) === c);
-             caseToExecute = matchedCase || defaultCase;
-           }
-           
+           const defaultCase = node.params.defaultCase || 'default';
+
+           // LabVIEW matching: exact values, inclusive ranges (1..5), comma lists;
+           // no match falls back to the configured default case.
+           const caseToExecute = resolveCaseToExecute(selectorValue, mode, cases, defaultCase);
+
            // Execute only the selected case subgraph
            await this.executeSubgraph(node.id, node.id, caseToExecute);
+
+           // LabVIEW: an output tunnel not wired in the executed case outputs
+           // the default value of its data type (instead of stale/undefined).
+           const caseTunnels = this.graph.nodes.filter(n => n.parent === node.id && n.type === 'io.tunnel');
+           for (const tunnel of caseTunnels) {
+             const incoming = this.graph.edges.filter(e => e.targetNode === tunnel.id);
+             // Output tunnel = at least one incoming wire from inside the case.
+             const isOutputTunnel = incoming.some(e => {
+               const src = this.nodeMap.get(e.sourceNode);
+               return src !== undefined && src.parent === node.id;
+             });
+             if (!isOutputTunnel) continue;
+             const wiredInExecutedCase = incoming.some(e => {
+               const src = this.nodeMap.get(e.sourceNode);
+               return src !== undefined && src.parent === node.id && src.caseId === caseToExecute;
+             });
+             const inputVal = this.runtime.portValues[`${tunnel.id}_input`];
+             if (!wiredInExecutedCase || inputVal === undefined) {
+               const defVal = this.defaultForTunnelTypeById(tunnel.id);
+               this.setPortValue(`${tunnel.id}_output`, defVal);
+               const tEdges = this.edgeByNodePort.get(`${tunnel.id}_output`) || [];
+               for (const edge of tEdges) {
+                 this.setPortValue(`${edge.targetNode}_${edge.targetPort}`, defVal);
+               }
+             }
+           }
         } else {
            // Standard Node or Tunnel
            let applyStandardExecution = true;
