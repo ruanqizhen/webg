@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
@@ -36,7 +36,50 @@ interface IconDef {
   symbolColor: string;
   w: number;
   h: number;
+  // When set, this SVG glyph is drawn inside the shape instead of the text symbol,
+  // so the node reads as an icon first and text only supports it.
+  symbolSvg?: (color: string) => ReactNode;
 }
+
+/* Small glyphs for nodes whose old symbol was plain text (sin, len, ms, …).
+   All drawn in a 24×24 box, stroked with the node's symbol color. */
+const glyphSvgProps = (color: string) => ({
+  width: 26, height: 26, viewBox: '0 0 24 24',
+  fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const,
+});
+const SineGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}><path d="M2 12 C5 5, 9 5, 12 12 C15 19, 19 19, 22 12" /></svg>
+);
+const CosineGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}><path d="M2 12 C5 19, 9 19, 12 12 C15 5, 19 5, 22 12" /></svg>
+);
+const TanGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}>
+    <path d="M3 21 C3 15, 5 11, 9 9" />
+    <path d="M15 15 C19 13, 21 9, 21 3" />
+    <line x1="12" y1="2" x2="12" y2="22" strokeDasharray="2 3" opacity="0.5" />
+  </svg>
+);
+const LengthGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}>
+    <path d="M3 12 H21" />
+    <path d="M3 7 V17 M21 7 V17" />
+  </svg>
+);
+const ClockGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7 V12 L16 14" />
+  </svg>
+);
+const DieGlyph = (color: string) => (
+  <svg {...glyphSvgProps(color)}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <circle cx="9" cy="9" r="1.4" fill={color} stroke="none" />
+    <circle cx="12" cy="12" r="1.4" fill={color} stroke="none" />
+    <circle cx="15" cy="15" r="1.4" fill={color} stroke="none" />
+  </svg>
+);
 
 const NODE_ICONS: Record<string, IconDef> = {
   // ── Math ── Amber chevron ──
@@ -44,26 +87,26 @@ const NODE_ICONS: Record<string, IconDef> = {
   'math.subtract': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'−',  symbolColor:'#78350F', w:56, h:44 },
   'math.multiply': { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'×',  symbolColor:'#78350F', w:56, h:44 },
   'math.divide':   { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'÷',  symbolColor:'#78350F', w:56, h:44 },
-  'math.sin':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'sin', symbolColor:'#78350F', w:56, h:44 },
-  'math.cos':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'cos', symbolColor:'#78350F', w:56, h:44 },
-  'math.tan':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'tan', symbolColor:'#78350F', w:56, h:44 },
+  'math.sin':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'sin', symbolColor:'#78350F', w:56, h:44, symbolSvg: SineGlyph },
+  'math.cos':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'cos', symbolColor:'#78350F', w:56, h:44, symbolSvg: CosineGlyph },
+  'math.tan':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'tan', symbolColor:'#78350F', w:56, h:44, symbolSvg: TanGlyph },
   'math.sqrt':     { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'√',  symbolColor:'#78350F', w:56, h:44 },
   'math.pow':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'xʸ', symbolColor:'#78350F', w:56, h:44 },
   'math.abs':      { shape:'chevron', bg:'#FEF3C7', stroke:'#B45309', symbol:'|x|', symbolColor:'#78350F', w:56, h:44 },
   // ── String ── Pink chevron ──
   'string.concat':    { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'++',  symbolColor:'#9D174D', w:56, h:44 },
-  'string.length':    { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'len', symbolColor:'#9D174D', w:56, h:44 },
+  'string.length':    { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'len', symbolColor:'#9D174D', w:56, h:44, symbolSvg: LengthGlyph },
   'string.substring': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'[..]', symbolColor:'#9D174D', w:56, h:44 },
   'string.uppercase': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'ABC', symbolColor:'#9D174D', w:56, h:44 },
   'string.lowercase': { shape:'chevron', bg:'#FDF2F8', stroke:'#BE185D', symbol:'abc', symbolColor:'#9D174D', w:56, h:44 },
   // ── Array ── Orange chevron ──
-  'array.length': { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'len', symbolColor:'#BF360C', w:56, h:44 },
+  'array.length': { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'len', symbolColor:'#BF360C', w:56, h:44, symbolSvg: LengthGlyph },
   'array.index':  { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'[i]', symbolColor:'#BF360C', w:56, h:44 },
   'array.append': { shape:'chevron', bg:'#FFF7ED', stroke:'#E65100', symbol:'+=',  symbolColor:'#BF360C', w:56, h:44 },
   // ── Random ── Purple chevron ──
-  'random.uniform': { shape:'chevron', bg:'#F5F3FF', stroke:'#7C3AED', symbol:'?', symbolColor:'#5B21B6', w:56, h:44 },
+  'random.uniform': { shape:'chevron', bg:'#F5F3FF', stroke:'#7C3AED', symbol:'?', symbolColor:'#5B21B6', w:56, h:44, symbolSvg: DieGlyph },
   // ── Time ── Teal chevron ──
-  'time.wait': { shape:'chevron', bg:'#ECFDF5', stroke:'#059669', symbol:'ms', symbolColor:'#065F46', w:56, h:44 },
+  'time.wait': { shape:'chevron', bg:'#ECFDF5', stroke:'#059669', symbol:'ms', symbolColor:'#065F46', w:56, h:44, symbolSvg: ClockGlyph },
   'time.now':  { shape:'chevron', bg:'#ECFDF5', stroke:'#059669', symbol:'t',  symbolColor:'#065F46', w:56, h:44 },
   // ── Comparison ── Orange hexagon ──
   'logic.greater': { shape:'hexagon', bg:'#FFEDD5', stroke:'#C2410C', symbol:'>',  symbolColor:'#7C2D12', w:48, h:42 },
@@ -456,7 +499,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
 
   /* ── Icon-based rendering ────────── */
   if (iconDef) {
-    const { shape, bg, stroke, symbol, symbolColor, w, h } = iconDef;
+    const { shape, bg, stroke, symbol, symbolColor, w, h, symbolSvg } = iconDef;
     const ringCls = stateRingClass(nodeState, !!selected, isCurrentStep);
     const isTerminal = actualType === 'io.terminal';
     // Determine effective port type color for handles
@@ -504,7 +547,7 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
 
     return (
       <div
-        className={`relative cursor-pointer transition-all rounded-lg ${ringCls}`}
+        className={`group relative cursor-pointer transition-all rounded-lg ${ringCls}`}
         style={{ width: w, height: h }}
         onClick={() => setSelectedNodeId(id)}
         onContextMenu={handleContextMenu}
@@ -527,6 +570,10 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
             >
               {displayValue}
             </span>
+          ) : symbolSvg ? (
+            <span className="flex items-center justify-center select-none">
+              {symbolSvg(symbolColor)}
+            </span>
           ) : (
             <span className="font-bold select-none" style={{ color: symbolColor, fontSize: h * 0.45 }}>
               {symbol}
@@ -534,8 +581,9 @@ export function BaseNode({ id, data, type, selected }: NodeProps<BaseNodeData>) 
           )}
         </div>
 
-        {/* Label below */}
-        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground font-medium pointer-events-none select-none tracking-wide">
+        {/* Label below — supporting text only: shown on hover or while selected,
+            so the canvas reads as icons first. Full name is also in the title tooltip. */}
+        <div className={`absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-muted-foreground font-medium pointer-events-none select-none tracking-wide transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
           {actualType === 'io.terminal' ? (boundControlLabel || def.label) : def.label}
         </div>
 
