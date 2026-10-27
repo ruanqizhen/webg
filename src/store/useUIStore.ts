@@ -8,7 +8,11 @@ interface UIState {
   selectedNodeIds: string[];
   selectedControlId: string | null;
   selectedEdgeId: string | null;
+  // Structure currently hovered while dragging a node over it (LabVIEW-style
+  // drop-target highlight). Transient UI state, never persisted.
+  dropTargetStructureId: string | null;
 
+  setDropTargetStructureId: (id: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setSelectedNodeId: (id: string | null) => void;
   addSelectedNodeId: (id: string) => void;
@@ -24,6 +28,9 @@ export const useUIStore = create<UIState>((set) => ({
   selectedNodeIds: [],
   selectedControlId: null,
   selectedEdgeId: null,
+  dropTargetStructureId: null,
+
+  setDropTargetStructureId: (id) => set({ dropTargetStructureId: id }),
 
   setViewMode: (mode) => set({ viewMode: mode }),
 

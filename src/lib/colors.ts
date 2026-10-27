@@ -48,6 +48,17 @@ export const getNodeColor = (category: string) => {
   return NODE_CATEGORY_COLORS[category.toLowerCase()] ?? '#546E7A';
 };
 
+// Frame colors for structures — also used for the drag-over drop-target highlight.
+export const STRUCTURE_COLORS: Record<string, string> = {
+  'structure.forLoop': '#1565C0',
+  'structure.whileLoop': '#D97706',
+  'structure.case': '#64748B',
+};
+
+export const getStructureColor = (structureType: string) => {
+  return STRUCTURE_COLORS[structureType] ?? '#64748B';
+};
+
 export const STATUS_COLORS = {
   idle: 'var(--status-idle)',
   running: 'var(--status-running)',

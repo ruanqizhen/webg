@@ -2,6 +2,7 @@ import type { NodeProps } from 'reactflow';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
+import { getStructureColor } from '../../../lib/colors';
 
 interface BackdropNodeData {
   structureId: string;
@@ -21,6 +22,7 @@ export function BackdropNode({ data }: NodeProps<BackdropNodeData>) {
   const { structureId, isForLoop } = data;
   const nodeState = useRuntimeStore(s => s.nodeState[structureId] || 'idle');
   const selected = useUIStore(s => s.selectedNodeId === structureId || s.selectedNodeIds.includes(structureId));
+  const isDropTarget = useUIStore(s => s.dropTargetStructureId === structureId);
   const structType = useGraphStore(s => s.nodes.find(n => n.id === structureId)?.type);
 
   // LabVIEW-style frame: near-square corners, 2px border tinted per structure
@@ -36,7 +38,14 @@ export function BackdropNode({ data }: NodeProps<BackdropNodeData>) {
   else if (nodeState === 'done') border = 'border-emerald-500/20';
   if (selected) border = 'border-ring/60';
 
+  // Same drop-target highlight as the chrome above, so the whole frame —
+  // fill included — reads as the target while a node hovers over it.
+  const targetColor = isDropTarget && structType ? getStructureColor(structType) : undefined;
+
   return (
-    <div className={`w-full h-full rounded-[2px] border-2 bg-canvas-bg/50 pointer-events-none ${border} ${isForLoop ? 'shadow-[0_0_0_1px_hsl(var(--border)),0_2px_8px_hsl(var(--border))]' : ''}`} />
+    <div
+      className={`w-full h-full rounded-[2px] border-2 bg-canvas-bg/50 pointer-events-none ${border} ${isForLoop && !targetColor ? 'shadow-[0_0_0_1px_hsl(var(--border)),0_2px_8px_hsl(var(--border))]' : ''}`}
+      style={targetColor ? { borderColor: targetColor, backgroundColor: `${targetColor}12`, boxShadow: `0 0 0 2px ${targetColor}33` } : undefined}
+    />
   );
 }
