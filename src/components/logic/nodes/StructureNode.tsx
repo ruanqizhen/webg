@@ -104,7 +104,7 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
       // Transparent overlay: the frosted fill lives on the BackdropNode mirror
       // (zIndex -1, below the edges layer) so wires inside stay crisp.
       // Chrome (header, ports, resizer, rings) stays here, above the wires.
-      className={`relative rounded-[2px] min-w-[320px] min-h-[200px] pointer-events-none transition-shadow ${stateBorder}`}
+      className={`group relative rounded-[2px] min-w-[320px] min-h-[200px] pointer-events-none transition-shadow ${stateBorder}`}
       style={{
         width: node?.width || 320,
         height: node?.height || 220,
@@ -113,7 +113,17 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
       onContextMenu={handleContextMenu}
     >
       <div className="pointer-events-auto">
-        <NodeResizer color="hsl(var(--ring))" isVisible={selected} minWidth={320} minHeight={200} onResizeStart={() => useGraphStore.getState().pushHistory()} />
+        {/* Always mounted (not just when selected) so the frame edge is a
+            resize zone on hover: the wide transparent hit areas below show
+            the directional cursor as soon as the pointer nears the edge,
+            and the visible marks fade in on hover or while selected. */}
+        <NodeResizer
+          minWidth={320}
+          minHeight={200}
+          handleClassName={selected ? 'structure-resize-handle opacity-100' : 'structure-resize-handle opacity-0 group-hover:opacity-100 transition-opacity'}
+          lineClassName={selected ? 'structure-resize-line opacity-100' : 'structure-resize-line opacity-0 group-hover:opacity-100 transition-opacity'}
+          onResizeStart={() => useGraphStore.getState().pushHistory()}
+        />
       </div>
 
       {/* Header */}
