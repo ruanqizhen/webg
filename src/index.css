@@ -209,3 +209,66 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 oklch(0.6 0.18 240 / 0.4); }
   50% { box-shadow: 0 0 0 6px oklch(0.6 0.18 240 / 0); }
 }
+
+/* ── Structure resize controls: wide invisible hit area, small visible mark ──
+   NodeResizer's defaults are a 4px corner handle and a 1px edge line that
+   only render while the node is selected — far too small to discover by
+   hovering. These overrides keep the controls mounted (so the frame edge is
+   always a resize zone with NodeResizer's directional cursors), widen the
+   grab area (16px corners, 12px edge strips centered on the border), and
+   draw a small visible mark via ::after. Visibility itself is driven by
+   Tailwind opacity classes on the controls (shown on frame hover/selected). */
+.react-flow__resize-control.handle.structure-resize-handle {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+}
+.react-flow__resize-control.handle.structure-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: hsl(var(--ring));
+  border: 1px solid #fff;
+}
+.react-flow__resize-control.line.structure-resize-line.left,
+.react-flow__resize-control.line.structure-resize-line.right,
+.react-flow__resize-control.line.structure-resize-line.top,
+.react-flow__resize-control.line.structure-resize-line.bottom {
+  border: none;
+  background: transparent;
+}
+.react-flow__resize-control.line.structure-resize-line.left,
+.react-flow__resize-control.line.structure-resize-line.right {
+  width: 12px;
+}
+.react-flow__resize-control.line.structure-resize-line.top,
+.react-flow__resize-control.line.structure-resize-line.bottom {
+  height: 12px;
+}
+.react-flow__resize-control.line.structure-resize-line::after {
+  content: '';
+  position: absolute;
+  background: hsl(var(--ring));
+}
+.react-flow__resize-control.line.structure-resize-line.left::after,
+.react-flow__resize-control.line.structure-resize-line.right::after {
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+.react-flow__resize-control.line.structure-resize-line.top::after,
+.react-flow__resize-control.line.structure-resize-line.bottom::after {
+  top: 50%;
+  left: 0;
+  height: 1px;
+  width: 100%;
+  transform: translateY(-50%);
+}
