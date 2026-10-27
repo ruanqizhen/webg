@@ -2,7 +2,7 @@ import type { NodeProps } from 'reactflow';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
-import { getStructureColor } from '../../../lib/colors';
+import { getStructureColor, getStructureDepthFill } from '../../../lib/colors';
 
 interface BackdropNodeData {
   structureId: string;
@@ -38,25 +38,36 @@ export function BackdropNode({ data }: NodeProps<BackdropNodeData>) {
   else if (nodeState === 'done') border = 'border-emerald-500/20';
   if (selected) border = 'border-ring/60';
 
-  // Visible translucent fill, tinted per structure type (For blue, While
-  // amber, Case slate). The old bg-canvas-bg/50 blended back to the canvas
-  // color and read as fully transparent, so the frame's region — and
-  // whether a control or wire sat inside it or behind it — was invisible.
-  // The mix stays mostly see-through, so the dot grid and wires still show
-  // through the region; the tint is what marks the region itself.
-  const fillColor = structType ? getStructureColor(structType) : '#64748B';
+  // Nesting depth: how many ancestor structures enclose this one. The fill
+  // color keys off depth (not type), so each nested layer gets its own very
+  // light hue and adjacent layers never share a color.
+  const depth = useGraphStore(s => {
+    let d = 0;
+    let cur = s.nodes.find(n => n.id === structureId);
+    while (cur?.parent) {
+      const parentId: string = cur.parent;
+      const parent = s.nodes.find(n => n.id === parentId);
+      if (!parent) break;
+      if (String(parent.type).startsWith('structure')) d += 1;
+      cur = parent;
+    }
+    return d;
+  });
+  const fillColor = getStructureDepthFill(depth);
+  // Border/glow color stays type-based, matching the StructureNode chrome.
+  const typeColor = structType ? getStructureColor(structType) : '#64748B';
 
   // Same drop-target highlight as the chrome above, so the whole frame —
   // fill included — reads as the target while a node hovers over it:
-  // the fill deepens and the border glows.
+  // the fill goes solid and the border glows.
   return (
     <div
       className={`w-full h-full rounded-[2px] border-2 pointer-events-none ${border} ${isForLoop && !isDropTarget ? 'shadow-[0_0_0_1px_hsl(var(--border)),0_2px_8px_hsl(var(--border))]' : ''}`}
       style={{
         backgroundColor: isDropTarget
-          ? `color-mix(in srgb, ${fillColor} 30%, white 25%)`
-          : `color-mix(in srgb, ${fillColor} 22%, white 18%)`,
-        ...(isDropTarget ? { borderColor: fillColor, boxShadow: `0 0 0 2px ${fillColor}33` } : {}),
+          ? fillColor
+          : `color-mix(in srgb, ${fillColor} 80%, transparent)`,
+        ...(isDropTarget ? { borderColor: typeColor, boxShadow: `0 0 0 2px ${typeColor}33` } : {}),
       }}
     />
   );
