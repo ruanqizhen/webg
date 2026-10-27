@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Handle, Position, NodeResizer, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
 import { resolveCaseToExecute } from '../../../engine/caseMatch';
-import { getTypeColor } from '../../../lib/colors';
+import { getTypeColor, getStructureColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
@@ -28,6 +28,7 @@ interface StructureNodeData {
 export function StructureNode({ id, data, type, selected }: NodeProps<StructureNodeData>) {
   const def = NodeRegistry[type] || data?.def;
   const nodeState = useRuntimeStore(s => s.nodeState[id] || 'idle');
+  const isDropTarget = useUIStore(s => s.dropTargetStructureId === id);
   const setSelectedNodeId = useUIStore(s => s.setSelectedNodeId);
   const clearSelection = useUIStore(s => s.clearSelection);
   const { updateNode } = useGraphStore();
@@ -87,6 +88,11 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
     ? resolveCaseToExecute(selectorValue, mode, cases, node?.params?.defaultCase)
     : null;
 
+  // Drop-target highlight wins over the other rings: a thick frame-colored
+  // border plus glow while a dragged node hovers over it.
+  const structureColor = getStructureColor(type);
+  if (isDropTarget) stateBorder = 'border-2 shadow-lg';
+
   const handleCaseChange = (newCase: string) => {
     updateNode(id, { params: { ...node?.params, activeCase: newCase } });
   };
@@ -98,8 +104,12 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
       // Transparent overlay: the frosted fill lives on the BackdropNode mirror
       // (zIndex -1, below the edges layer) so wires inside stay crisp.
       // Chrome (header, ports, resizer, rings) stays here, above the wires.
-      className={`relative rounded-[2px] min-w-[320px] min-h-[200px] pointer-events-none ${stateBorder}`}
-      style={{ width: node?.width || 320, height: node?.height || 220 }}
+      className={`relative rounded-[2px] min-w-[320px] min-h-[200px] pointer-events-none transition-shadow ${stateBorder}`}
+      style={{
+        width: node?.width || 320,
+        height: node?.height || 220,
+        ...(isDropTarget ? { borderColor: structureColor, boxShadow: `0 0 0 3px ${structureColor}33, 0 0 28px ${structureColor}55` } : {}),
+      }}
       onContextMenu={handleContextMenu}
     >
       <div className="pointer-events-auto">
@@ -109,6 +119,7 @@ export function StructureNode({ id, data, type, selected }: NodeProps<StructureN
       {/* Header */}
       <div
         className="px-2.5 py-1 text-xs font-medium select-none flex justify-between items-center rounded-t-[2px] bg-muted/60 text-muted-foreground border-b border-border pointer-events-auto cursor-pointer h-8"
+        style={isDropTarget ? { backgroundColor: `${structureColor}14` } : undefined}
         onClick={(e) => { e.stopPropagation(); setSelectedNodeId(id); }}
       >
         <span className="flex items-center gap-1.5 tracking-tight">

@@ -89,6 +89,123 @@ export const resolveNodeOverlaps = (draggedNodeId: string) => {
     }, 50);
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   LabVIEW-style drop-into-structure feedback.
+   While a node is dragged over a structure, the frame highlights and
+   swells to swallow the node (grow-only, like LabVIEW's auto-grow).
+   ═══════════════════════════════════════════════════════════════ */
+
+const DROP_PAD = 16;
+
+type LocalRect = { x: number; y: number; w: number; h: number };
+
+// Canvas-absolute position of a store node, walking up ancestor offsets.
+function absPosOf(all: any[], n: any) {
+  let x = n.position?.x ?? 0;
+  let y = n.position?.y ?? 0;
+  let p = n.parent;
+  while (p) {
+    const pn = all.find(a => a.id === p);
+    if (!pn) break;
+    x += pn.position?.x ?? 0;
+    y += pn.position?.y ?? 0;
+    p = pn.parent;
+  }
+  return { x, y };
+}
+
+// Size used for fit math: structures carry real dims, tunnels are 16px,
+// everything else falls back to the same 120×60 the drop code already uses.
+function childSize(n: any): { w: number; h: number } {
+  if (String(n.type).startsWith('structure')) return { w: n.width || 300, h: n.height || 200 };
+  if (n.type === 'io.tunnel' || n.type === 'io.shiftRegister') return { w: 16, h: 16 };
+  return { w: 120, h: 60 };
+}
+
+// Innermost structure whose bounds contain (cx, cy). Excludes the dragged
+// node itself and its descendants — a frame can't swallow its own child.
+// Shared by the drag highlight and the drop adoption so the two agree.
+function findDropTarget(all: any[], cx: number, cy: number, draggedId: string) {
+  let best: any | null = null;
+  let bestArea = Infinity;
+  for (const s of all) {
+    if (!String(s.type).startsWith('structure.') || s.id === draggedId) continue;
+    let p = s.parent;
+    let isDescendant = false;
+    while (p) {
+      if (p === draggedId) { isDescendant = true; break; }
+      const pn = all.find(a => a.id === p);
+      p = pn?.parent;
+    }
+    if (isDescendant) continue;
+    const { x, y } = absPosOf(all, s);
+    const w = s.width || 300;
+    const h = s.height || 200;
+    if (cx > x && cx < x + w && cy > y && cy < y + h) {
+      const area = w * h;
+      if (area < bestArea) { best = s; bestArea = area; }
+    }
+  }
+  return best;
+}
+
+// Grow a structure (never shrink) so it encloses `rects` (frame-local coords)
+// with DROP_PAD slack. Growing left/top moves the frame and shifts direct
+// children by the same amount so they stay visually put; edge-pinned
+// tunnels/shift-registers stay glued to the frame edge instead.
+function growStructureToFit(structureId: string, rects: LocalRect[]) {
+  if (rects.length === 0) return false;
+  const st = useGraphStore.getState();
+  const all = st.nodes;
+  const s = all.find(n => n.id === structureId);
+  if (!s) return false;
+  const minX = Math.min(...rects.map(r => r.x));
+  const minY = Math.min(...rects.map(r => r.y));
+  const maxR = Math.max(...rects.map(r => r.x + r.w));
+  const maxB = Math.max(...rects.map(r => r.y + r.h));
+  const dx = Math.max(0, DROP_PAD - minX);
+  const dy = Math.max(0, DROP_PAD - minY);
+  const w = s.width || 300;
+  const h = s.height || 200;
+  // Bottom/right edges never move inward: height must cover the top shift too.
+  const newW = Math.max(w + dx, maxR + dx + DROP_PAD);
+  const newH = Math.max(h + dy, maxB + dy + DROP_PAD);
+  if (dx === 0 && dy === 0 && newW === w && newH === h) return false;
+  const sx = s.position?.x ?? 0;
+  const sy = s.position?.y ?? 0;
+  st.updateNode(structureId, { position: { x: sx - dx, y: sy - dy }, width: newW, height: newH }, true);
+  for (const c of all.filter(n => n.parent === structureId)) {
+    const cx = c.position?.x ?? 0;
+    const cy = c.position?.y ?? 0;
+    if (c.type === 'io.tunnel' || c.type === 'io.shiftRegister') {
+      const isRight = c.type === 'io.shiftRegister' ? c.params?.side === 'right' : cx > w / 2;
+      const nx = isRight ? newW - 16 : cx + dx;
+      const ny = Math.max(0, Math.min(newH - 16, cy + dy));
+      if (nx !== cx || ny !== cy) st.updateNode(c.id, { position: { x: nx, y: ny } }, true);
+    } else if (dx !== 0 || dy !== 0) {
+      st.updateNode(c.id, { position: { x: cx + dx, y: cy + dy } }, true);
+    }
+  }
+  return true;
+}
+
+// After a drop, grow each ancestor so it still encloses its (possibly
+// just-grown) child frames. Grow-only: frames never shrink on drop.
+function fitAncestors(startId: string) {
+  let curId: string | undefined = startId;
+  while (curId) {
+    const all = useGraphStore.getState().nodes;
+    const cur = all.find(n => n.id === curId);
+    const parentId = cur?.parent;
+    if (!parentId) break;
+    const kids = all.filter(n => n.parent === parentId);
+    if (kids.length > 0) {
+      growStructureToFit(parentId, kids.map(k => ({ x: k.position?.x ?? 0, y: k.position?.y ?? 0, ...childSize(k) })));
+    }
+    curId = parentId;
+  }
+}
+
 const initialNodeTypes: any = {
   custom: BaseNode,
   backdrop: BackdropNode,
@@ -418,7 +535,54 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     pushHistory();
   }, [pushHistory]);
 
+  // Live LabVIEW-style feedback while dragging: highlight the frame the node
+  // hovers over, and swell that frame to swallow the node. For nodes already
+  // inside a frame, only grow the frame's right/bottom edge — never move a
+  // frame under a live drag.
+  const onNodeDrag = useCallback((_: any, node: FlowNode) => {
+    const st = useGraphStore.getState();
+    const ui = useUIStore.getState();
+    const all = st.nodes;
+    const nw = node.width || 120;
+    const nh = node.height || 60;
+    const nx = node.position?.x ?? 0;
+    const ny = node.position?.y ?? 0;
+
+    if (node.parentNode) {
+      if (ui.dropTargetStructureId) ui.setDropTargetStructureId(null);
+      if (node.type === 'io.tunnel' || node.type === 'io.shiftRegister') return;
+      const p = all.find(n => n.id === node.parentNode);
+      if (p && String(p.type).startsWith('structure')) {
+        const w = p.width || 300;
+        const h = p.height || 200;
+        const newW = Math.max(w, nx + nw + DROP_PAD);
+        const newH = Math.max(h, ny + nh + DROP_PAD);
+        if (newW !== w || newH !== h) {
+          st.updateNode(p.id, { width: newW, height: newH }, true);
+          for (const c of all.filter(n => n.parent === p.id && (n.type === 'io.tunnel' || n.type === 'io.shiftRegister'))) {
+            const isRight = c.type === 'io.shiftRegister' ? c.params?.side === 'right' : (c.position?.x ?? 0) > w / 2;
+            if (isRight && (c.position?.x ?? 0) !== newW - 16) {
+              st.updateNode(c.id, { position: { x: newW - 16, y: c.position?.y ?? 0 } }, true);
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    const cx = nx + nw / 2;
+    const cy = ny + nh / 2;
+    const target = findDropTarget(all, cx, cy, node.id);
+    const targetId = target?.id ?? null;
+    if (ui.dropTargetStructureId !== targetId) ui.setDropTargetStructureId(targetId);
+    if (target) {
+      const { x: tx, y: ty } = absPosOf(all, target);
+      growStructureToFit(target.id, [{ x: nx - tx, y: ny - ty, w: nw, h: nh }]);
+    }
+  }, []);
+
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
+    useUIStore.getState().setDropTargetStructureId(null);
     const GRID = 16;
     const snappedX = Math.round(node.position.x / GRID) * GRID;
     const snappedY = Math.round(node.position.y / GRID) * GRID;
@@ -428,37 +592,24 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     }
 
     if (!node.parentNode) {
-       const structures = flowNodes.filter(n => n.id !== node.id && String(n.type).startsWith('structure'));
        const nodeCenterX = pos.x + (node.width || 120) / 2;
        const nodeCenterY = pos.y + (node.height || 60) / 2;
+       // Same innermost-frame rule as the drag highlight, so the frame that
+       // lit up is the frame that adopts the node.
+       const target = findDropTarget(nodes, nodeCenterX, nodeCenterY, node.id);
+       if (target) {
+          const { x: absX, y: absY } = absPosOf(nodes, target);
+          const isCaseStructure = target.type === 'structure.case';
+          const activeCase = target.params?.activeCase;
 
-       for (const s of structures) {
-          let absX = s.position?.x ?? 0;
-          let absY = s.position?.y ?? 0;
-          let curParentId: string | undefined = nodes.find(n => n.id === s.id)?.parent;
-          while (curParentId) {
-            const p = nodes.find(n => n.id === curParentId);
-            if (!p) break;
-            absX += p.position?.x ?? 0;
-            absY += p.position?.y ?? 0;
-            curParentId = p.parent;
-          }
-          const sW = s.width || 300;
-          const sH = s.height || 200;
-          if (nodeCenterX > absX && nodeCenterX < absX + sW &&
-              nodeCenterY > absY && nodeCenterY < absY + sH) {
-             const isCaseStructure = s.type === 'structure.case';
-             const caseStructureNode = nodes.find(n => n.id === s.id);
-             const activeCase = caseStructureNode?.params?.activeCase;
-
-             updateNode(node.id, {
-                 parent: s.id,
-                 position: { x: pos.x - absX, y: pos.y - absY },
-                 caseId: isCaseStructure ? activeCase : undefined
-             });
-             resolveNodeOverlaps(node.id);
-             return;
-          }
+          updateNode(node.id, {
+              parent: target.id,
+              position: { x: pos.x - absX, y: pos.y - absY },
+              caseId: isCaseStructure ? activeCase : undefined
+          });
+          fitAncestors(target.id);
+          resolveNodeOverlaps(node.id);
+          return;
        }
     } else {
        const parentNode = flowNodes.find(n => n.id === node.parentNode);
@@ -524,6 +675,7 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={initialNodeTypes}
         edgeTypes={initialEdgeTypes}
