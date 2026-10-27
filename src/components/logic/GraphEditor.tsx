@@ -474,6 +474,11 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           focusable: false,
           zIndex: -1,
           className: 'pointer-events-none',
+          // Explicit size: ReactFlow's node wrapper carries no width/height
+          // of its own and shrink-fits its content, so without this the
+          // w-full h-full fill measured ~0 and the backdrop was invisible.
+          // Same fallback as the StructureNode chrome (320×220).
+          style: { width: n.width || 320, height: n.height || 220 },
           ...(n.width ? { width: n.width } : {}),
           ...(n.height ? { height: n.height } : {}),
         });

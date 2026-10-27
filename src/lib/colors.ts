@@ -59,6 +59,23 @@ export const getStructureColor = (structureType: string) => {
   return STRUCTURE_COLORS[structureType] ?? '#64748B';
 };
 
+// One very light fill per nesting depth, cycling. Adjacent layers always
+// differ in hue, so nested frames read as separate regions even when they
+// are the same structure type (a For-in-For would otherwise share one tint).
+export const STRUCTURE_DEPTH_FILLS = [
+  '#DBEAFE', // 0 — pale blue
+  '#FEF3C7', // 1 — pale amber
+  '#DCFCE7', // 2 — pale green
+  '#FCE7F3', // 3 — pale pink
+  '#EDE9FE', // 4 — pale violet
+  '#CCFBF1', // 5 — pale teal
+];
+
+export const getStructureDepthFill = (depth: number) => {
+  const n = STRUCTURE_DEPTH_FILLS.length;
+  return STRUCTURE_DEPTH_FILLS[((depth % n) + n) % n];
+};
+
 export const STATUS_COLORS = {
   idle: 'var(--status-idle)',
   running: 'var(--status-running)',
