@@ -555,23 +555,15 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
 
     if (node.parentNode) {
       if (ui.dropTargetStructureId) ui.setDropTargetStructureId(null);
-      if (node.type === 'io.tunnel' || node.type === 'io.shiftRegister') return;
-      const p = all.find(n => n.id === node.parentNode);
-      if (p && String(p.type).startsWith('structure')) {
-        const w = p.width || 300;
-        const h = p.height || 200;
-        const newW = Math.max(w, nx + nw + DROP_PAD);
-        const newH = Math.max(h, ny + nh + DROP_PAD);
-        if (newW !== w || newH !== h) {
-          st.updateNode(p.id, { width: newW, height: newH }, true);
-          for (const c of all.filter(n => n.parent === p.id && (n.type === 'io.tunnel' || n.type === 'io.shiftRegister'))) {
-            const isRight = c.type === 'io.shiftRegister' ? c.params?.side === 'right' : (c.position?.x ?? 0) > w / 2;
-            if (isRight && (c.position?.x ?? 0) !== newW - 16) {
-              st.updateNode(c.id, { position: { x: newW - 16, y: c.position?.y ?? 0 } }, true);
-            }
-          }
-        }
-      }
+      // Deliberately NO frame growth while dragging a node that is already
+      // inside a structure. Growing here only ever extends the right/bottom
+      // edges (left/top growth would have to shift the frame and every child
+      // mid-drag), so the frame chased the node on right/bottom exits and
+      // the node's center could never cross the border — while left/top
+      // exits worked directly. That asymmetry made drag-out direction
+      // dependent. The frame now stays put during the drag, so exiting
+      // works identically in all four directions; containment is restored
+      // at drop time (see onNodeDragStop) instead of mid-drag.
       return;
     }
 
@@ -655,6 +647,13 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
           updateNode(node.id, { caseId: activeCase });
         }
       }
+      // Drop-time fit: a node dropped half-out (center still inside, edge
+      // poking past the border) swells the frame to enclose it, and the
+      // ancestors follow. This runs only on drop, never during the drag,
+      // so it cannot chase a node that is being dragged out — which is
+      // what keeps drag-out identical in all four directions.
+      growStructureToFit(node.parentNode, [{ x: pos.x, y: pos.y, w: node.width || 120, h: node.height || 60 }]);
+      fitAncestors(node.parentNode);
     }
 
     resolveNodeOverlaps(node.id);
