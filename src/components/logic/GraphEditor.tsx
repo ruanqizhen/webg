@@ -572,10 +572,12 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     const target = findDropTarget(all, cx, cy, node.id);
     const targetId = target?.id ?? null;
     if (ui.dropTargetStructureId !== targetId) ui.setDropTargetStructureId(targetId);
-    if (target) {
-      const { x: tx, y: ty } = absPosOf(all, target);
-      growStructureToFit(target.id, [{ x: nx - tx, y: ny - ty, w: nw, h: nh }]);
-    }
+    // Deliberately NO frame growth while dragging over a structure. Growing
+    // here made the frame chase the node: the frame swelled to keep the node
+    // inside with a PAD margin, so the node's center could never cross the
+    // border again and the node could not be pulled back out without
+    // releasing. During the drag the frame only highlights (the "release
+    // here to adopt" promise); growth happens on drop, in onNodeDragStop.
   }, []);
 
   const onNodeDragStop = useCallback((_: any, node: FlowNode) => {
@@ -604,6 +606,10 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
               position: { x: pos.x - absX, y: pos.y - absY },
               caseId: isCaseStructure ? activeCase : undefined
           });
+          // Drop-time fit: the frame swells to enclose the newly adopted
+          // node (this used to happen during the drag, which trapped the
+          // node inside — see onNodeDrag). Ancestors follow afterwards.
+          growStructureToFit(target.id, [{ x: pos.x - absX, y: pos.y - absY, w: node.width || 120, h: node.height || 60 }]);
           fitAncestors(target.id);
           resolveNodeOverlaps(node.id);
           return;
