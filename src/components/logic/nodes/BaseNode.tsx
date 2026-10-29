@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { NodeRegistry } from '../../../engine/registry';
-import { getTypeColor, getTypeAbbrev } from '../../../lib/colors';
+import { getTypeColor } from '../../../lib/colors';
 import { useRuntimeStore } from '../../../store/useRuntimeStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useGraphStore } from '../../../store/useGraphStore';
@@ -270,26 +270,14 @@ const HANDLE_STYLE_BASE = {
   border: '2px solid white',
 } as const;
 
-// Helper for handle rendering to keep BaseNode clean — upgraded with type + value + source tracing + error dot
+// Helper for handle rendering to keep BaseNode clean. Hover tips are
+// deliberately minimal: the node itself shows only its name (title tooltip
+// + label below), and a port shows only its name as a native tooltip —
+// the old multi-row port card (type + live value + source trace) was wider
+// than the node and covered it, so it was removed.
 function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverride }: HandleRendererProps) {
-  const val = useRuntimeStore(s => s.portValues[`${nodeId}_${port.name}`]);
-  const allNodes = useGraphStore(s => s.nodes);
-  const allEdges = useGraphStore(s => s.edges);
   const typeErrors = useTypeErrorStore(s => s.errors);
   const hasError = typeErrors.some(e => e.targetNode === nodeId && e.targetPort === port.name);
-
-  // Trace source for input ports
-  let sourceInfo: { label: string; type: string } | null = null;
-  if (isInput) {
-    const edge = allEdges.find(e => e.targetNode === nodeId && e.targetPort === port.name);
-    if (edge) {
-      const srcNode = allNodes.find(n => n.id === edge.sourceNode);
-      const srcDef = srcNode ? NodeRegistry[srcNode.type] : null;
-      const srcPortDef = (srcNode?.outputs || srcDef?.outputs || []).find((p: any) => p.name === edge.sourcePort) as any;
-      const srcLabel = srcDef?.label || srcNode?.type || edge.sourceNode.slice(0, 6);
-      sourceInfo = { label: `${srcLabel}.${edge.sourcePort}`, type: srcPortDef?.type || 'any' };
-    }
-  }
 
   const handleStyle = {
     ...HANDLE_STYLE_BASE,
@@ -298,51 +286,20 @@ function OptimizedHandle({ nodeId, port, position, topPct, isInput, colorOverrid
     [isInput ? 'left' : 'right']: -5,
     boxShadow: hasError ? '0 0 0 2px hsl(var(--destructive))' : undefined,
   };
-  const tooltipSide = isInput ? 'left' : 'right';
-
-  const displayVal = val !== undefined ? (() => {
-    if (typeof val === 'object') return JSON.stringify(val).slice(0, 40);
-    return String(val);
-  })() : '—';
 
   return (
-    <div className="group">
+    <>
       <Handle
         type={isInput ? "target" : "source"}
         position={position}
         id={port.name}
         style={handleStyle}
+        title={port.name}
       />
       {hasError && (
         <span className="absolute w-2.5 h-2.5 rounded-full bg-destructive border border-card animate-pulse pointer-events-none z-10" style={{ top: `${topPct}%`, [isInput ? 'left' : 'right']: -10, transform: 'translateY(-50%)' }} />
       )}
-      <div
-        className="hidden group-hover:flex absolute z-50 flex-col gap-0.5 bg-popover border border-border text-foreground rounded-md shadow-xl px-2.5 py-1.5 text-[11px] pointer-events-none min-w-[120px] animate-in fade-in zoom-in-95"
-        style={{
-          top: `${topPct}%`,
-          [tooltipSide]: 14,
-          transform: 'translateY(-50%)',
-        }}
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: colorOverride || getTypeColor(port.type) }} />
-          <span className="font-semibold">{port.name}</span>
-          <span className="text-[10px] font-mono text-muted-foreground">· {port.type}</span>
-          <span className="text-[9px] font-mono px-1 rounded bg-muted text-muted-foreground">{getTypeAbbrev(port.type)}</span>
-        </div>
-        <div className="flex items-center gap-1 text-[11px] font-mono">
-          <span className="text-muted-foreground">=</span>
-          <span className="tabular-nums truncate max-w-[140px]">{displayVal}</span>
-          {val === undefined && <span className="text-muted-foreground/60 text-[10px]">(Not executed)</span>}
-        </div>
-        {sourceInfo && (
-          <div className="text-[10px] text-muted-foreground flex items-center gap-1 border-t border-border/50 pt-0.5 mt-0.5">
-            <span>←</span><span className="truncate max-w-[120px]">{sourceInfo.label}</span><span className="font-mono">({sourceInfo.type})</span>
-          </div>
-        )}
-        {hasError && <div className="text-[10px] text-destructive font-medium">⚠ Type mismatch</div>}
-      </div>
-    </div>
+    </>
   );
 }
 
