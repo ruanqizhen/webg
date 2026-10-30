@@ -554,16 +554,28 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     const ny = node.position?.y ?? 0;
 
     if (node.parentNode) {
-      if (ui.dropTargetStructureId) ui.setDropTargetStructureId(null);
-      // Deliberately NO frame growth while dragging a node that is already
-      // inside a structure. Growing here only ever extends the right/bottom
-      // edges (left/top growth would have to shift the frame and every child
-      // mid-drag), so the frame chased the node on right/bottom exits and
-      // the node's center could never cross the border — while left/top
-      // exits worked directly. That asymmetry made drag-out direction
-      // dependent. The frame now stays put during the drag, so exiting
-      // works identically in all four directions; containment is restored
-      // at drop time (see onNodeDragStop) instead of mid-drag.
+      // A node already inside a structure can still move to another one:
+      // into a nested structure, out to an ancestor, or out entirely. The
+      // highlight follows the same innermost-frame rule as a top-level
+      // drag, but stays dark while the node remains in its current parent
+      // (dropping there changes nothing). Frame growth is still
+      // deliberately absent mid-drag; containment is restored at drop time
+      // in onNodeDragStop.
+      if (node.type === 'io.tunnel') {
+        if (ui.dropTargetStructureId) ui.setDropTargetStructureId(null);
+        return;
+      }
+      const p = all.find(n => n.id === node.parentNode);
+      let absCx = nx + nw / 2;
+      let absCy = ny + nh / 2;
+      if (p) {
+        const pp = absPosOf(all, p);
+        absCx += pp.x;
+        absCy += pp.y;
+      }
+      const target = findDropTarget(all, absCx, absCy, node.id);
+      const targetId = target && target.id !== node.parentNode ? target.id : null;
+      if (ui.dropTargetStructureId !== targetId) ui.setDropTargetStructureId(targetId);
       return;
     }
 
@@ -617,22 +629,47 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
     } else {
        const parentNode = flowNodes.find(n => n.id === node.parentNode);
        if (parentNode && node.type !== 'io.tunnel') {
-          const pW = parentNode.width || 300;
-          const pH = parentNode.height || 200;
-          const nodeCenterX2 = pos.x + (node.width || 120) / 2;
-          const nodeCenterY2 = pos.y + (node.height || 60) / 2;
+          // The node's position is relative to its parent, so walk up to
+          // global coordinates first, then apply the same innermost-frame
+          // rule as a top-level drag. This is what makes nested moves work:
+          // into a sibling structure (for → case), out to an ancestor
+          // (case → for), or out entirely (→ top level). Previously this
+          // branch only knew "inside current parent" vs "outside", so a
+          // node could never change from one structure to another.
+          let gx = (parentNode.position?.x ?? 0) + pos.x;
+          let gy = (parentNode.position?.y ?? 0) + pos.y;
+          let curPid: string | undefined = nodes.find(n => n.id === parentNode.id)?.parent;
+          while (curPid) {
+            const pp = nodes.find(n => n.id === curPid);
+            if (!pp) break;
+            gx += pp.position?.x ?? 0;
+            gy += pp.position?.y ?? 0;
+            curPid = pp.parent;
+          }
+          const nodeCenterX2 = gx + (node.width || 120) / 2;
+          const nodeCenterY2 = gy + (node.height || 60) / 2;
+          const target = findDropTarget(nodes, nodeCenterX2, nodeCenterY2, node.id);
 
-          if (nodeCenterX2 < 0 || nodeCenterX2 > pW || nodeCenterY2 < 0 || nodeCenterY2 > pH) {
-             let gx = (parentNode.position?.x ?? 0) + pos.x;
-             let gy = (parentNode.position?.y ?? 0) + pos.y;
-             let curPid: string | undefined = nodes.find(n => n.id === parentNode.id)?.parent;
-             while (curPid) {
-               const pp = nodes.find(n => n.id === curPid);
-               if (!pp) break;
-               gx += pp.position?.x ?? 0;
-               gy += pp.position?.y ?? 0;
-               curPid = pp.parent;
-             }
+          if (target && target.id !== node.parentNode) {
+             // Re-parent into the innermost structure containing the center.
+             const { x: tAbsX, y: tAbsY } = absPosOf(nodes, target);
+             const relX = gx - tAbsX;
+             const relY = gy - tAbsY;
+             const isCaseStructure = target.type === 'structure.case';
+             const activeCase = target.params?.activeCase;
+             updateNode(node.id, {
+                 parent: target.id,
+                 position: { x: relX, y: relY },
+                 caseId: isCaseStructure ? activeCase : undefined
+             });
+             growStructureToFit(target.id, [{ x: relX, y: relY, w: node.width || 120, h: node.height || 60 }]);
+             fitAncestors(target.id);
+             resolveNodeOverlaps(node.id);
+             return;
+          }
+
+          if (!target) {
+             // Outside every structure: unparent to top level.
              updateNode(node.id, {
                  parent: undefined,
                  position: { x: gx, y: gy },
@@ -641,6 +678,8 @@ function FlowContent({ onZoomFitRef }: { onZoomFitRef?: React.MutableRefObject<(
              resolveNodeOverlaps(node.id);
              return;
           }
+          // else: target === current parent → stays; falls through to the
+          // caseId sync + drop-time fit below.
        }
     }
 
