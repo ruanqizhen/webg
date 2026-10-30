@@ -68,8 +68,82 @@ function resolveEdgeVisuals(
   return { strokeColor, isArrayBase, arrayModifiers };
 }
 
+// ── Dimming wires that pass behind a structure ─────────────────────────
+// The structure backdrop sits below the edges layer (zIndex -1), so every
+// wire paints crisply above it — including wires that merely pass behind a
+// structure, which then read as if they belonged to it. A wire is dimmed
+// when its bezier passes through a structure's rect while neither endpoint
+// belongs to that structure (endpoint is the structure itself or one of
+// its descendants). Wires genuinely inside, or connected to, the structure
+// stay at full opacity, so inside vs behind stays distinguishable.
+const BEHIND_OPACITY = 0.35;
+const CROSS_INSET = 6;
+const SAMPLES = 32;
+
+function belongsTo(nodeId: string | undefined, structureId: string, allNodes: NodeInstance[]): boolean {
+  if (!nodeId) return false;
+  if (nodeId === structureId) return true;
+  let cur = allNodes.find(n => n.id === nodeId);
+  let guard = 0;
+  while (cur?.parent && guard++ < 100) {
+    if (cur.parent === structureId) return true;
+    cur = allNodes.find(n => n.id === cur!.parent);
+  }
+  return false;
+}
+
+function absoluteRect(s: NodeInstance, allNodes: NodeInstance[]) {
+  let x = s.position?.x ?? 0;
+  let y = s.position?.y ?? 0;
+  let cur = s.parent;
+  let guard = 0;
+  while (cur && guard++ < 100) {
+    const pn = allNodes.find(n => n.id === cur);
+    if (!pn) break;
+    x += pn.position?.x ?? 0;
+    y += pn.position?.y ?? 0;
+    cur = pn.parent;
+  }
+  return { x, y, w: s.width || 320, h: s.height || 220 };
+}
+
+function cubicAt(p0: number, p1: number, p2: number, p3: number, t: number) {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+}
+
+function isBehindStructure(
+  edgePath: string,
+  sourceX: number, sourceY: number, targetX: number, targetY: number,
+  sourceId: string, targetId: string,
+  allNodes: NodeInstance[],
+): boolean {
+  const structures = allNodes.filter(n => n.type?.startsWith('structure.'));
+  if (structures.length === 0) return false;
+  // Control points from the rendered bezier; fall back to a straight line.
+  let c1x = sourceX, c1y = sourceY, c2x = targetX, c2y = targetY;
+  const m = edgePath.match(/^M([\d.eE+-]+),([\d.eE+-]+)C([\d.eE+-]+),([\d.eE+-]+)\s([\d.eE+-]+),([\d.eE+-]+)\s([\d.eE+-]+),([\d.eE+-]+)$/);
+  if (m) {
+    c1x = +m[3]; c1y = +m[4]; c2x = +m[5]; c2y = +m[6];
+  }
+  for (const s of structures) {
+    if (belongsTo(sourceId, s.id, allNodes) || belongsTo(targetId, s.id, allNodes)) continue;
+    const r = absoluteRect(s, allNodes);
+    const x0 = r.x + CROSS_INSET, y0 = r.y + CROSS_INSET;
+    const x1 = r.x + r.w - CROSS_INSET, y1 = r.y + r.h - CROSS_INSET;
+    for (let i = 1; i < SAMPLES; i++) {
+      const t = i / SAMPLES;
+      const px = cubicAt(sourceX, c1x, c2x, targetX, t);
+      const py = cubicAt(sourceY, c1y, c2y, targetY, t);
+      if (px > x0 && px < x1 && py > y0 && py < y1) return true;
+    }
+  }
+  return false;
+}
+
 export function CustomEdge({
   source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -117,6 +191,14 @@ export function CustomEdge({
   const isSelected = selectedEdgeId === id;
   const isArray = (isArrayBase ? 1 : 0) + arrayModifiers > 0;
 
+  // Dimmed while passing behind a structure it doesn't belong to; a
+  // selected wire always shows at full opacity so it stays legible.
+  const isBehind = useMemo(
+    () => isBehindStructure(edgePath, sourceX, sourceY, targetX, targetY, source, target, allNodes),
+    [edgePath, sourceX, sourceY, targetX, targetY, source, target, allNodes]
+  );
+  const edgeOpacity = isBehind && !isSelected ? BEHIND_OPACITY : 1;
+
   return (
     <>
       <g onClick={() => setSelectedEdgeId(id)} onContextMenu={handleContextMenu} style={{ cursor: 'pointer' }}>
@@ -131,6 +213,7 @@ export function CustomEdge({
                   strokeWidth: 5,
                   animation: 'none',
                   strokeDasharray: 'none',
+                  opacity: edgeOpacity,
                 }}
               />
               <BaseEdge
@@ -142,6 +225,7 @@ export function CustomEdge({
                   strokeWidth: 2,
                   animation: 'none',
                   strokeDasharray: 'none',
+                  opacity: edgeOpacity,
                 }}
               />
            </>
@@ -156,6 +240,7 @@ export function CustomEdge({
                strokeWidth: isSelected ? 4 : 3,
                animation: 'none',
                strokeDasharray: 'none',
+               opacity: edgeOpacity,
              }}
            />
         )}
