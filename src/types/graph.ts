@@ -60,3 +60,19 @@ export interface Graph {
   edges: Edge[];
   uiControls: UIControl[];
 }
+
+/** One open document. The tab shows `name` (no file suffix); the .webg
+ * suffix belongs to the saved project file, not to VI names. */
+export interface VI {
+  id: string;
+  name: string;
+  graph: Graph;
+}
+
+/** The whole multi-VI project: what gets saved to localStorage and to
+ * .webg files. Version 2; version 1 files held a single Graph. */
+export interface Project {
+  version: number;
+  vis: VI[];
+  activeViId: string | null;
+}

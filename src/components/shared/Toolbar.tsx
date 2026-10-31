@@ -4,16 +4,18 @@ import { useLogStore } from '../../store/useLogStore';
 import { createExampleProject } from '../../lib/exampleProject';
 import { createLoopExampleProject } from '../../lib/loopExampleProject';
 import { useGraphStore } from '../../store/useGraphStore';
+import { useProjectStore, singleVIProject } from '../../store/useProjectStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
 import { useTypeErrorStore } from '../../store/useTypeErrorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { ExecutionEngine } from '../../engine/scheduler';
 import { Button } from '../ui/button';
 import { BadgeDot } from '../ui/badge-dot';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
-  const { clearGraph, exportGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
+  const { clearGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
+  const { exportProject, loadProject } = useProjectStore.getState();
   const runtimeStore = useRuntimeStore();
   const typeErrors = useTypeErrorStore(s => s.errors);
   const [showTypeErrors, setShowTypeErrors] = useState(false);
@@ -103,6 +105,19 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     runtimeStore.resetDebug();
   };
 
+  // A run belongs to its VI: the runtime store is single-VI, so switching
+  // tabs (or closing the last VI) stops any run in progress rather than
+  // letting it write into the next VI's view.
+  const activeViId = useProjectStore(s => s.activeViId);
+  const prevViIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevViIdRef.current !== null && prevViIdRef.current !== activeViId && engineRef.current) {
+      handleStop();
+    }
+    prevViIdRef.current = activeViId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeViId]);
+
   const cycleTheme = () => {
     const next: Record<string, 'light' | 'dark' | 'system'> = { light: 'dark', dark: 'system', system: 'light' };
     setTheme(next[theme]);
@@ -134,13 +149,13 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
   const handleSave = () => {
     try {
-      const graph = exportGraph();
-      const json = JSON.stringify({ version: "1.1", graph, ui: { panelLayout: {}, viewport: {} } }, null, 2);
+      const project = exportProject();
+      const json = JSON.stringify(project, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `project_${new Date().toISOString().slice(0,10)}.webg`;
+      a.download = `webg-project_${new Date().toISOString().slice(0,10)}.webg`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -167,8 +182,12 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
         const result = event.target?.result;
         if (typeof result !== 'string') throw new Error('Invalid file content');
         const data = JSON.parse(result);
-        if (data.graph) loadGraph(data.graph);
-        else if (data.nodes) loadGraph(data);
+        // v2 project file, or a v1 single graph (old .webg / bare JSON):
+        // the latter becomes one VI named after the file.
+        const baseName = file.name.replace(/\.(webg|json)$/i, '') || 'Untitled 1';
+        if (data.vis) loadProject(data);
+        else if (data.graph) loadProject(singleVIProject(data.graph, baseName));
+        else if (data.nodes) loadProject(singleVIProject(data, baseName));
         else throw new Error('Invalid file format');
       } catch (err: any) {
         alert("Failed to load: " + (err.message || 'Unknown error'));
