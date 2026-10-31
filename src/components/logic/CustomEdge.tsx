@@ -75,7 +75,7 @@ function resolveEdgeVisuals(
 // the boundaries of every structure it passes behind (see
 // lib/edgeOcclusion), and only the segments inside such a structure get
 // the frosted treatment; the rest of the same wire renders unchanged.
-const FROST_OPACITY = 0.55;
+const FROST_OPACITY = 0.35;
 
 export function CustomEdge({
   source,
@@ -143,7 +143,7 @@ export function CustomEdge({
       {hasFrost && (
         <defs>
           <filter id="webg-wire-frost" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="1.2" />
+            <feGaussianBlur stdDeviation="2.2" />
           </filter>
         </defs>
       )}
