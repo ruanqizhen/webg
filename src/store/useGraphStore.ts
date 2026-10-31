@@ -4,9 +4,6 @@ import { NodeRegistry } from '../engine/registry';
 import { generateId, deepClone } from '../lib/utils';
 import { useTypeErrorStore } from './useTypeErrorStore';
 
-const STORAGE_KEY = 'webg-project';
-const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
-
 interface GraphState extends Graph {
   addNode: (node: NodeInstance) => void;
   updateNode: (id: string, updates: Partial<NodeInstance>, skipHistory?: boolean) => void;
@@ -24,11 +21,13 @@ interface GraphState extends Graph {
   clearGraph: () => void;
 
   // File operations
-  loadGraph: (graph: Graph) => void;
+  loadGraph: (graph: Graph, skipHistory?: boolean) => void;
   exportGraph: () => Graph;
-  saveToStorage: () => void;
-  loadFromStorage: () => boolean;
-  startAutoSave: () => () => void;
+
+  // Multi-VI: undo/redo stacks are keyed by document. The project store
+  // sets the key on tab switch so each VI keeps its own history.
+  setDocumentKey: (key: string) => void;
+  dropDocumentHistory: (key: string) => void;
 
   // Copy/Paste
   copyNode: (nodeId: string) => void;
@@ -54,9 +53,10 @@ export const useGraphStore = create<GraphState>((set, get) => {
   // Multi-node clipboard for subgraph copy
   let multiClipboard: { nodes: NodeInstance[]; edges: Edge[]; uiControls: UIControl[] } | null = null;
 
-  // History stacks for undo/redo
-  let historyStack: Graph[] = [];
-  let redoStack: Graph[] = [];
+  // History stacks for undo/redo, keyed by document (one VI = one key).
+  let historyStacks: Record<string, Graph[]> = {};
+  let redoStacks: Record<string, Graph[]> = {};
+  let currentDocKey = '';
 
   const saveToHistory = () => {
     const state = get();
@@ -65,11 +65,12 @@ export const useGraphStore = create<GraphState>((set, get) => {
       edges: state.edges,
       uiControls: state.uiControls
     });
-    historyStack.push(snapshot);
-    if (historyStack.length > MAX_HISTORY) {
-      historyStack.shift();
+    const stack = (historyStacks[currentDocKey] ??= []);
+    stack.push(snapshot);
+    if (stack.length > MAX_HISTORY) {
+      stack.shift();
     }
-    redoStack = []; // Clear redo stack on new action
+    redoStacks[currentDocKey] = []; // Clear redo stack on new action
   };
 
   return {
@@ -405,7 +406,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
       };
     },
 
-    loadGraph: (graph: Graph) => {
+    loadGraph: (graph: Graph, skipHistory = false) => {
       if (!graph || typeof graph !== 'object') {
         throw new Error('Invalid graph data: expected an object');
       }
@@ -418,7 +419,9 @@ export const useGraphStore = create<GraphState>((set, get) => {
       if (!Array.isArray(graph.uiControls)) {
         throw new Error('Invalid graph data: uiControls must be an array');
       }
-      saveToHistory();
+      // Tab switches and file/project loads pass skipHistory: the graph
+      // being replaced must not land in the new document's undo stack.
+      if (!skipHistory) saveToHistory();
       try { useTypeErrorStore.getState().clear(); } catch {}
       set({
         nodes: graph.nodes,
@@ -568,6 +571,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
     pushHistory: () => saveToHistory(),
 
     undo: () => {
+      const historyStack = historyStacks[currentDocKey] ?? [];
       if (historyStack.length === 0) return;
 
       const state = get();
@@ -576,7 +580,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         edges: state.edges,
         uiControls: state.uiControls
       });
-      redoStack.push(currentState);
+      (redoStacks[currentDocKey] ??= []).push(currentState);
 
       const previousState = historyStack.pop();
       if (previousState) {
@@ -589,6 +593,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
     },
 
     redo: () => {
+      const redoStack = redoStacks[currentDocKey] ?? [];
       if (redoStack.length === 0) return;
 
       const state = get();
@@ -597,7 +602,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         edges: state.edges,
         uiControls: state.uiControls
       });
-      historyStack.push(currentState);
+      (historyStacks[currentDocKey] ??= []).push(currentState);
 
       const nextState = redoStack.pop();
       if (nextState) {
@@ -609,65 +614,18 @@ export const useGraphStore = create<GraphState>((set, get) => {
       }
     },
 
-    canUndo: () => historyStack.length > 0,
+    canUndo: () => (historyStacks[currentDocKey] ?? []).length > 0,
 
-    canRedo: () => redoStack.length > 0,
-    
-    // Save to localStorage
-    saveToStorage: () => {
-      try {
-        const state = get();
-        const data = {
-          version: '1.1',
-          timestamp: Date.now(),
-          graph: {
-            nodes: state.nodes,
-            edges: state.edges,
-            uiControls: state.uiControls
-          }
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (err) {
-        console.error('Failed to save to storage:', err);
-      }
+    canRedo: () => (redoStacks[currentDocKey] ?? []).length > 0,
+
+    setDocumentKey: (key: string) => {
+      currentDocKey = key;
+    },
+
+    dropDocumentHistory: (key: string) => {
+      delete historyStacks[key];
+      delete redoStacks[key];
     },
     
-    // Load from localStorage (bypasses loadGraph to avoid pushing empty state to history)
-    loadFromStorage: () => {
-      try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) return false;
-
-        const parsed = JSON.parse(data);
-        if (!parsed.graph || !Array.isArray(parsed.graph.nodes) || !Array.isArray(parsed.graph.edges) || !Array.isArray(parsed.graph.uiControls)) {
-          console.error('Invalid project data structure');
-          return false;
-        }
-        set({
-          nodes: parsed.graph.nodes,
-          edges: parsed.graph.edges,
-          uiControls: parsed.graph.uiControls
-        });
-        return true;
-      } catch (err) {
-        console.error('Failed to load from storage:', err);
-        return false;
-      }
-    },
-    
-    // Start auto-save interval, returns cleanup function
-    startAutoSave: () => {
-      const intervalId = setInterval(() => {
-        get().saveToStorage();
-      }, AUTO_SAVE_INTERVAL);
-
-      // Initial save after 2 seconds
-      const timeoutId = setTimeout(() => get().saveToStorage(), 2000);
-
-      return () => {
-        clearInterval(intervalId);
-        clearTimeout(timeoutId);
-      };
-    }
   };
 });

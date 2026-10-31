@@ -8,9 +8,10 @@ import { NodeSearch } from '../shared/NodeSearch';
 import { ShortcutCheatsheet } from '../shared/ShortcutCheatsheet';
 import { FrontPanel } from '../ui/FrontPanel';
 import { GraphEditor, resolveNodeOverlaps } from '../logic/GraphEditor';
+import { TabBar } from '../shared/TabBar';
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { useGraphStore } from '../../store/useGraphStore';
-import { createExampleProject } from '../../lib/exampleProject';
+import { useProjectStore } from '../../store/useProjectStore';
 import { generateId, generateUniqueLabel } from '../../lib/utils';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { ReactFlowProvider, useReactFlow } from 'reactflow';
@@ -74,16 +75,14 @@ function IdeLayoutInner() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Load from storage on mount and start auto-save.
-  // First visit (nothing saved): load the wired temperature-conversion
-  // example so Run does something meaningful instead of an empty canvas.
+  // Restore the project on mount and start auto-save. First visit
+  // (nothing saved): the project store loads the wired
+  // temperature-conversion example as a single VI so Run does something
+  // meaningful instead of an empty canvas.
   useEffect(() => {
-    const graphStore = useGraphStore.getState();
-    const loaded = graphStore.loadFromStorage();
-    if (!loaded) {
-      graphStore.loadGraph(createExampleProject());
-    }
-    const cleanup = graphStore.startAutoSave();
+    const projectStore = useProjectStore.getState();
+    projectStore.initProject();
+    const cleanup = projectStore.startAutoSave();
     return cleanup;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -312,6 +311,8 @@ function IdeLayoutInner() {
          <Palette />
 
          <div className="flex-1 flex flex-col overflow-hidden relative border-l border-r border-border">
+            {/* VI document tabs */}
+            <TabBar />
             {/* Tabs Header */}
             <div className="flex bg-muted/40 border-b border-border shrink-0 px-2 h-10 items-center gap-1 select-none">
                <button
