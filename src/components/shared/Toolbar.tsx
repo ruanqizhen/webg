@@ -3,6 +3,7 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { useLogStore } from '../../store/useLogStore';
 import { createExampleProject } from '../../lib/exampleProject';
 import { createLoopExampleProject } from '../../lib/loopExampleProject';
+import { createTankExampleProject } from '../../lib/tankExampleProject';
 import { useGraphStore } from '../../store/useGraphStore';
 import { useProjectStore, singleVIProject } from '../../store/useProjectStore';
 import { useRuntimeStore } from '../../store/useRuntimeStore';
@@ -136,6 +137,11 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
       name: 'Loop Demo',
       description: 'For/While loops with shift registers',
       create: createLoopExampleProject,
+    },
+    {
+      name: 'Tank Level Control',
+      description: 'Two sliders set a tank level in a While loop, paced at 50 ms',
+      create: createTankExampleProject,
     },
   ];
 
