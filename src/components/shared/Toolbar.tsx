@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle, Sun, Moon, Monitor, Terminal, Lightbulb, Repeat } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, Save, FolderOpen, ZoomIn, StepForward, X, HelpCircle, Sun, Moon, Monitor, Terminal, Lightbulb } from 'lucide-react';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLogStore } from '../../store/useLogStore';
 import { createExampleProject } from '../../lib/exampleProject';
@@ -14,8 +14,8 @@ import { BadgeDot } from '../ui/badge-dot';
 import { useEffect, useRef, useState } from 'react';
 
 export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
-  const { clearGraph, loadGraph, nodes, edges, uiControls } = useGraphStore();
-  const { exportProject, loadProject } = useProjectStore.getState();
+  const { clearGraph, nodes, edges, uiControls } = useGraphStore();
+  const { exportProject, loadProject, openVI } = useProjectStore.getState();
   const runtimeStore = useRuntimeStore();
   const typeErrors = useTypeErrorStore(s => s.errors);
   const [showTypeErrors, setShowTypeErrors] = useState(false);
@@ -123,20 +123,21 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
     setTheme(next[theme]);
   };
 
-  const confirmDiscardCurrent = () => {
-    if (nodes.length === 0 && edges.length === 0 && uiControls.length === 0) return true;
-    return window.confirm('Loading the example will replace the current program. Unsaved changes will be lost. Continue?');
-  };
-
-  const handleLoadExample = () => {
-    if (!confirmDiscardCurrent()) return;
-    loadGraph(createExampleProject());
-  };
-
-  const handleLoadLoopExample = () => {
-    if (!confirmDiscardCurrent()) return;
-    loadGraph(createLoopExampleProject());
-  };
+  // Examples open as a new tab and never replace the current VI, so no
+  // discard confirmation is needed anymore.
+  const [showExamples, setShowExamples] = useState(false);
+  const EXAMPLES = [
+    {
+      name: 'Temperature Conversion',
+      description: 'Celsius → Fahrenheit, with an over-100 indicator',
+      create: createExampleProject,
+    },
+    {
+      name: 'Loop Demo',
+      description: 'For/While loops with shift registers',
+      create: createLoopExampleProject,
+    },
+  ];
 
   const handleClear = () => {
     if (window.confirm('Clear the entire project? This action cannot be undone.')) {
@@ -223,6 +224,29 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
         <div className="flex items-center gap-1">
           <Button size="sm" variant="secondary" onClick={handleSave} className="gap-1.5 h-7"><Save size={14} /> Save</Button>
           <Button size="sm" variant="secondary" onClick={handleLoad} className="gap-1.5 h-7"><FolderOpen size={14} /> Load</Button>
+          <div className="relative">
+            <Button size="sm" variant="secondary" onClick={() => setShowExamples(v => !v)} className="gap-1.5 h-7"><Lightbulb size={14} /> Examples</Button>
+            {showExamples && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExamples(false)} />
+                <div className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1">
+                  {EXAMPLES.map(ex => (
+                    <button
+                      key={ex.name}
+                      onClick={() => {
+                        openVI(ex.name, ex.create());
+                        setShowExamples(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-muted"
+                    >
+                      <div className="text-sm font-medium">{ex.name}</div>
+                      <div className="text-xs text-muted-foreground">{ex.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <Button size="sm" variant="secondary" onClick={onZoomFit} className="gap-1.5 h-7"><ZoomIn size={14} /> Fit</Button>
 
           <div className="w-px h-4 bg-border mx-1.5" />
@@ -249,8 +273,6 @@ export function Toolbar({ onZoomFit }: { onZoomFit?: () => void }) {
 
           <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
 
-          <Button size="sm" variant="ghost" onClick={handleLoadExample} className="h-7 w-7 p-0 text-muted-foreground" title="Example"><Lightbulb size={14} /></Button>
-          <Button size="sm" variant="ghost" onClick={handleLoadLoopExample} className="h-7 w-7 p-0 text-muted-foreground" title="Loop Demo (For/While)"><Repeat size={14} /></Button>
           <Button size="sm" variant="ghost" onClick={handleClear} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Clear"><Trash2 size={14} /></Button>
 
           <div className="w-px h-4 bg-border mx-1 hidden sm:block" />
