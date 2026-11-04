@@ -4,6 +4,7 @@ import type { Graph } from '../types/graph';
 import type { NodeState } from '../types/runtime';
 import { createExampleProject } from './exampleProject';
 import { createLoopExampleProject } from './loopExampleProject';
+import { createTankExampleProject } from './tankExampleProject';
 
 async function runGraph(graph: Graph): Promise<Record<string, any>> {
   const portValues: Record<string, any> = {};
@@ -63,5 +64,33 @@ describe('createLoopExampleProject 循环示例', () => {
     expect(portValues[`${forSum.id}_value`]).toBe(15); // 1+2+3+4+5
     expect(portValues[`${forArray.id}_value`]).toEqual([1, 2, 3, 4, 5]);
     expect(portValues[`${whileSum.id}_value`]).toBe(6); // 计数到 >5 停
+  });
+});
+
+describe('createTankExampleProject 水罐示例', () => {
+  it('结构完整：边都连到存在的节点', () => {
+    assertStructurallyValid(createTankExampleProject());
+  });
+
+  it('While 循环带 50ms 延时：拉杆 30+40 → 水罐 70', async () => {
+    const graph = createTankExampleProject();
+    // While 循环没有接停止条件，本意是跑到用户按 Stop；测试里跑一会儿就 abort。
+    const portValues: Record<string, any> = {};
+    const nodeStates: Record<string, NodeState> = {};
+    const engine = new ExecutionEngine(
+      graph,
+      { portValues: {}, nodeState: {} },
+      (nid, s) => { nodeStates[nid] = s; },
+      (pid, v) => { portValues[pid] = v; },
+    );
+    const run = engine.executeAll();
+    await new Promise(r => setTimeout(r, 400)); // 50ms/轮，足够跑好几轮
+    engine.abort();
+    await expect(run).rejects.toThrow('Execution Aborted');
+    const tank = graph.nodes.find(
+      (n) => n.type === 'io.terminal' && n.inputs.length > 0,
+    );
+    expect(tank).toBeDefined();
+    expect(portValues[`${tank!.id}_input`]).toBeCloseTo(70, 10);
   });
 });
