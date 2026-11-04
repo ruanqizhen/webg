@@ -32,6 +32,10 @@ interface ProjectState {
    * dev strict mode). */
   initProject: () => void;
   createVI: () => void;
+  /** Open a new tab with the given graph (e.g. an example). Existing VIs
+   * are untouched; the new tab becomes active. Repeats get a numbered
+   * name so tabs stay distinguishable. */
+  openVI: (name: string, graph: Graph) => void;
   renameVI: (id: string, name: string) => void;
   closeVI: (id: string) => void;
   switchVI: (id: string) => void;
@@ -73,6 +77,15 @@ function nextUntitledName(vis: VI[]): string {
   let n = 1;
   while (taken.has(`Untitled ${n}`)) n++;
   return `Untitled ${n}`;
+}
+
+/** First free name for a new tab: the base itself, else "base 2", "base 3", … */
+function uniqueVIName(vis: VI[], base: string): string {
+  const taken = new Set(vis.map(v => v.name));
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
 }
 
 /** Transient per-VI state that must not leak across tabs. */
@@ -151,6 +164,13 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       const vis = syncActiveGraph();
       const id = generateId();
       const next: VI[] = [...vis, { id, name: nextUntitledName(vis), graph: deepClone(EMPTY_GRAPH) }];
+      activate(next, id);
+    },
+
+    openVI: (name, graph) => {
+      const vis = syncActiveGraph();
+      const id = generateId();
+      const next: VI[] = [...vis, { id, name: uniqueVIName(vis, name), graph: deepClone(graph) }];
       activate(next, id);
     },
 
